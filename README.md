@@ -1,1 +1,1 @@
-# Akka.Persistence.DynamoDb
+# DC.Akka.Projections
