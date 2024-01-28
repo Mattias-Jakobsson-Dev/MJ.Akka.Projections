@@ -1,0 +1,16 @@
+name: Build and test pull requests
+
+on:
+  pull_request
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:8.0
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Test
+      run: make test

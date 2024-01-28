@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>12</LangVersion>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Copyright>Copyright © 2024 Digital Creation Sweden AB</Copyright>
+        <Authors>Team Digital Creation</Authors>
+        <Version>0.1.0</Version>
+        <PackageProjectUrl>
+            https://github.com/DigitalCreationAb/DC.Akka.Projections
+        </PackageProjectUrl>
+        <PackageTags>akka</PackageTags>
+        <PackageLicenseUrl>https://github.com/DigitalCreationAb/DC.Akka.Projections/blob/master/LICENSE</PackageLicenseUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Akka" Version="1.5.15" />
+      <PackageReference Include="Akka.Streams" Version="1.5.15" />
+    </ItemGroup>
+
+</Project>
