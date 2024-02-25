@@ -4,26 +4,29 @@ using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections.Configuration;
 
-public interface IProjectionConfigurationSetup<TDocument>
+public interface IProjectionConfigurationSetup<TId, TDocument> where TId : notnull where TDocument : notnull
 {
-    ActorSystem System { get; }
-    IProjection<TDocument> Projection { get; }
+    IProjection<TId, TDocument> Projection { get; }
+    public ProjectionsApplication Application { get; }
     
-    IProjectionConfigurationSetup<TDocument> AutoStart();
+    IProjectionConfigurationSetup<TId, TDocument> AutoStart();
 
-    IProjectionConfigurationSetup<TDocument> WithCoordinatorFactory(
+    IProjectionConfigurationSetup<TId, TDocument> WithCoordinatorFactory(
         Func<Task<IActorRef>> factory);
     
-    IProjectionConfigurationSetup<TDocument> WithProjectionFactory(
-        Func<object, Task<IActorRef>> factory);
+    IProjectionConfigurationSetup<TId, TDocument> WithProjectionFactory(
+        Func<TId, Task<IActorRef>> factory);
 
-    IProjectionConfigurationSetup<TDocument> WithRestartSettings(
+    IProjectionConfigurationSetup<TId, TDocument> WithRestartSettings(
         RestartSettings restartSettings);
     
-    IProjectionConfigurationSetup<TDocument> WithProjectionStreamConfiguration(
+    IProjectionConfigurationSetup<TId, TDocument> WithProjectionStreamConfiguration(
         ProjectionStreamConfiguration projectionStreamConfiguration);
     
-    IProjectionStorageConfigurationSetup<TDocument> WithStorage(IProjectionStorage storage);
+    IProjectionStorageConfigurationSetup<TId, TDocument> WithProjectionStorage(
+        IProjectionStorage<TId, TDocument> storage);
 
-    Task<ProjectionsCoordinator<TDocument>.Proxy> Build();
+    IProjectionConfigurationSetup<TId, TDocument> WithPositionStorage(IProjectionPositionStorage positionStorage);
+
+    internal ProjectionConfiguration<TId, TDocument> Build();
 }

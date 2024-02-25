@@ -5,57 +5,63 @@ using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections.Configuration;
 
-public class ProjectionConfigurationSetup<TDocument>(
-    IProjection<TDocument> projection,
-    ActorSystem actorSystem) : IProjectionStorageConfigurationSetup<TDocument>
+public class ProjectionConfigurationSetup<TId, TDocument>(
+    IProjection<TId, TDocument> projection,
+    ProjectionsApplication application)
+    : IProjectionStorageConfigurationSetup<TId, TDocument>
+    where TId : notnull where TDocument : notnull
 {
     private bool _autoStart;
 
-    private Func<object, Task<IActorRef>>? _projectionRefFactory;
+    private Func<TId, Task<IActorRef>>? _projectionRefFactory;
 
     private Func<Task<IActorRef>>? _projectionCoordinatorFactory;
 
-    private IProjectionStorage _storage = new InMemoryProjectionStorage();
+    private IProjectionStorage<TId, TDocument> _storage = new InMemoryProjectionStorage<TId, TDocument>();
+
+    private IProjectionPositionStorage _positionStorage = new InMemoryProjectionPositionStorage();
+
+    private IStorageSession _storageSession = new InProcStorageSession(application);
 
     private ProjectionStreamConfiguration _projectionStreamConfiguration =
         ProjectionStreamConfiguration.Default;
-    
+
     private RestartSettings _restartSettings = RestartSettings
         .Create(TimeSpan.FromSeconds(3), TimeSpan.FromMinutes(1), 0.2)
         .WithMaxRestarts(5, TimeSpan.FromMinutes(15));
 
-    public ActorSystem System => actorSystem;
-    public IProjection<TDocument> Projection => projection;
+    public IProjection<TId, TDocument> Projection { get; } = projection;
+    public ProjectionsApplication Application => application;
 
-    public IProjectionConfigurationSetup<TDocument> AutoStart()
+    public IProjectionConfigurationSetup<TId, TDocument> AutoStart()
     {
         _autoStart = true;
 
         return this;
     }
 
-    public IProjectionConfigurationSetup<TDocument> WithCoordinatorFactory(Func<Task<IActorRef>> factory)
+    public IProjectionConfigurationSetup<TId, TDocument> WithCoordinatorFactory(Func<Task<IActorRef>> factory)
     {
         _projectionCoordinatorFactory = factory;
 
         return this;
     }
 
-    public IProjectionConfigurationSetup<TDocument> WithProjectionFactory(Func<object, Task<IActorRef>> factory)
+    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionFactory(Func<TId, Task<IActorRef>> factory)
     {
         _projectionRefFactory = factory;
 
         return this;
     }
 
-    public IProjectionConfigurationSetup<TDocument> WithRestartSettings(RestartSettings restartSettings)
+    public IProjectionConfigurationSetup<TId, TDocument> WithRestartSettings(RestartSettings restartSettings)
     {
         _restartSettings = restartSettings;
 
         return this;
     }
 
-    public IProjectionConfigurationSetup<TDocument> WithProjectionStreamConfiguration(
+    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionStreamConfiguration(
         ProjectionStreamConfiguration projectionStreamConfiguration)
     {
         _projectionStreamConfiguration = projectionStreamConfiguration;
@@ -63,30 +69,29 @@ public class ProjectionConfigurationSetup<TDocument>(
         return this;
     }
 
-    public IProjectionStorageConfigurationSetup<TDocument> WithStorage(IProjectionStorage storage)
+    public IProjectionStorageConfigurationSetup<TId, TDocument> WithProjectionStorage(
+        IProjectionStorage<TId, TDocument> storage)
     {
         _storage = storage;
 
         return this;
     }
-    
-    public IProjectionStorageConfigurationSetup<TDocument> Batched(
-        (int Number, TimeSpan Timeout)? batching = null,
-        int parallelism = 10)
-    {
-        if (_storage is BatchedProjectionStorage)
-            return this;
 
-        _storage = new BatchedProjectionStorage(
-            _storage,
-            System,
-            batching ?? (100, TimeSpan.FromSeconds(5)),
-            parallelism);
+    public IProjectionConfigurationSetup<TId, TDocument> WithPositionStorage(IProjectionPositionStorage positionStorage)
+    {
+        _positionStorage = positionStorage;
 
         return this;
     }
     
-    public async Task<ProjectionsCoordinator<TDocument>.Proxy> Build()
+    public IProjectionStorageConfigurationSetup<TId, TDocument> WithStorageSession(IStorageSession session)
+    {
+        _storageSession = session;
+
+        return this;
+    }
+    
+    public ProjectionConfiguration<TId, TDocument> Build()
     {
         var setup = new SetupProjection();
 
@@ -95,65 +100,57 @@ public class ProjectionConfigurationSetup<TDocument>(
         if (_projectionRefFactory == null)
         {
             var documentProjectionCoordinator =
-                System.ActorOf(Props.Create(() => new InProcDocumentProjectionCoordinator(Projection.Name)));
-            
-            _projectionRefFactory = async name =>
+                Application.ActorSystem.ActorOf(Props.Create(() => new InProcDocumentProjectionCoordinator(Projection.Name)));
+
+            _projectionRefFactory = async id =>
             {
                 var response = await documentProjectionCoordinator
                     .Ask<InProcDocumentProjectionCoordinator.Responses.GetProjectionRefResponse>(
-                        new InProcDocumentProjectionCoordinator.Queries.GetProjectionRef(name));
-                
-                return response.ProjectionRef ?? throw new NoDocumentProjectionException<TDocument>(name);
+                        new InProcDocumentProjectionCoordinator.Queries.GetProjectionRef(id));
+
+                return response.ProjectionRef ?? throw new NoDocumentProjectionException<TId, TDocument>(id);
             };
         }
 
-        if (!System.HasExtension<ProjectionsApplication>())
-            System.RegisterExtension(new ProjectionsApplication());
-        
-        var application = System.WithExtension<ProjectionsApplication>();
-
-        application.WithProjection(Projection.Name, new ProjectionConfiguration<TDocument>(
+        return new ProjectionConfiguration<TId, TDocument>(
             Projection.Name,
             _autoStart,
+            _storageSession,
             _storage,
+            _positionStorage,
             eventHandler,
             Projection.StartSource,
             _projectionRefFactory,
+            _projectionCoordinatorFactory ??= () =>
+            {
+                return Task.FromResult(Application.ActorSystem.ActorOf(
+                    Props.Create(() => new ProjectionsCoordinator<TId, TDocument>(Projection.Name)), Projection.Name));
+            },
             _restartSettings,
-            _projectionStreamConfiguration));
-
-        _projectionCoordinatorFactory ??= () =>
-        {
-            return Task.FromResult(System.ActorOf(
-                Props.Create(() => new ProjectionsCoordinator<TDocument>(Projection.Name)), Projection.Name));
-        };
-        
-        var coordinator = await _projectionCoordinatorFactory();
-
-        return new ProjectionsCoordinator<TDocument>.Proxy(coordinator);
+            _projectionStreamConfiguration);
     }
 
-    private class SetupProjection : ISetupProjection<TDocument>
+    private class SetupProjection : ISetupProjection<TId, TDocument>
     {
-        private readonly IImmutableDictionary<Type, (Func<object, object> GetId,
+        private readonly IImmutableDictionary<Type, (Func<object, TId> GetId,
             Func<object, TDocument?, long, Task<TDocument?>> Handle)> _handlers;
 
         public SetupProjection()
             : this(
-                ImmutableDictionary<Type, (Func<object, object>, Func<object, TDocument?, long, Task<TDocument?>>)>
+                ImmutableDictionary<Type, (Func<object, TId>, Func<object, TDocument?, long, Task<TDocument?>>)>
                     .Empty)
         {
         }
 
         private SetupProjection(
-            IImmutableDictionary<Type, (Func<object, object>, Func<object, TDocument?, long, Task<TDocument?>>)>
+            IImmutableDictionary<Type, (Func<object, TId>, Func<object, TDocument?, long, Task<TDocument?>>)>
                 handlers)
         {
             _handlers = handlers;
         }
 
-        public ISetupProjection<TDocument> RegisterHandler<TProjectedEvent>(
-            Func<TProjectedEvent, object> getId,
+        public ISetupProjection<TId, TDocument> RegisterHandler<TProjectedEvent>(
+            Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, long, Task<TDocument?>> handler)
         {
             return new SetupProjection(
@@ -162,8 +159,8 @@ public class ProjectionConfigurationSetup<TDocument>(
                     (evnt, doc, position) => handler((TProjectedEvent)evnt, doc, position))));
         }
 
-        public ISetupProjection<TDocument> RegisterHandler<TProjectedEvent>(
-            Func<TProjectedEvent, object> getId,
+        public ISetupProjection<TId, TDocument> RegisterHandler<TProjectedEvent>(
+            Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, Task<TDocument?>> handler)
         {
             return RegisterHandler(
@@ -171,8 +168,8 @@ public class ProjectionConfigurationSetup<TDocument>(
                 (evnt, doc, _) => handler(evnt, doc));
         }
 
-        public ISetupProjection<TDocument> RegisterHandler<TProjectedEvent>(
-            Func<TProjectedEvent, object> getId,
+        public ISetupProjection<TId, TDocument> RegisterHandler<TProjectedEvent>(
+            Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, TDocument?> handler)
         {
             return RegisterHandler(
@@ -180,8 +177,8 @@ public class ProjectionConfigurationSetup<TDocument>(
                 (evnt, doc, _) => handler(evnt, doc));
         }
 
-        public ISetupProjection<TDocument> RegisterHandler<TProjectedEvent>(
-            Func<TProjectedEvent, object> getId,
+        public ISetupProjection<TId, TDocument> RegisterHandler<TProjectedEvent>(
+            Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, long, TDocument?> handler)
         {
             return RegisterHandler(
@@ -189,20 +186,20 @@ public class ProjectionConfigurationSetup<TDocument>(
                 (evnt, doc, offset) => Task.FromResult(handler(evnt, doc, offset)));
         }
 
-        public IHandleEventInProjection<TDocument> Build()
+        public IHandleEventInProjection<TId, TDocument> Build()
         {
             return new EventHandler(_handlers);
         }
 
         private class EventHandler(
-            IImmutableDictionary<Type, (Func<object, object>, Func<object, TDocument?, long, Task<TDocument?>>)>
+            IImmutableDictionary<Type, (Func<object, TId>, Func<object, TDocument?, long, Task<TDocument?>>)>
                 handlers)
-            : IHandleEventInProjection<TDocument>
+            : IHandleEventInProjection<TId, TDocument>
         {
-            private readonly IImmutableDictionary<Type, (Func<object, object> GetId,
+            private readonly IImmutableDictionary<Type, (Func<object, TId> GetId,
                 Func<object, TDocument?, long, Task<TDocument?>> Handle)> _handlers = handlers;
 
-            public object? GetDocumentIdFrom(object evnt)
+            public TId? GetDocumentIdFrom(object evnt)
             {
                 var typesToCheck = evnt.GetType().GetInheritedTypes();
 
@@ -228,14 +225,14 @@ public class ProjectionConfigurationSetup<TDocument>(
             }
         }
     }
-    
+
     private class InProcDocumentProjectionCoordinator : ReceiveActor
     {
         public static class Queries
         {
-            public record GetProjectionRef(object Id);
+            public record GetProjectionRef(TId Id);
         }
-    
+
         public static class Responses
         {
             public record GetProjectionRefResponse(IActorRef? ProjectionRef);
@@ -250,15 +247,17 @@ public class ProjectionConfigurationSetup<TDocument>(
                 if (string.IsNullOrEmpty(id))
                 {
                     Sender.Tell(new Responses.GetProjectionRefResponse(null));
-                    
+
                     return;
                 }
-                
+
                 var projectionRef = Context.Child(id);
-            
+
                 if (projectionRef.IsNobody())
-                    projectionRef = Context.ActorOf(Props.Create(() => new DocumentProjection<TDocument>(projectionName, id)), id);
-            
+                    projectionRef =
+                        Context.ActorOf(
+                            Props.Create(() => new DocumentProjection<TId, TDocument>(projectionName, cmd.Id)), id);
+
                 Sender.Tell(new Responses.GetProjectionRefResponse(projectionRef));
             });
         }

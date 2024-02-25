@@ -4,18 +4,18 @@ using Akka.Streams.Dsl;
 
 namespace DC.Akka.Projections.Tests.TestData;
 
-public class MutableTestProjection(IImmutableList<object> events) : IProjection<MutableTestDocument>
+public class TestProjection(IImmutableList<object> events) : IProjection<string, TestDocument>
 {
     public string Name => "MutableTestProjection";
 
-    public ISetupProjection<MutableTestDocument> Configure(ISetupProjection<MutableTestDocument> config)
+    public ISetupProjection<string, TestDocument> Configure(ISetupProjection<string, TestDocument> config)
     {
         return config
             .RegisterHandler<Events.FirstEvent>(
                 x => x.DocId,
                 (evnt, doc) =>
                 {
-                    doc ??= new MutableTestDocument
+                    doc ??= new TestDocument
                     {
                         Id = evnt.DocId
                     };
@@ -28,7 +28,7 @@ public class MutableTestProjection(IImmutableList<object> events) : IProjection<
                 x => x.DocId,
                 (evnt, doc) =>
                 {
-                    doc ??= new MutableTestDocument
+                    doc ??= new TestDocument
                     {
                         Id = evnt.DocId
                     };
@@ -39,21 +39,11 @@ public class MutableTestProjection(IImmutableList<object> events) : IProjection<
                 });
     }
 
-    public Source<IProjectionSourceData, NotUsed> StartSource(long? fromPosition)
+    public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
     {
         return Source.From(events
             .Select((x, i) => new EventWithPosition(x, i + 1))
             .Where(x => fromPosition == null || x.Position >= fromPosition)
-            .Select(x => new SourceData(x))
-            .OfType<IProjectionSourceData>()
             .ToImmutableList());
-    }
-    
-    private class SourceData(EventWithPosition evnt) : IProjectionSourceData
-    {
-        public IImmutableList<EventWithPosition> ParseEvents()
-        {
-            return ImmutableList.Create(evnt);
-        }
     }
 }

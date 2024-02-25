@@ -1,22 +1,22 @@
 namespace DC.Akka.Projections;
 
-public interface ISetupProjection<TDocument>
+public interface ISetupProjection<TId, TDocument> where TId : notnull where TDocument : notnull
 {
-    ISetupProjection<TDocument> RegisterHandler<TEvent>(
-        Func<TEvent, object> getId,
+    ISetupProjection<TId, TDocument> RegisterHandler<TEvent>(
+        Func<TEvent, TId> getId,
         Func<TEvent, TDocument?, TDocument?> handler);
      
-    ISetupProjection<TDocument> RegisterHandler<TEvent>(
-        Func<TEvent, object> getId,
+    ISetupProjection<TId, TDocument> RegisterHandler<TEvent>(
+        Func<TEvent, TId> getId,
         Func<TEvent, TDocument?, long, TDocument?> handler);
         
-    ISetupProjection<TDocument> RegisterHandler<TEvent>(
-        Func<TEvent, object> getId,
+    ISetupProjection<TId, TDocument> RegisterHandler<TEvent>(
+        Func<TEvent, TId> getId,
         Func<TEvent, TDocument?, Task<TDocument?>> handler);
         
-    ISetupProjection<TDocument> RegisterHandler<TEvent>(
-        Func<TEvent, object> getId,
+    ISetupProjection<TId, TDocument> RegisterHandler<TEvent>(
+        Func<TEvent, TId> getId,
         Func<TEvent, TDocument?, long, Task<TDocument?>> handler);
         
-    IHandleEventInProjection<TDocument> Build();
+    IHandleEventInProjection<TId, TDocument> Build();
 }

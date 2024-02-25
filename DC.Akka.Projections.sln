@@ -16,10 +16,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{6BEC8584
 		Makefile = Makefile
 		LICENSE = LICENSE
 		.github\workflows\publish-to-nuget.yml = .github\workflows\publish-to-nuget.yml
-        .github\workflows\test-pull-requests.yml = .github\workflows\test-pull-requests.yml
-        .github\main.workflow = .github\main.workflow
-        .gitignore = .gitignore
+								.github\workflows\test-pull-requests.yml = .github\workflows\test-pull-requests.yml
+								.github\main.workflow = .github\main.workflow
+								.gitignore = .gitignore
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DC.Akka.Projections.Storage.InfluxDb", "src\DC.Akka.Projections.Storage.InfluxDb\DC.Akka.Projections.Storage.InfluxDb.csproj", "{E477DE81-8A6D-4966-8CAD-D8C4DD29A2C8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -43,6 +45,10 @@ Global
 		{B6378B10-0320-4AD9-AF8B-C0735DC43D22}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B6378B10-0320-4AD9-AF8B-C0735DC43D22}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B6378B10-0320-4AD9-AF8B-C0735DC43D22}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E477DE81-8A6D-4966-8CAD-D8C4DD29A2C8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E477DE81-8A6D-4966-8CAD-D8C4DD29A2C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E477DE81-8A6D-4966-8CAD-D8C4DD29A2C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E477DE81-8A6D-4966-8CAD-D8C4DD29A2C8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B6378B10-0320-4AD9-AF8B-C0735DC43D22} = {F80B7828-7152-4FD3-B882-C80EF0CAEE3E}

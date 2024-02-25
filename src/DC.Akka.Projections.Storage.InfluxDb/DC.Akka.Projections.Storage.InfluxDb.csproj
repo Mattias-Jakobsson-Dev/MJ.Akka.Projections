@@ -4,7 +4,6 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>12</LangVersion>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -19,8 +18,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Akka" Version="1.5.15" />
-      <PackageReference Include="Akka.Streams" Version="1.5.15" />
+      <ProjectReference Include="..\DC.Akka.Projections\DC.Akka.Projections.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="InfluxDB.Client" Version="4.14.0" />
     </ItemGroup>
 
 </Project>

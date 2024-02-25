@@ -1,21 +1,14 @@
 using System.Collections.Immutable;
+using Akka.Actor;
 
 namespace DC.Akka.Projections.Storage;
 
-public interface IProjectionStorage
+public interface IProjectionStorage<TId, TDocument> where TId : notnull where TDocument : notnull
 {
-    Task<TDocument?> LoadDocument<TDocument>(object id, CancellationToken cancellationToken = default);
-
-    Task StoreDocuments(
-        IImmutableList<(ProjectedDocument Document, Action Ack, Action<Exception?> Nack)> documents,
-        CancellationToken cancellationToken = default);
+    Task<(TDocument? document, bool requireReload)> LoadDocument(TId id, CancellationToken cancellationToken = default);
     
-    Task<long?> LoadLatestPosition(
-        string projectionName,
-        CancellationToken cancellationToken = default);
-    
-    Task<long?> StoreLatestPosition(
-        string projectionName,
-        long? position, 
+    Task<IStorageTransaction> StartTransaction(
+        IImmutableList<(TId Id, TDocument Document, IActorRef ackTo)> toUpsert,
+        IImmutableList<(TId id, IActorRef ackTo)> toDelete,
         CancellationToken cancellationToken = default);
 }

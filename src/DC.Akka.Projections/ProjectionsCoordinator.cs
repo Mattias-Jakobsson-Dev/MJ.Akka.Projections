@@ -8,7 +8,7 @@ using DC.Akka.Projections.Configuration;
 
 namespace DC.Akka.Projections;
 
-public class ProjectionsCoordinator<TDocument> : ReceiveActor
+public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : notnull where TDocument : notnull
 {
     private static class Commands
     {
@@ -32,7 +32,7 @@ public class ProjectionsCoordinator<TDocument> : ReceiveActor
 
     private IKillSwitch? _killSwitch;
 
-    private readonly ProjectionConfiguration<TDocument> _configuration;
+    private readonly ProjectionConfiguration<TId, TDocument> _configuration;
 
     public ProjectionsCoordinator(string projectionName)
     {
@@ -41,7 +41,7 @@ public class ProjectionsCoordinator<TDocument> : ReceiveActor
         _configuration = Context
                              .System
                              .GetExtension<ProjectionsApplication>()
-                             .GetProjectionConfiguration<TDocument>(projectionName) ??
+                             .GetProjectionConfiguration<TId, TDocument>(projectionName) ??
                          throw new NoDocumentProjectionException<TDocument>(projectionName);
 
         Become(Stopped);
@@ -53,7 +53,7 @@ public class ProjectionsCoordinator<TDocument> : ReceiveActor
         {
             _logger.Info("Starting projection {Name}", _configuration.Name);
 
-            var latestPosition = await _configuration.Storage.LoadLatestPosition(_configuration.Name);
+            var latestPosition = await _configuration.PositionStorage.LoadLatestPosition(_configuration.Name);
 
             _killSwitch = RestartSource
                 .OnFailuresWithBackoff(() =>
@@ -65,11 +65,7 @@ public class ProjectionsCoordinator<TDocument> : ReceiveActor
                             _configuration.ProjectionStreamConfiguration.EventBatching.Timeout)
                         .SelectMany(data =>
                         {
-                            var events = data
-                                .SelectMany(x => x.ParseEvents())
-                                .ToImmutableList();
-
-                            return events
+                            return data
                                 .Select(x => new
                                 {
                                     Event = x,
@@ -84,45 +80,50 @@ public class ProjectionsCoordinator<TDocument> : ReceiveActor
                         .SelectAsyncUnordered(
                             _configuration.ProjectionStreamConfiguration.ProjectionParallelism, 
                             async data =>
-                        {
-                            var projectionRef =
-                                await _configuration.CreateProjectionRef(data.Id);
-
-                            var tries = 0;
-
-                            while (tries <= _configuration.ProjectionStreamConfiguration.MaxProjectionRetries)
                             {
-                                try
-                                {
-                                    var response =
-                                        await projectionRef
-                                            .Ask<Messages.IProjectEventsResponse>(
-                                                new DocumentProjection<TDocument>.Commands.ProjectEvents(
-                                                    data.Id,
-                                                    data.Events));
+                                if (data.Events.IsEmpty)
+                                    return null;
+                            
+                                var projectionRef =
+                                    await _configuration.CreateProjectionRef(data.Id);
 
-                                    return response switch
+                                var tries = 0;
+                                
+                                var maxPosition = data.Events.Select(x => x.Position).Max();
+
+                                while (tries <= _configuration.ProjectionStreamConfiguration.MaxProjectionRetries)
+                                {
+                                    try
                                     {
-                                        Messages.Acknowledge ack => ack.Position,
-                                        Messages.Reject nack => throw new Exception(
-                                            "Rejected projection", nack.Cause),
-                                        _ => throw new Exception("Unknown projection response")
-                                    };
-                                }
-                                catch (AskTimeoutException)
-                                {
-                                    tries++;
-                                }
-                                catch (Exception e)
-                                {
-                                    _logger
-                                        .Error(e, "Failed handling events for {EntityId}", data.Id);
+                                        var response =
+                                            await projectionRef
+                                                .Ask<Messages.IProjectEventsResponse>(
+                                                    new DocumentProjection<TId, TDocument>.Commands.ProjectEvents(
+                                                        data.Id,
+                                                        data.Events));
 
-                                    throw;
-                                }
-                            }
+                                        return response switch
+                                        {
+                                            Messages.Acknowledge => maxPosition,
+                                            Messages.Reject nack => throw new Exception(
+                                                "Rejected projection", nack.Cause),
+                                            _ => throw new Exception("Unknown projection response")
+                                        };
+                                    }
+                                    catch (AskTimeoutException)
+                                    {
+                                        tries++;
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        _logger
+                                            .Error(e, "Failed handling events for {EntityId}", data.Id);
 
-                            throw new Exception("Max retries reached");
+                                        throw;
+                                    }
+                                }
+
+                                throw new Exception("Max retries reached");
                         })
                         .GroupedWithin(
                             _configuration.ProjectionStreamConfiguration.PositionBatching.Number,
@@ -132,7 +133,7 @@ public class ProjectionsCoordinator<TDocument> : ReceiveActor
                             var highestPosition = positions.MaxBy(y => y);
 
                             latestPosition =
-                                await _configuration.Storage.StoreLatestPosition(_configuration.Name, highestPosition);
+                                await _configuration.PositionStorage.StoreLatestPosition(_configuration.Name, highestPosition);
 
                             return NotUsed.Instance;
                         });

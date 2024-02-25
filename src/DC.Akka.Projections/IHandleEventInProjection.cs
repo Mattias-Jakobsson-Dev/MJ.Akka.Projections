@@ -1,7 +1,7 @@
 namespace DC.Akka.Projections;
 
-public interface IHandleEventInProjection<TDocument>
+public interface IHandleEventInProjection<out TId, TDocument> where TId : notnull where TDocument : notnull
 {
-    object? GetDocumentIdFrom(object evnt);
+    TId? GetDocumentIdFrom(object evnt);
     Task<TDocument?> Handle(TDocument? document, object evnt, long position);
 }

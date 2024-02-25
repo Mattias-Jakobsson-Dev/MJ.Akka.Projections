@@ -1,8 +1,9 @@
+using DC.Akka.Projections.Storage;
+
 namespace DC.Akka.Projections.Configuration;
 
-public interface IProjectionStorageConfigurationSetup<TDocument> : IProjectionConfigurationSetup<TDocument>
+public interface IProjectionStorageConfigurationSetup<TId, TDocument> 
+    : IProjectionConfigurationSetup<TId, TDocument> where TId : notnull where TDocument : notnull
 {
-    IProjectionStorageConfigurationSetup<TDocument> Batched(
-        (int Number, TimeSpan Timeout)? batching = null,
-        int parallelism = 10);
+    IProjectionStorageConfigurationSetup<TId, TDocument> WithStorageSession(IStorageSession session);
 }

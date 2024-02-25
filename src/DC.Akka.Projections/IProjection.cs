@@ -3,9 +3,9 @@ using Akka.Streams.Dsl;
 
 namespace DC.Akka.Projections;
 
-public interface IProjection<TDocument>
+public interface IProjection<TId, TDocument> where TId : notnull where TDocument : notnull
 {
     string Name { get; }
-    ISetupProjection<TDocument> Configure(ISetupProjection<TDocument> config);
-    Source<IProjectionSourceData, NotUsed> StartSource(long? fromPosition);
+    ISetupProjection<TId, TDocument> Configure(ISetupProjection<TId, TDocument> config);
+    Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
 }

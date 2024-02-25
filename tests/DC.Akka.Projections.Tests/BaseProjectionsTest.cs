@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using DC.Akka.Projections.Configuration;
 using DC.Akka.Projections.Storage;
@@ -9,29 +10,28 @@ namespace DC.Akka.Projections.Tests;
 
 public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
 {
-    private MutableTestProjection _projection = null!;
-    protected TestInMemoryProjectionStorage Storage = null!;
+    private TestProjection _projection = null!;
+    protected TestInMemoryProjectionStorage<TestDocument> Storage = null!;
+    protected IProjectionPositionStorage PositionStorage = null!;
     
     public async Task InitializeAsync()
     {
-        _projection = new MutableTestProjection(WhenEvents());
-        Storage = new TestInMemoryProjectionStorage();
+        _projection = new TestProjection(WhenEvents());
+        Storage = new TestInMemoryProjectionStorage<TestDocument>();
+        PositionStorage = new InMemoryProjectionPositionStorage();
+
+        var projectionsApplication = Sys.Projections();
         
         var documents = GivenDocuments();
 
-        await Storage
-            .StoreDocuments(documents
-                .Select<MutableTestDocument, (ProjectedDocument, Action, Action<Exception?>)>(x => (
-                    new ProjectedDocument(
-                        x.Id,
-                        x,
-                        1),
-                    () => { },
-                    _ => { }))
-                .ToImmutableList());
-            
-        var coordinator = await Configure(Sys.WithProjection(_projection))
-            .Build();
+        var transaction = await Storage.StartTransaction(
+            documents
+                .Select(x => (x.Id, x, ActorRefs.NoSender)).ToImmutableList(),
+            ImmutableList<(string id, IActorRef ackTo)>.Empty);
+
+        await transaction.Commit();
+
+        var coordinator = await projectionsApplication.WithProjection(_projection, Configure);
 
         coordinator.Start();
 
@@ -43,11 +43,12 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    protected virtual IProjectionConfigurationSetup<MutableTestDocument> Configure(
-        IProjectionConfigurationSetup<MutableTestDocument> config)
+    protected virtual IProjectionConfigurationSetup<string, TestDocument> Configure(
+        IProjectionConfigurationSetup<string, TestDocument> config)
     {
         return config
-            .WithStorage(Storage)
+            .WithProjectionStorage(Storage)
+            .WithPositionStorage(PositionStorage)
             .WithProjectionStreamConfiguration(new ProjectionStreamConfiguration(
                 (10, TimeSpan.FromMilliseconds(100)),
                 1,
@@ -55,16 +56,18 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
                 5));
     }
     
-    protected virtual IImmutableList<MutableTestDocument> GivenDocuments()
+    protected virtual IImmutableList<TestDocument> GivenDocuments()
     {
-        return ImmutableList<MutableTestDocument>.Empty;
+        return ImmutableList<TestDocument>.Empty;
     }
     
     protected abstract IImmutableList<object> WhenEvents();
 
-    protected Task<MutableTestDocument?> LoadDocument(string id)
+    protected async Task<TestDocument?> LoadDocument(string id)
     {
-        return Storage.LoadDocument<MutableTestDocument>(id);
+        var (document, _) = await Storage.LoadDocument(id);
+
+        return document;
     }
 
     protected Task<IImmutableList<object>> LoadAllDocuments()
@@ -74,6 +77,6 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
     
     protected Task<long?> LoadPosition()
     {
-        return Storage.LoadLatestPosition(_projection.Name);
+        return PositionStorage.LoadLatestPosition(_projection.Name);
     }
 }
