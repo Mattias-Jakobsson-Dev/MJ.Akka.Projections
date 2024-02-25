@@ -42,6 +42,7 @@ package: clean
 	dotnet pack ./src/DC.Akka.Projections -c Release -o ./.packages
 	dotnet pack ./src/DC.Akka.Projections.Cluster.Sharding -c Release -o ./.packages
 	dotnet pack ./src/DC.Akka.Projections.Storage.RavenDb -c Release -o ./.packages
+	dotnet pack ./src/DC.Akka.Projections.Storage.InfluxDb -c Release -o ./.packages
 
 .PHONY: publish
 publish: package
