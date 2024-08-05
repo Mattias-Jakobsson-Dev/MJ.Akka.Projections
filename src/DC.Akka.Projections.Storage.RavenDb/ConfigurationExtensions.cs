@@ -1,8 +1,10 @@
 using DC.Akka.Projections.Configuration;
+using JetBrains.Annotations;
 using Raven.Client.Documents;
 
 namespace DC.Akka.Projections.Storage.RavenDb;
 
+[PublicAPI]
 public static class ConfigurationExtensions
 {
     public static IProjectionStorageConfigurationSetup<string, TDocument> WithRavenDbDocumentStorage<TDocument>(

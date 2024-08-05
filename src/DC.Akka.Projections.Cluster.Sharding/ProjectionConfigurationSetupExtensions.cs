@@ -2,9 +2,11 @@
 using Akka.Cluster.Sharding;
 using Akka.Cluster.Tools.Singleton;
 using DC.Akka.Projections.Configuration;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Cluster.Sharding;
 
+[PublicAPI]
 public static class ProjectionConfigurationSetupExtensions
 {
     public static IProjectionConfigurationSetup<TId, TDocument> WithSharding<TId, TDocument>(

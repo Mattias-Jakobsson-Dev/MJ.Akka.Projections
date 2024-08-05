@@ -67,6 +67,10 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         .SelectMany(data =>
                         {
                             return data
+                                .SelectMany(x => _configuration
+                                    .ProjectionsHandler
+                                    .Transform(x.Event)
+                                    .Select(y => x with { Event = y }))
                                 .Select(x => new
                                 {
                                     Event = x,

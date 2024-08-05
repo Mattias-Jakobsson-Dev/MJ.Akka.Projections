@@ -1,5 +1,8 @@
+using JetBrains.Annotations;
+
 namespace DC.Akka.Projections.Storage.RavenDb;
 
+[PublicAPI]
 public class ProjectionPosition
 {
     public ProjectionPosition()

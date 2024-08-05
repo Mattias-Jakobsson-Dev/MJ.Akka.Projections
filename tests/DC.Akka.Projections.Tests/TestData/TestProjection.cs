@@ -11,7 +11,9 @@ public class TestProjection(IImmutableList<object> events) : IProjection<string,
     public ISetupProjection<string, TestDocument> Configure(ISetupProjection<string, TestDocument> config)
     {
         return config
-            .RegisterHandler<Events.FirstEvent>(
+            .TransformUsing<Events.TransformToMultipleEvents>(
+                evnt => evnt.Events.OfType<object>().ToImmutableList())
+            .On<Events.FirstEvent>(
                 x => x.DocId,
                 (evnt, doc) =>
                 {
@@ -24,7 +26,7 @@ public class TestProjection(IImmutableList<object> events) : IProjection<string,
 
                     return doc;
                 })
-            .RegisterHandler<Events.SecondEvent>(
+            .On<Events.SecondEvent>(
                 x => x.DocId,
                 (evnt, doc) =>
                 {

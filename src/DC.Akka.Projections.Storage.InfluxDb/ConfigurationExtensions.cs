@@ -1,8 +1,10 @@
 using DC.Akka.Projections.Configuration;
 using InfluxDB.Client;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Storage.InfluxDb;
 
+[PublicAPI]
 public static class ConfigurationExtensions
 {
     public static IProjectionStorageConfigurationSetup<InfluxDbTimeSeriesId, InfluxTimeSeries> WithInfluxDbStorage(

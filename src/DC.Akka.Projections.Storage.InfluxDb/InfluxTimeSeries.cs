@@ -1,8 +1,10 @@
 using System.Collections.Immutable;
 using InfluxDB.Client.Writes;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Storage.InfluxDb;
 
+[PublicAPI]
 public record InfluxTimeSeries(
     IImmutableList<PointData> Points,
     IImmutableList<InfluxTimeSeries.DeletePoint> ToDelete)

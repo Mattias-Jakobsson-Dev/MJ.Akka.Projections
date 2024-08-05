@@ -7,6 +7,8 @@ namespace DC.Akka.Projections.Tests;
 
 public class When_projecting_two_events_to_two_simple_documents_with_normal_storage : BaseProjectionsTest
 {
+    protected virtual int ExpectedPosition => 2;
+    
     protected override IImmutableList<object> WhenEvents()
     {
         return ImmutableList.Create<object>(
@@ -15,11 +17,11 @@ public class When_projecting_two_events_to_two_simple_documents_with_normal_stor
     }
     
     [Fact]
-    public async Task Then_position_should_be_2()
+    public async Task Then_position_should_be_correct()
     {
         var position = await LoadPosition();
 
-        position.Should().Be(2);
+        position.Should().Be(ExpectedPosition);
     }
     
     [Fact]

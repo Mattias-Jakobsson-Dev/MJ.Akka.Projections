@@ -135,77 +135,108 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         private readonly IImmutableDictionary<Type, (Func<object, TId> GetId,
             Func<object, TDocument?, long, Task<TDocument?>> Handle)> _handlers;
 
+        private readonly IImmutableDictionary<Type, Func<object, IImmutableList<object>>> _transformers;
+
         public SetupProjection()
             : this(
                 ImmutableDictionary<Type, (Func<object, TId>, Func<object, TDocument?, long, Task<TDocument?>>)>
-                    .Empty)
+                    .Empty,
+                ImmutableDictionary<Type, Func<object, IImmutableList<object>>>.Empty)
         {
         }
 
         private SetupProjection(
             IImmutableDictionary<Type, (Func<object, TId>, Func<object, TDocument?, long, Task<TDocument?>>)>
-                handlers)
+                handlers,
+            IImmutableDictionary<Type, Func<object, IImmutableList<object>>> transformers)
         {
             _handlers = handlers;
+            _transformers = transformers;
         }
 
-        public ISetupProjection<TId, TDocument> RegisterHandler<TProjectedEvent>(
+        public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
             Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, long, Task<TDocument?>> handler)
         {
             return new SetupProjection(
                 _handlers.SetItem(typeof(TProjectedEvent), (
                     evnt => getId((TProjectedEvent)evnt),
-                    (evnt, doc, position) => handler((TProjectedEvent)evnt, doc, position))));
+                    (evnt, doc, position) => handler((TProjectedEvent)evnt, doc, position))),
+                _transformers);
         }
 
-        public ISetupProjection<TId, TDocument> RegisterHandler<TProjectedEvent>(
+        public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
             Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, Task<TDocument?>> handler)
         {
-            return RegisterHandler(
+            return On(
                 getId,
                 (evnt, doc, _) => handler(evnt, doc));
         }
+        
+        public ISetupProjection<TId, TDocument> TransformUsing<TEvent>(
+            Func<TEvent, IImmutableList<object>> transform)
+        {
+            return new SetupProjection(
+                _handlers,
+                _transformers.SetItem(typeof(TEvent), evnt => transform((TEvent)evnt)));
+        }
 
-        public ISetupProjection<TId, TDocument> RegisterHandler<TProjectedEvent>(
+        public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
             Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, TDocument?> handler)
         {
-            return RegisterHandler(
+            return On(
                 getId,
                 (evnt, doc, _) => handler(evnt, doc));
         }
 
-        public ISetupProjection<TId, TDocument> RegisterHandler<TProjectedEvent>(
+        public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
             Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, long, TDocument?> handler)
         {
-            return RegisterHandler(
+            return On(
                 getId,
                 (evnt, doc, offset) => Task.FromResult(handler(evnt, doc, offset)));
         }
 
         public IHandleEventInProjection<TId, TDocument> Build()
         {
-            return new EventHandler(_handlers);
+            return new EventHandler(_handlers, _transformers);
         }
 
         private class EventHandler(
-            IImmutableDictionary<Type, (Func<object, TId>, Func<object, TDocument?, long, Task<TDocument?>>)>
-                handlers)
+            IImmutableDictionary<Type, (Func<object, TId> GetId, Func<object, TDocument?, long, Task<TDocument?>> Handle)>
+                handlers,
+            IImmutableDictionary<Type, Func<object, IImmutableList<object>>> transformers)
             : IHandleEventInProjection<TId, TDocument>
         {
-            private readonly IImmutableDictionary<Type, (Func<object, TId> GetId,
-                Func<object, TDocument?, long, Task<TDocument?>> Handle)> _handlers = handlers;
+            public IImmutableList<object> Transform(object evnt)
+            {
+                var typesToCheck = evnt.GetType().GetInheritedTypes();
+                var results = ImmutableList<object>.Empty;
+                var hasTransformed = false;
 
+                foreach (var type in typesToCheck)
+                {
+                    if (!transformers.ContainsKey(type)) 
+                        continue;
+                    
+                    results = results.AddRange(transformers[type](evnt));
+
+                    hasTransformed = true;
+                }
+
+                return hasTransformed ? results : ImmutableList.Create(evnt);
+            }
+            
             public TId? GetDocumentIdFrom(object evnt)
             {
                 var typesToCheck = evnt.GetType().GetInheritedTypes();
 
                 return (from type in typesToCheck
-                        where _handlers.ContainsKey(type)
-                        select _handlers[type].GetId(evnt))
+                        where handlers.ContainsKey(type)
+                        select handlers[type].GetId(evnt))
                     .FirstOrDefault();
             }
 
@@ -215,7 +246,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
 
                 foreach (var type in typesToCheck)
                 {
-                    if (!_handlers.TryGetValue(type, out var handler))
+                    if (!handlers.TryGetValue(type, out var handler))
                         continue;
 
                     document = await handler.Handle(evnt, document, position);

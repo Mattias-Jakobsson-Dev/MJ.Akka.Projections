@@ -34,7 +34,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnu
         {
             var (document, requireReload) = await _configuration.DocumentStorage.LoadDocument(_id);
 
-            await ProjectEvents(document, cmd.Events);
+            document = await ProjectEvents(document, cmd.Events);
             
             if (!requireReload)
                 Become(() => Loaded(document));
