@@ -215,10 +215,10 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
 
                 foreach (var type in typesToCheck)
                 {
-                    if (!_handlers.ContainsKey(type))
+                    if (!_handlers.TryGetValue(type, out var handler))
                         continue;
 
-                    document = await _handlers[type].Handle(evnt, document, position);
+                    document = await handler.Handle(evnt, document, position);
                 }
 
                 return document;

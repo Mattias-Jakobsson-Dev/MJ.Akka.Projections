@@ -10,7 +10,7 @@
     <PropertyGroup>
         <Copyright>Copyright © 2024 Digital Creation Sweden AB</Copyright>
         <Authors>Team Digital Creation</Authors>
-        <Version>0.2.0</Version>
+        <Version>0.3.0</Version>
         <PackageProjectUrl>
             https://github.com/DigitalCreationAb/DC.Akka.Projections
         </PackageProjectUrl>
@@ -21,6 +21,7 @@
     <ItemGroup>
       <PackageReference Include="Akka" Version="1.5.15" />
       <PackageReference Include="Akka.Streams" Version="1.5.15" />
+      <PackageReference Include="JetBrains.Annotations" Version="2024.2.0" />
     </ItemGroup>
 
 </Project>

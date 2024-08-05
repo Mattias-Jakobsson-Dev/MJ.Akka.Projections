@@ -45,11 +45,13 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnu
     {
         ReceiveAsync<Commands.ProjectEvents>(async cmd =>
         {
-            await ProjectEvents(document, cmd.Events);
+            document = await ProjectEvents(document, cmd.Events);
+            
+            Become(() => Loaded(document));
         });
     }
 
-    private async Task ProjectEvents(TDocument? document, IImmutableList<EventWithPosition> events)
+    private async Task<TDocument?> ProjectEvents(TDocument? document, IImmutableList<EventWithPosition> events)
     {
         var exists = document != null;
         
@@ -59,7 +61,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnu
             {
                 Sender.Tell(new Messages.Acknowledge());
                 
-                return;
+                return document;
             }
             
             foreach (var evnt in events)
@@ -77,6 +79,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnu
                     .StorageSession
                     .Delete<TId, TDocument>(_projectionName, _id, Sender);
             }
+
+            return document;
         }
         catch (Exception e)
         {

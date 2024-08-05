@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json;
 using Akka.Actor;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Storage;
 
@@ -33,6 +34,7 @@ public class InMemoryProjectionStorage<TId, TDocument> : IProjectionStorage<TId,
             SerializeData));
     }
 
+    [PublicAPI]
     protected static async Task<ReadOnlyMemory<byte>> SerializeData(object data)
     {
         var buffer = new ArrayBufferWriter<byte>();

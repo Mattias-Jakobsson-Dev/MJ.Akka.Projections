@@ -1,13 +1,15 @@
 using Akka.Actor;
 using Akka.Streams;
 using DC.Akka.Projections.Storage;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Configuration;
 
+[PublicAPI]
 public interface IProjectionConfigurationSetup<TId, TDocument> where TId : notnull where TDocument : notnull
 {
     IProjection<TId, TDocument> Projection { get; }
-    public ProjectionsApplication Application { get; }
+    ProjectionsApplication Application { get; }
     
     IProjectionConfigurationSetup<TId, TDocument> AutoStart();
 

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Akka.Actor;
 using DC.Akka.Projections.Configuration;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections;
 
@@ -31,6 +32,7 @@ public class ProjectionsApplication(ActorSystem actorSystem) : IExtension
         return _projections.GetValueOrDefault(name) as ProjectionConfiguration<TId, TDocument>;
     }
     
+    [PublicAPI]
     internal class Provider : ExtensionIdProvider<ProjectionsApplication>
     {
         public override ProjectionsApplication CreateExtension(ExtendedActorSystem system)

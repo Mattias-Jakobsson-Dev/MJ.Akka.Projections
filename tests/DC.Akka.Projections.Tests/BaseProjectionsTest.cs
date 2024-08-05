@@ -4,6 +4,7 @@ using Akka.TestKit.Xunit2;
 using DC.Akka.Projections.Configuration;
 using DC.Akka.Projections.Storage;
 using DC.Akka.Projections.Tests.TestData;
+using JetBrains.Annotations;
 using Xunit;
 
 namespace DC.Akka.Projections.Tests;
@@ -12,6 +13,7 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
 {
     private TestProjection _projection = null!;
     protected TestInMemoryProjectionStorage<TestDocument> Storage = null!;
+    [PublicAPI]
     protected IProjectionPositionStorage PositionStorage = null!;
     
     public async Task InitializeAsync()
@@ -26,16 +28,15 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
 
         var transaction = await Storage.StartTransaction(
             documents
-                .Select(x => (x.Id, x, ActorRefs.NoSender)).ToImmutableList(),
+                .Select(x => (x.Id, x, ActorRefs.NoSender))
+                .ToImmutableList(),
             ImmutableList<(string id, IActorRef ackTo)>.Empty);
 
         await transaction.Commit();
 
         var coordinator = await projectionsApplication.WithProjection(_projection, Configure);
-
-        coordinator.Start();
-
-        await coordinator.WaitForCompletion(TimeSpan.FromSeconds(5));
+        
+        await coordinator.RunToCompletion(TimeSpan.FromSeconds(5));
     }
 
     public Task DisposeAsync()
@@ -56,6 +57,7 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
                 5));
     }
     
+    [PublicAPI]
     protected virtual IImmutableList<TestDocument> GivenDocuments()
     {
         return ImmutableList<TestDocument>.Empty;

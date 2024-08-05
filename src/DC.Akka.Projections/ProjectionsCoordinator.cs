@@ -5,6 +5,7 @@ using Akka.Event;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 using DC.Akka.Projections.Configuration;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections;
 
@@ -30,7 +31,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     
     private readonly ILoggingAdapter _logger;
 
-    private IKillSwitch? _killSwitch;
+    private UniqueKillSwitch? _killSwitch;
 
     private readonly ProjectionConfiguration<TId, TDocument> _configuration;
 
@@ -77,7 +78,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                     Events: x.Select(y => y.Event).ToImmutableList(),
                                     Id: x.Key));
                         })
-                        .SelectAsyncUnordered(
+                        .SelectAsync(
                             _configuration.ProjectionStreamConfiguration.ProjectionParallelism, 
                             async data =>
                             {
@@ -212,7 +213,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         
         base.PreStart();
     }
-    
+
+    [PublicAPI]
     public class Proxy(IActorRef coordinator)
     {
         public void Start()
@@ -233,6 +235,13 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
             if (response.Error != null)
                 throw response.Error;
+        }
+
+        public async Task RunToCompletion(TimeSpan? timeout = null)
+        {
+            Start();
+
+            await WaitForCompletion(timeout);
         }
     }
 }

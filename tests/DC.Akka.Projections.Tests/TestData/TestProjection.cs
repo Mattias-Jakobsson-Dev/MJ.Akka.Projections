@@ -6,7 +6,7 @@ namespace DC.Akka.Projections.Tests.TestData;
 
 public class TestProjection(IImmutableList<object> events) : IProjection<string, TestDocument>
 {
-    public string Name => "MutableTestProjection";
+    public string Name => nameof(TestProjection);
 
     public ISetupProjection<string, TestDocument> Configure(ISetupProjection<string, TestDocument> config)
     {

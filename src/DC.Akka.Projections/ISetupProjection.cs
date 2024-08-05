@@ -1,5 +1,8 @@
+using JetBrains.Annotations;
+
 namespace DC.Akka.Projections;
 
+[PublicAPI]
 public interface ISetupProjection<TId, TDocument> where TId : notnull where TDocument : notnull
 {
     ISetupProjection<TId, TDocument> RegisterHandler<TEvent>(
