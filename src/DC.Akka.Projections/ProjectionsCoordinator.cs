@@ -28,7 +28,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     {
         public record WaitForCompletionResponse(Exception? Error = null);
     }
-    
+
     private readonly ILoggingAdapter _logger;
 
     private UniqueKillSwitch? _killSwitch;
@@ -83,53 +83,44 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                     Id: x.Key));
                         })
                         .SelectAsync(
-                            _configuration.ProjectionStreamConfiguration.ProjectionParallelism, 
+                            _configuration.ProjectionStreamConfiguration.ProjectionParallelism,
                             async data =>
                             {
                                 if (data.Events.IsEmpty)
                                     return null;
-                            
+
                                 var projectionRef =
                                     await _configuration.CreateProjectionRef(data.Id);
 
-                                var tries = 0;
-                                
                                 var maxPosition = data.Events.Select(x => x.Position).Max();
 
-                                while (tries <= _configuration.ProjectionStreamConfiguration.MaxProjectionRetries)
+                                try
                                 {
-                                    try
-                                    {
-                                        var response =
-                                            await projectionRef
+                                    var response = await Retries
+                                        .Run<Messages.IProjectEventsResponse, AskTimeoutException>(
+                                            () => projectionRef
                                                 .Ask<Messages.IProjectEventsResponse>(
                                                     new DocumentProjection<TId, TDocument>.Commands.ProjectEvents(
                                                         data.Id,
-                                                        data.Events));
+                                                        data.Events)),
+                                            _configuration.ProjectionStreamConfiguration.MaxProjectionRetries);
 
-                                        return response switch
-                                        {
-                                            Messages.Acknowledge => maxPosition,
-                                            Messages.Reject nack => throw new Exception(
-                                                "Rejected projection", nack.Cause),
-                                            _ => throw new Exception("Unknown projection response")
-                                        };
-                                    }
-                                    catch (AskTimeoutException)
+                                    return response switch
                                     {
-                                        tries++;
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        _logger
-                                            .Error(e, "Failed handling events for {EntityId}", data.Id);
-
-                                        throw;
-                                    }
+                                        Messages.Acknowledge => maxPosition,
+                                        Messages.Reject nack => throw new Exception(
+                                            "Rejected projection", nack.Cause),
+                                        _ => throw new Exception("Unknown projection response")
+                                    };
                                 }
+                                catch (Exception e)
+                                {
+                                    _logger
+                                        .Error(e, "Failed handling events for {EntityId}", data.Id);
 
-                                throw new Exception("Max retries reached");
-                        })
+                                    throw;
+                                }
+                            })
                         .GroupedWithin(
                             _configuration.ProjectionStreamConfiguration.PositionBatching.Number,
                             _configuration.ProjectionStreamConfiguration.PositionBatching.Timeout)
@@ -138,7 +129,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                             var highestPosition = positions.MaxBy(y => y);
 
                             latestPosition =
-                                await _configuration.PositionStorage.StoreLatestPosition(_configuration.Name, highestPosition);
+                                await _configuration.PositionStorage.StoreLatestPosition(_configuration.Name,
+                                    highestPosition);
 
                             return NotUsed.Instance;
                         });
@@ -157,16 +149,16 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     private void Started()
     {
         var waitingForCompletion = new HashSet<IActorRef>();
-        
+
         Receive<Commands.Stop>(_ =>
         {
             _logger.Info("Stopping projection {Name}", _configuration.Name);
 
             _killSwitch?.Shutdown();
-            
+
             foreach (var item in waitingForCompletion)
                 item.Tell(new Responses.WaitForCompletionResponse());
-            
+
             waitingForCompletion.Clear();
 
             Become(Stopped);
@@ -177,44 +169,38 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             _logger.Error(cmd.Cause, "Projection {Name} failed", _configuration.Name);
 
             _killSwitch?.Shutdown();
-            
+
             foreach (var item in waitingForCompletion)
                 item.Tell(new Responses.WaitForCompletionResponse(cmd.Cause));
-            
+
             waitingForCompletion.Clear();
 
             Become(Stopped);
         });
 
-        Receive<Commands.WaitForCompletion>(_ =>
-        {
-            waitingForCompletion.Add(Sender);
-        });
-        
+        Receive<Commands.WaitForCompletion>(_ => { waitingForCompletion.Add(Sender); });
+
         Receive<Commands.Complete>(_ =>
         {
             foreach (var item in waitingForCompletion)
                 item.Tell(new Responses.WaitForCompletionResponse());
-            
+
             waitingForCompletion.Clear();
-            
+
             Become(Completed);
         });
     }
 
     private void Completed()
     {
-        Receive<Commands.WaitForCompletion>(_ =>
-        {
-            Sender.Tell(new Responses.WaitForCompletionResponse());
-        });
+        Receive<Commands.WaitForCompletion>(_ => { Sender.Tell(new Responses.WaitForCompletionResponse()); });
     }
 
     protected override void PreStart()
     {
         if (_configuration.AutoStart)
             Self.Tell(new Commands.Start());
-        
+
         base.PreStart();
     }
 
