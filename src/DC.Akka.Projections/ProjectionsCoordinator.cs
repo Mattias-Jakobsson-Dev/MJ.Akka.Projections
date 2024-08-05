@@ -92,8 +92,6 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                 var projectionRef =
                                     await _configuration.CreateProjectionRef(data.Id);
 
-                                var maxPosition = data.Events.Select(x => x.Position).Max();
-
                                 try
                                 {
                                     var response = await Retries
@@ -107,7 +105,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
                                     return response switch
                                     {
-                                        Messages.Acknowledge => maxPosition,
+                                        Messages.Acknowledge => data.Events.Select(x => x.Position).Max(),
                                         Messages.Reject nack => throw new Exception(
                                             "Rejected projection", nack.Cause),
                                         _ => throw new Exception("Unknown projection response")

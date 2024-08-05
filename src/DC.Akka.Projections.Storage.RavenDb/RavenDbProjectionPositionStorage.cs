@@ -30,7 +30,7 @@ public class RavenDbProjectionPositionStorage(IDocumentStore documentStore) : IP
 
         if (projectionPosition == null)
         {
-            projectionPosition = new ProjectionPosition();
+            projectionPosition = new ProjectionPosition(projectionName);
 
             await session.StoreAsync(projectionPosition, cancellationToken);
         }
