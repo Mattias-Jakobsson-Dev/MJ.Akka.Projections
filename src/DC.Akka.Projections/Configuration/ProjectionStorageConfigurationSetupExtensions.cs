@@ -1,7 +1,9 @@
 using DC.Akka.Projections.Storage;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Configuration;
 
+[PublicAPI]
 public static class ProjectionStorageConfigurationSetupExtensions
 {
     public static IProjectionStorageConfigurationSetup<TId, TDocument> Batched<TId, TDocument>(

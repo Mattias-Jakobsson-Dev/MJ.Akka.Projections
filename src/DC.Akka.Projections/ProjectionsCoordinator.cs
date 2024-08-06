@@ -100,7 +100,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                                 .Ask<Messages.IProjectEventsResponse>(
                                                     new DocumentProjection<TId, TDocument>.Commands.ProjectEvents(
                                                         data.Id,
-                                                        data.Events)),
+                                                        data.Events),
+                                                    _configuration.ProjectionStreamConfiguration.ProjectDocumentTimeout),
                                             _configuration.ProjectionStreamConfiguration.MaxProjectionRetries);
 
                                     return response switch

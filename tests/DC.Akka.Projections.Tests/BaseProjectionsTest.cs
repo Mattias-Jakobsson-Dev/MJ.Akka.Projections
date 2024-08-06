@@ -54,7 +54,8 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
                 (10, TimeSpan.FromMilliseconds(100)),
                 1,
                 (10, TimeSpan.FromMilliseconds(100)),
-                5));
+                5,
+                TimeSpan.FromSeconds(30)));
     }
     
     [PublicAPI]
