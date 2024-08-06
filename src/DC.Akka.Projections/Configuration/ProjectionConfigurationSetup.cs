@@ -285,12 +285,27 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                 var projectionRef = Context.Child(id);
 
                 if (projectionRef.IsNobody())
+                {
                     projectionRef =
                         Context.ActorOf(
-                            Props.Create(() => new DocumentProjection<TId, TDocument>(projectionName, cmd.Id)), id);
+                            Props.Create(() => new DocumentProjection<TId, TDocument>(projectionName, cmd.Id)), SanitizeActorName(id));
+                }
 
                 Sender.Tell(new Responses.GetProjectionRefResponse(projectionRef));
             });
+        }
+
+        private static string SanitizeActorName(string id)
+        {
+            const string validSymbols = "\"-_.*$+:@&=,!~';()";
+
+            if (id.StartsWith('$'))
+                id = id[1..];
+
+            var chars = id
+                .Where(x => char.IsAsciiLetter(x) || char.IsAsciiDigit(x) || validSymbols.Contains(x));
+
+            return string.Join("", chars);
         }
     }
 }
