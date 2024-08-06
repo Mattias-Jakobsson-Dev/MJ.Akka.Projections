@@ -5,78 +5,98 @@ using Xunit;
 
 namespace DC.Akka.Projections.Tests;
 
-public class When_projecting_two_events_to_two_simple_documents_with_normal_storage : BaseProjectionsTest
+public class When_projecting_two_events_to_two_simple_documents_with_normal_storage
 {
-    protected virtual int ExpectedPosition => 2;
-    
-    protected override IImmutableList<object> WhenEvents()
+    public class With_string_id : BaseTests<string>
     {
-        return ImmutableList.Create<object>(
-            new Events.FirstEvent("1"),
-            new Events.SecondEvent("2"));
+        protected override string FirstDocumentId { get; } = Guid.NewGuid().ToString();
+        protected override string SecondDocumentId { get; } = Guid.NewGuid().ToString();
     }
     
-    [Fact]
-    public async Task Then_position_should_be_correct()
+    public class With_int_id : BaseTests<int>
     {
-        var position = await LoadPosition();
-
-        position.Should().Be(ExpectedPosition);
+        protected override int FirstDocumentId => 1;
+        protected override int SecondDocumentId => 2;
     }
     
-    [Fact]
-    public async Task Exactly_two_documents_should_be_saved()
+    public abstract class BaseTests<TId> : BaseProjectionsTest<TId> where TId : notnull
     {
-        var docs = await LoadAllDocuments();
+        protected virtual int ExpectedPosition => 2;
+        protected abstract TId FirstDocumentId { get; }
+        protected abstract TId SecondDocumentId { get; }
 
-        docs.Should().HaveCount(2);
-    }
-    
-    [Fact]
-    public async Task Then_first_document_should_be_saved()
-    {
-        var doc = await LoadDocument("1");
+        protected readonly string FirstEventId = Guid.NewGuid().ToString();
+        protected readonly string SecondEventId = Guid.NewGuid().ToString();
 
-        doc.Should().NotBeNull();
-    }
-    
-    [Fact]
-    public async Task Then_second_document_should_be_saved()
-    {
-        var doc = await LoadDocument("2");
+        protected override IImmutableList<object> WhenEvents()
+        {
+            return ImmutableList.Create<object>(
+                new Events<TId>.FirstEvent(FirstDocumentId, FirstEventId),
+                new Events<TId>.SecondEvent(SecondDocumentId, SecondEventId));
+        }
 
-        doc.Should().NotBeNull();
-    }
+        [Fact]
+        public async Task Then_position_should_be_correct()
+        {
+            var position = await LoadPosition();
 
-    [Fact]
-    public async Task Then_first_document_should_have_added_one_event()
-    {
-        var doc = await LoadDocument("1");
+            position.Should().Be(ExpectedPosition);
+        }
 
-        doc!.HandledEvents.Should().HaveCount(1);
-    }
-    
-    [Fact]
-    public async Task Then_second_document_should_have_added_one_event()
-    {
-        var doc = await LoadDocument("2");
+        [Fact]
+        public async Task Exactly_two_documents_should_be_saved()
+        {
+            var docs = await LoadAllDocuments();
 
-        doc!.HandledEvents.Should().HaveCount(1);
-    }
-    
-    [Fact]
-    public async Task Then_first_document_should_have_added_first_event()
-    {
-        var doc = await LoadDocument("1");
+            docs.Should().HaveCount(2);
+        }
 
-        doc!.HandledEvents[0].Should().BeOfType<Events.FirstEvent>();
-    }
-    
-    [Fact]
-    public async Task Then_second_document_should_have_added_second_event()
-    {
-        var doc = await LoadDocument("2");
+        [Fact]
+        public async Task Then_first_document_should_be_saved()
+        {
+            var doc = await LoadDocument(FirstDocumentId);
 
-        doc!.HandledEvents[0].Should().BeOfType<Events.SecondEvent>();
+            doc.Should().NotBeNull();
+        }
+
+        [Fact]
+        public async Task Then_second_document_should_be_saved()
+        {
+            var doc = await LoadDocument(SecondDocumentId);
+
+            doc.Should().NotBeNull();
+        }
+
+        [Fact]
+        public async Task Then_first_document_should_have_added_one_event()
+        {
+            var doc = await LoadDocument(FirstDocumentId);
+
+            doc!.HandledEvents.Should().HaveCount(1);
+        }
+
+        [Fact]
+        public async Task Then_second_document_should_have_added_one_event()
+        {
+            var doc = await LoadDocument(SecondDocumentId);
+
+            doc!.HandledEvents.Should().HaveCount(1);
+        }
+
+        [Fact]
+        public async Task Then_first_document_should_have_added_first_event()
+        {
+            var doc = await LoadDocument(FirstDocumentId);
+
+            doc!.HandledEvents[0].Should().Be(FirstEventId);
+        }
+
+        [Fact]
+        public async Task Then_second_document_should_have_added_second_event()
+        {
+            var doc = await LoadDocument(SecondDocumentId);
+
+            doc!.HandledEvents[0].Should().Be(SecondEventId);
+        }
     }
 }

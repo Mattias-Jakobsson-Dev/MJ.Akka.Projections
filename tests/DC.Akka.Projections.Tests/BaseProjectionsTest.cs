@@ -9,17 +9,17 @@ using Xunit;
 
 namespace DC.Akka.Projections.Tests;
 
-public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
+public abstract class BaseProjectionsTest<TId> : TestKit, IAsyncLifetime where TId : notnull
 {
-    private TestProjection _projection = null!;
-    protected TestInMemoryProjectionStorage<TestDocument> Storage = null!;
+    private TestProjection<TId> _projection = null!;
+    protected TestInMemoryProjectionStorage<TId, TestDocument<TId>> Storage = null!;
     [PublicAPI]
     protected IProjectionPositionStorage PositionStorage = null!;
     
     public async Task InitializeAsync()
     {
-        _projection = new TestProjection(WhenEvents());
-        Storage = new TestInMemoryProjectionStorage<TestDocument>();
+        _projection = new TestProjection<TId>(WhenEvents());
+        Storage = new TestInMemoryProjectionStorage<TId, TestDocument<TId>>();
         PositionStorage = new InMemoryProjectionPositionStorage();
 
         var projectionsApplication = Sys.Projections();
@@ -30,7 +30,7 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
             documents
                 .Select(x => (x.Id, x, ActorRefs.NoSender))
                 .ToImmutableList(),
-            ImmutableList<(string id, IActorRef ackTo)>.Empty);
+            ImmutableList<(TId id, IActorRef ackTo)>.Empty);
 
         await transaction.Commit();
 
@@ -44,8 +44,8 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    protected virtual IProjectionConfigurationSetup<string, TestDocument> Configure(
-        IProjectionConfigurationSetup<string, TestDocument> config)
+    protected virtual IProjectionConfigurationSetup<TId, TestDocument<TId>> Configure(
+        IProjectionConfigurationSetup<TId, TestDocument<TId>> config)
     {
         return config
             .WithProjectionStorage(Storage)
@@ -59,14 +59,14 @@ public abstract class BaseProjectionsTest : TestKit, IAsyncLifetime
     }
     
     [PublicAPI]
-    protected virtual IImmutableList<TestDocument> GivenDocuments()
+    protected virtual IImmutableList<TestDocument<TId>> GivenDocuments()
     {
-        return ImmutableList<TestDocument>.Empty;
+        return ImmutableList<TestDocument<TId>>.Empty;
     }
     
     protected abstract IImmutableList<object> WhenEvents();
 
-    protected async Task<TestDocument?> LoadDocument(string id)
+    protected async Task<TestDocument<TId>?> LoadDocument(TId id)
     {
         var (document, _) = await Storage.LoadDocument(id);
 

@@ -59,6 +59,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             _killSwitch = RestartSource
                 .OnFailuresWithBackoff(() =>
                 {
+                    _logger.Info("Starting projection source for {Name} from {Position}", _configuration.Name, latestPosition);
+                    
                     return _configuration
                         .StartSource(latestPosition)
                         .GroupedWithin(
@@ -76,8 +78,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                     Event = x,
                                     Id = _configuration.ProjectionsHandler.GetDocumentIdFrom(x.Event)
                                 })
-                                .Where(x => x.Id != null)
-                                .GroupBy(x => x.Id!)
+                                .GroupBy(x => x.Id)
                                 .Select(x => (
                                     Events: x.Select(y => y.Event).ToImmutableList(),
                                     Id: x.Key));
@@ -88,9 +89,12 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                             {
                                 if (data.Events.IsEmpty)
                                     return null;
+                                
+                                if (!data.Id.HasMatch || data.Id.Id == null)
+                                    return data.Events.Select(x => x.Position).Max();
 
                                 var projectionRef =
-                                    await _configuration.CreateProjectionRef(data.Id);
+                                    await _configuration.CreateProjectionRef(data.Id.Id);
 
                                 try
                                 {
@@ -102,7 +106,14 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                                         data.Id,
                                                         data.Events),
                                                     _configuration.ProjectionStreamConfiguration.ProjectDocumentTimeout),
-                                            _configuration.ProjectionStreamConfiguration.MaxProjectionRetries);
+                                            _configuration.ProjectionStreamConfiguration.MaxProjectionRetries,
+                                            (retries, exception) => _logger
+                                                .Warning(
+                                                    exception, 
+                                                    "Failed handling {Count} events for {EntityId}, retrying (tries: {Tries})", 
+                                                    data.Events.Count,
+                                                    data.Id,
+                                                    retries));
 
                                     return response switch
                                     {
@@ -115,7 +126,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                 catch (Exception e)
                                 {
                                     _logger
-                                        .Error(e, "Failed handling events for {EntityId}", data.Id);
+                                        .Error(e, "Failed handling {Count} events for {EntityId}", data.Events.Count, data.Id);
 
                                     throw;
                                 }

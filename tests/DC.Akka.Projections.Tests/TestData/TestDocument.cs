@@ -1,9 +1,11 @@
 using System.Collections.Immutable;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Tests.TestData;
 
-public class TestDocument
+[PublicAPI]
+public class TestDocument<TId>
 {
-    public string Id { get; set; } = null!;
-    public IImmutableList<Events.IEvent> HandledEvents { get; set; } = ImmutableList<Events.IEvent>.Empty;
+    public TId Id { get; set; } = default!;
+    public IImmutableList<string> HandledEvents { get; set; } = ImmutableList<string>.Empty;
 }

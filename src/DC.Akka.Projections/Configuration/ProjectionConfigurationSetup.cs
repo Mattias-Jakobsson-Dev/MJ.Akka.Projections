@@ -230,14 +230,18 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                 return hasTransformed ? results : ImmutableList.Create(evnt);
             }
             
-            public TId? GetDocumentIdFrom(object evnt)
+            public IHandleEventInProjection<TId, TDocument>.DocumentIdResponse GetDocumentIdFrom(object evnt)
             {
                 var typesToCheck = evnt.GetType().GetInheritedTypes();
 
-                return (from type in typesToCheck
+                var ids = (from type in typesToCheck
                         where handlers.ContainsKey(type)
                         select handlers[type].GetId(evnt))
-                    .FirstOrDefault();
+                    .ToImmutableList();
+
+                return new IHandleEventInProjection<TId, TDocument>.DocumentIdResponse(
+                    ids.FirstOrDefault(),
+                    !ids.IsEmpty);
             }
 
             public async Task<TDocument?> Handle(TDocument? document, object evnt, long position)

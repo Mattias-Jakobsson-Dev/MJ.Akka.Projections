@@ -4,38 +4,39 @@ using Akka.Streams.Dsl;
 
 namespace DC.Akka.Projections.Tests.TestData;
 
-public class TestProjection(IImmutableList<object> events) : IProjection<string, TestDocument>
+public class TestProjection<TId>(IImmutableList<object> events) : IProjection<TId, TestDocument<TId>> 
+    where TId : notnull
 {
-    public string Name => nameof(TestProjection);
+    public string Name => nameof(TestProjection<TId>);
 
-    public ISetupProjection<string, TestDocument> Configure(ISetupProjection<string, TestDocument> config)
+    public ISetupProjection<TId, TestDocument<TId>> Configure(ISetupProjection<TId, TestDocument<TId>> config)
     {
         return config
-            .TransformUsing<Events.TransformToMultipleEvents>(
+            .TransformUsing<Events<TId>.TransformToMultipleEvents>(
                 evnt => evnt.Events.OfType<object>().ToImmutableList())
-            .On<Events.FirstEvent>(
+            .On<Events<TId>.FirstEvent>(
                 x => x.DocId,
                 (evnt, doc) =>
                 {
-                    doc ??= new TestDocument
+                    doc ??= new TestDocument<TId>
                     {
                         Id = evnt.DocId
                     };
 
-                    doc.HandledEvents = doc.HandledEvents.Add(evnt);
+                    doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
 
                     return doc;
                 })
-            .On<Events.SecondEvent>(
+            .On<Events<TId>.SecondEvent>(
                 x => x.DocId,
                 (evnt, doc) =>
                 {
-                    doc ??= new TestDocument
+                    doc ??= new TestDocument<TId>
                     {
                         Id = evnt.DocId
                     };
 
-                    doc.HandledEvents = doc.HandledEvents.Add(evnt);
+                    doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
 
                     return doc;
                 });
