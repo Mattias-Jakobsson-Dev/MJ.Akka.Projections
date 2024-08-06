@@ -4,7 +4,8 @@ using DC.Akka.Projections.Configuration;
 
 namespace DC.Akka.Projections;
 
-public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnull where TDocument : notnull
+public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers 
+    where TId : notnull where TDocument : notnull
 {
     public static class Commands
     {
@@ -14,11 +15,15 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnu
     private readonly ProjectionConfiguration<TId, TDocument> _configuration;
     private readonly string _projectionName;
     private readonly TId _id;
+    private readonly TimeSpan? _passivateAfter;
+    
+    public ITimerScheduler? Timers { get; set; }
 
-    public DocumentProjection(string projectionName, TId id)
+    public DocumentProjection(string projectionName, TId id, TimeSpan? passivateAfter)
     {
         _projectionName = projectionName;
         _id = id;
+        _passivateAfter = passivateAfter;
         
         var configuration = Context.System.GetExtension<ProjectionsApplication>()
             .GetProjectionConfiguration<TId, TDocument>(projectionName);
@@ -26,6 +31,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnu
         _configuration = configuration ?? throw new NoDocumentProjectionException<TId, TDocument>(id);
 
         Become(NotLoaded);
+
+        HandlePassivation();
     }
 
     private void NotLoaded()
@@ -38,6 +45,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnu
             
             if (!requireReload)
                 Become(() => Loaded(document));
+            
+            HandlePassivation();
         });
     }
 
@@ -48,6 +57,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnu
             document = await ProjectEvents(document, cmd.Events);
             
             Become(() => Loaded(document));
+            
+            HandlePassivation();
         });
     }
 
@@ -88,5 +99,16 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor where TId : notnu
             
             throw;
         }
+    }
+
+    private void HandlePassivation()
+    {
+        if (_passivateAfter == null || Timers == null)
+            return;
+        
+        Timers.StartSingleTimer(
+            "passivation",
+            PoisonPill.Instance,
+            _passivateAfter.Value);
     }
 }

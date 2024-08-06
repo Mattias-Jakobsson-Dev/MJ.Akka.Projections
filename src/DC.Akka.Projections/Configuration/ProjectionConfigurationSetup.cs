@@ -288,7 +288,12 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                 {
                     projectionRef =
                         Context.ActorOf(
-                            Props.Create(() => new DocumentProjection<TId, TDocument>(projectionName, cmd.Id)), SanitizeActorName(id));
+                            Props.Create(
+                                () => new DocumentProjection<TId, TDocument>(
+                                    projectionName,
+                                    cmd.Id,
+                                    TimeSpan.FromMinutes(2))), 
+                            SanitizeActorName(id));
                 }
 
                 Sender.Tell(new Responses.GetProjectionRefResponse(projectionRef));

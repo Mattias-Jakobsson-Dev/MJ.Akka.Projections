@@ -28,7 +28,8 @@ public static class ProjectionConfigurationSetupExtensions
             typeName: $"projection-{setup.Projection.Name}",
             entityPropsFactory: id => Props.Create(() => new DocumentProjection<TId, TDocument>(
                 setup.Projection.Name,
-                parseId(id))),
+                parseId(id),
+                null)),
             settings: (configureShard ?? (x => x))(ClusterShardingSettings.Create(setup.Application.ActorSystem)),
             messageExtractor: new MessageExtractor<TId, TDocument>(maxNumberOfShards));
         
