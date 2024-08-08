@@ -19,18 +19,17 @@ public static class ProjectionConfigurationSetupExtensions
         where TDocument : notnull
     {
         var coordinator = CreateCoordinator(setup, configureCoordinator);
-        
-        var projectionShard = ClusterSharding.Get(setup.Application.ActorSystem).Start(
+
+        var projectionShard = ClusterSharding.Get(setup.ActorSystem).Start(
             typeName: $"projection-{setup.Projection.Name}",
             entityPropsFactory: id => Props.Create(() => new DocumentProjection<TId, TDocument>(
                 setup.Projection.Name,
                 parseId(id),
                 null)),
-            settings: (configureShard ?? (x => x))(ClusterShardingSettings.Create(setup.Application.ActorSystem)),
+            settings: (configureShard ?? (x => x))(ClusterShardingSettings.Create(setup.ActorSystem)),
             messageExtractor: new MessageExtractor<TId, TDocument>(maxNumberOfShards));
-        
+
         return setup
-            .AutoStart()
             .WithCoordinatorFactory(() => Task.FromResult(coordinator))
             .WithProjectionFactory(_ => Task.FromResult(projectionShard));
     }
@@ -43,9 +42,8 @@ public static class ProjectionConfigurationSetupExtensions
         where TDocument : notnull
     {
         var coordinator = CreateCoordinator(setup, configureCoordinator);
-        
+
         return setup
-            .AutoStart()
             .WithCoordinatorFactory(() => Task.FromResult(coordinator));
     }
 
@@ -55,14 +53,15 @@ public static class ProjectionConfigurationSetupExtensions
         where TId : notnull
         where TDocument : notnull
     {
-        return setup.Application.ActorSystem.ActorOf(ClusterSingletonManager.Props(
+        return setup.ActorSystem.ActorOf(ClusterSingletonManager.Props(
                 singletonProps: Props.Create(() => new ProjectionsCoordinator<TId, TDocument>(setup.Projection.Name)),
                 terminationMessage: PoisonPill.Instance,
-                settings: (configureCoordinator ?? (x => x))(ClusterSingletonManagerSettings.Create(setup.Application.ActorSystem))),
+                settings: (configureCoordinator ?? (x => x))(
+                    ClusterSingletonManagerSettings.Create(setup.ActorSystem))),
             name: setup.Projection.Name);
     }
-    
-    private class MessageExtractor<TId, TDocument>(int maxNumberOfShards) 
+
+    private class MessageExtractor<TId, TDocument>(int maxNumberOfShards)
         : HashCodeMessageExtractor(maxNumberOfShards) where TId : notnull where TDocument : notnull
     {
         public override string EntityId(object message)

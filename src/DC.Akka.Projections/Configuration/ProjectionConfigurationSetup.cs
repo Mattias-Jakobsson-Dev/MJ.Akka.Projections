@@ -7,36 +7,24 @@ namespace DC.Akka.Projections.Configuration;
 
 public class ProjectionConfigurationSetup<TId, TDocument>(
     IProjection<TId, TDocument> projection,
-    ProjectionsApplication application)
+    ActorSystem actorSystem)
     : IProjectionConfigurationSetup<TId, TDocument>
     where TId : notnull where TDocument : notnull
 {
-    private bool _autoStart;
-
-    private Func<TId, Task<IActorRef>>? _projectionRefFactory;
+    private Func<object, Task<IActorRef>>? _projectionRefFactory;
 
     private Func<Task<IActorRef>>? _projectionCoordinatorFactory;
 
-    private IProjectionStorage _storage = new InMemoryPositionStorage();
+    private IProjectionStorage? _storage;
 
-    private IProjectionPositionStorage _positionStorage = new InMemoryProjectionPositionStorage();
+    private IProjectionPositionStorage? _positionStorage;
 
-    private ProjectionStreamConfiguration _projectionStreamConfiguration =
-        ProjectionStreamConfiguration.Default;
+    private ProjectionStreamConfiguration? _projectionStreamConfiguration;
 
-    private RestartSettings _restartSettings = RestartSettings
-        .Create(TimeSpan.FromSeconds(3), TimeSpan.FromMinutes(1), 0.2)
-        .WithMaxRestarts(5, TimeSpan.FromMinutes(15));
+    private RestartSettings? _restartSettings;
 
     public IProjection<TId, TDocument> Projection { get; } = projection;
-    public ProjectionsApplication Application => application;
-
-    public IProjectionConfigurationSetup<TId, TDocument> AutoStart()
-    {
-        _autoStart = true;
-
-        return this;
-    }
+    public ActorSystem ActorSystem => actorSystem;
 
     public IProjectionConfigurationSetup<TId, TDocument> WithCoordinatorFactory(Func<Task<IActorRef>> factory)
     {
@@ -45,7 +33,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         return this;
     }
 
-    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionFactory(Func<TId, Task<IActorRef>> factory)
+    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionFactory(Func<object, Task<IActorRef>> factory)
     {
         _projectionRefFactory = factory;
 
@@ -80,43 +68,46 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
 
         return this;
     }
-    
-    public ProjectionConfiguration<TId, TDocument> Build()
+
+    public ProjectionConfiguration<TId, TDocument> Build(IProjectionsSetup projectionsSetup)
     {
         var setup = new SetupProjection();
 
         var eventHandler = Projection.Configure(setup).Build();
 
-        if (_projectionRefFactory == null)
+        var projectionRefFactory = _projectionRefFactory ?? projectionsSetup.ProjectionFactory;
+
+        if (projectionRefFactory == null)
         {
             var documentProjectionCoordinator =
-                Application.ActorSystem.ActorOf(Props.Create(() => new InProcDocumentProjectionCoordinator(Projection.Name)));
+                ActorSystem.ActorOf(Props.Create(() => new InProcDocumentProjectionCoordinator(Projection.Name)));
 
-            _projectionRefFactory = async id =>
+            projectionRefFactory = async id =>
             {
                 var response = await documentProjectionCoordinator
                     .Ask<InProcDocumentProjectionCoordinator.Responses.GetProjectionRefResponse>(
-                        new InProcDocumentProjectionCoordinator.Queries.GetProjectionRef(id));
+                        new InProcDocumentProjectionCoordinator.Queries.GetProjectionRef((TId)id));
 
-                return response.ProjectionRef ?? throw new NoDocumentProjectionException<TId, TDocument>(id);
+                return response.ProjectionRef ?? throw new NoDocumentProjectionException<TId, TDocument>((TId)id);
             };
         }
 
+        var projectionCoordinatorFactory = (_projectionCoordinatorFactory ?? projectionsSetup.CoordinatorFactory) ??
+                                           (() => Task.FromResult(ActorSystem.ActorOf(
+                                               Props.Create(() =>
+                                                   new ProjectionsCoordinator<TId, TDocument>(Projection.Name)),
+                                               Projection.Name)));
+
         return new ProjectionConfiguration<TId, TDocument>(
             Projection.Name,
-            _autoStart,
-            _storage,
-            _positionStorage,
+            _storage ?? projectionsSetup.Storage,
+            _positionStorage ?? projectionsSetup.PositionStorage,
             eventHandler,
             Projection.StartSource,
-            _projectionRefFactory,
-            _projectionCoordinatorFactory ??= () =>
-            {
-                return Task.FromResult(Application.ActorSystem.ActorOf(
-                    Props.Create(() => new ProjectionsCoordinator<TId, TDocument>(Projection.Name)), Projection.Name));
-            },
-            _restartSettings,
-            _projectionStreamConfiguration);
+            projectionRefFactory,
+            projectionCoordinatorFactory,
+            _restartSettings ?? projectionsSetup.RestartSettings,
+            _projectionStreamConfiguration ?? projectionsSetup.ProjectionStreamConfiguration);
     }
 
     private class SetupProjection : ISetupProjection<TId, TDocument>
@@ -162,7 +153,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                 getId,
                 (evnt, doc, _) => handler(evnt, doc));
         }
-        
+
         public ISetupProjection<TId, TDocument> TransformUsing<TEvent>(
             Func<TEvent, IImmutableList<object>> transform)
         {
@@ -195,7 +186,8 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         }
 
         private class EventHandler(
-            IImmutableDictionary<Type, (Func<object, TId> GetId, Func<object, TDocument?, long, Task<TDocument?>> Handle)>
+            IImmutableDictionary<Type, (Func<object, TId> GetId, Func<object, TDocument?, long, Task<TDocument?>> Handle
+                    )>
                 handlers,
             IImmutableDictionary<Type, Func<object, IImmutableList<object>>> transformers)
             : IHandleEventInProjection<TId, TDocument>
@@ -208,9 +200,9 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
 
                 foreach (var type in typesToCheck)
                 {
-                    if (!transformers.ContainsKey(type)) 
+                    if (!transformers.ContainsKey(type))
                         continue;
-                    
+
                     results = results.AddRange(transformers[type](evnt));
 
                     hasTransformed = true;
@@ -218,7 +210,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
 
                 return hasTransformed ? results : ImmutableList.Create(evnt);
             }
-            
+
             public IHandleEventInProjection<TId, TDocument>.DocumentIdResponse GetDocumentIdFrom(object evnt)
             {
                 var typesToCheck = evnt.GetType().GetInheritedTypes();
@@ -285,7 +277,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                                 () => new DocumentProjection<TId, TDocument>(
                                     projectionName,
                                     cmd.Id,
-                                    TimeSpan.FromMinutes(2))), 
+                                    TimeSpan.FromMinutes(2))),
                             SanitizeActorName(id));
                 }
 

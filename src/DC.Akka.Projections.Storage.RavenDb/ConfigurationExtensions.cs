@@ -24,7 +24,7 @@ public static class ConfigurationExtensions
     {
         var storage = new RavenDbProjectionStorage(documentStore)
             .Batched(
-                setup.Application.ActorSystem,
+                setup.ActorSystem,
                 batchSize, 
                 parallelism);
         

@@ -4,9 +4,9 @@ namespace DC.Akka.Projections.Configuration;
 
 public static class ActorSystemExtensions
 {
-    public static ProjectionsApplication Projections(this ActorSystem actorSystem)
+    public static IProjectionsSetup Projections(this ActorSystem actorSystem)
     {
-        return actorSystem.WithExtension<ProjectionsApplication, ProjectionsApplication.Provider>();
+        return ProjectionsSetup.CreateDefault(actorSystem);
     }
 }
 

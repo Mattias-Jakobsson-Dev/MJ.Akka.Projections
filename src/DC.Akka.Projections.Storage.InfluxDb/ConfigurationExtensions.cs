@@ -24,7 +24,7 @@ public static class ConfigurationExtensions
     {
         var storage = new InfluxDbProjectionStorage(client)
             .Batched(
-                setup.Application.ActorSystem,
+                setup.ActorSystem,
                 batchSize, 
                 parallelism);
         

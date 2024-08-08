@@ -2,24 +2,25 @@ using System.Collections.Immutable;
 using DC.Akka.Projections.Tests.TestData;
 using FluentAssertions;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace DC.Akka.Projections.Tests;
 
 public class When_projecting_two_events_to_two_simple_documents_with_normal_storage
 {
-    public class With_string_id : BaseTests<string>
+    public class With_string_id(ITestOutputHelper output) : BaseTests<string>(output)
     {
         protected override string FirstDocumentId { get; } = Guid.NewGuid().ToString();
         protected override string SecondDocumentId { get; } = Guid.NewGuid().ToString();
     }
     
-    public class With_int_id : BaseTests<int>
+    public class With_int_id(ITestOutputHelper output) : BaseTests<int>(output)
     {
         protected override int FirstDocumentId => 1;
         protected override int SecondDocumentId => 2;
     }
     
-    public abstract class BaseTests<TId> : BaseProjectionsTest<TId> where TId : notnull
+    public abstract class BaseTests<TId>(ITestOutputHelper output) : BaseProjectionsTest<TId>(output) where TId : notnull
     {
         protected virtual int ExpectedPosition => 2;
         protected abstract TId FirstDocumentId { get; }

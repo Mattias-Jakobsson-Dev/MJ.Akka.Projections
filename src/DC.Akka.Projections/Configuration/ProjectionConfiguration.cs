@@ -6,14 +6,31 @@ using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections.Configuration;
 
-public record ProjectionConfiguration<TId, TDocument>(
-    string Name,
-    bool AutoStart,
-    IProjectionStorage DocumentStorage,
-    IProjectionPositionStorage PositionStorage,
-    IHandleEventInProjection<TId, TDocument> ProjectionsHandler,
-    Func<long?, Source<EventWithPosition, NotUsed>> StartSource,
-    Func<TId, Task<IActorRef>> CreateProjectionRef,
-    Func<Task<IActorRef>> CreateProjectionCoordinator,
-    RestartSettings RestartSettings,
-    ProjectionStreamConfiguration ProjectionStreamConfiguration) where TId : notnull where TDocument : notnull;
+public class ProjectionConfiguration<TId, TDocument>(
+    string name,
+    IProjectionStorage documentStorage,
+    IProjectionPositionStorage positionStorage,
+    IHandleEventInProjection<TId, TDocument> projectionsHandler,
+    Func<long?, Source<EventWithPosition, NotUsed>> startSource,
+    Func<object, Task<IActorRef>> createProjectionRef,
+    Func<Task<IActorRef>> createProjectionCoordinator,
+    RestartSettings? restartSettings,
+    ProjectionStreamConfiguration projectionStreamConfiguration) 
+    : ExtensionIdProvider<ProjectionConfiguration<TId, TDocument>>, IExtension
+    where TId : notnull where TDocument : notnull
+{
+    public string Name { get; } = name;
+    public IProjectionStorage DocumentStorage { get; } = documentStorage;
+    public IProjectionPositionStorage PositionStorage { get; } = positionStorage;
+    public IHandleEventInProjection<TId, TDocument> ProjectionsHandler { get; } = projectionsHandler;
+    public Func<long?, Source<EventWithPosition, NotUsed>> StartSource { get; } = startSource;
+    public Func<object, Task<IActorRef>> CreateProjectionRef { get; } = createProjectionRef;
+    public Func<Task<IActorRef>> CreateProjectionCoordinator { get; } = createProjectionCoordinator;
+    public RestartSettings? RestartSettings { get; } = restartSettings;
+    public ProjectionStreamConfiguration ProjectionStreamConfiguration { get; } = projectionStreamConfiguration;
+    
+    public override ProjectionConfiguration<TId, TDocument> CreateExtension(ExtendedActorSystem system)
+    {
+        return this;
+    }
+}

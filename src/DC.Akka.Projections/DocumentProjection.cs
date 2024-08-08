@@ -23,9 +23,9 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
     {
         _id = id;
         _passivateAfter = passivateAfter;
-        
-        var configuration = Context.System.GetExtension<ProjectionsApplication>()
-            .GetProjectionConfiguration<TId, TDocument>(projectionName);
+
+        var configuration = Context.System.GetExtension<ProjectionConfiguration<TId, TDocument>>() ??
+                            throw new NoDocumentProjectionException<TDocument>(projectionName);
 
         _configuration = configuration ?? throw new NoDocumentProjectionException<TId, TDocument>(id);
 

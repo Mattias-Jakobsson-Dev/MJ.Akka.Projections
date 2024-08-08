@@ -41,8 +41,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         _configuration = Context
                              .System
-                             .GetExtension<ProjectionsApplication>()
-                             .GetProjectionConfiguration<TId, TDocument>(projectionName) ??
+                             .GetExtension<ProjectionConfiguration<TId, TDocument>>() ??
                          throw new NoDocumentProjectionException<TDocument>(projectionName);
 
         Become(Stopped);
@@ -56,8 +55,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
             var latestPosition = await _configuration.PositionStorage.LoadLatestPosition(_configuration.Name);
 
-            _killSwitch = RestartSource
-                .OnFailuresWithBackoff(() =>
+            _killSwitch = MaybeCreateRestartSource(() =>
                 {
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Name, latestPosition);
                     
@@ -209,16 +207,24 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
     protected override void PreStart()
     {
-        if (_configuration.AutoStart)
-            Self.Tell(new Commands.Start());
+        Self.Tell(new Commands.Start());
 
         base.PreStart();
     }
+    
+    private static Source<NotUsed, NotUsed> MaybeCreateRestartSource(
+        Func<Source<NotUsed, NotUsed>> createSource,
+        RestartSettings? restartSettings)
+    {
+        return restartSettings != null
+            ? RestartSource.OnFailuresWithBackoff(createSource, restartSettings)
+            : createSource();
+    }
 
     [PublicAPI]
-    public class Proxy(IActorRef coordinator)
+    public class Proxy(IActorRef coordinator) : IProjectionProxy
     {
-        public void Start()
+        internal void Start()
         {
             coordinator.Tell(new Commands.Start());
         }
@@ -236,13 +242,6 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
             if (response.Error != null)
                 throw response.Error;
-        }
-
-        public async Task RunToCompletion(TimeSpan? timeout = null)
-        {
-            Start();
-
-            await WaitForCompletion(timeout);
         }
     }
 }

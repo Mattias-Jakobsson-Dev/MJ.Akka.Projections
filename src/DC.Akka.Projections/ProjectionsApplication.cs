@@ -1,43 +1,37 @@
-using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Akka.Actor;
-using DC.Akka.Projections.Configuration;
 using JetBrains.Annotations;
 
 namespace DC.Akka.Projections;
 
-public class ProjectionsApplication(ActorSystem actorSystem) : IExtension
+public class ProjectionsApplication(ActorSystem actorSystem, IImmutableDictionary<string, IProjectionProxy> projections) 
+    : ExtensionIdProvider<ProjectionsApplication>, IExtension
 {
-    private readonly ConcurrentDictionary<string, object> _projections = new();
-
     public ActorSystem ActorSystem => actorSystem;
 
-    public async Task<ProjectionsCoordinator<TId, TDocument>.Proxy> WithProjection<TId, TDocument>(
-        IProjection<TId, TDocument> projection,
-        Func<IProjectionConfigurationSetup<TId, TDocument>, IProjectionConfigurationSetup<TId, TDocument>> configure)
-        where TId : notnull where TDocument : notnull
+    // public async Task<ProjectionsCoordinator<TId, TDocument>.Proxy> WithProjection<TId, TDocument>(
+    //     IProjection<TId, TDocument> projection,
+    //     Func<IProjectionConfigurationSetup<TId, TDocument>, IProjectionConfigurationSetup<TId, TDocument>> configure)
+    //     where TId : notnull where TDocument : notnull
+    // {
+    //     var configuration = configure(new ProjectionConfigurationSetup<TId, TDocument>(projection, this))
+    //         .Build();
+    //     
+    //     _projections.AddOrUpdate(projection.Name, _ => configuration, (_, _) => configuration);
+    //
+    //     var coordinator = await configuration.CreateProjectionCoordinator();
+    //
+    //     return new ProjectionsCoordinator<TId, TDocument>.Proxy(coordinator);
+    // }
+    //
+
+    public IProjectionProxy? GetProjection(string projectionName)
     {
-        var configuration = configure(new ProjectionConfigurationSetup<TId, TDocument>(projection, this))
-            .Build();
-        
-        _projections.AddOrUpdate(projection.Name, _ => configuration, (_, _) => configuration);
-
-        var coordinator = await configuration.CreateProjectionCoordinator();
-
-        return new ProjectionsCoordinator<TId, TDocument>.Proxy(coordinator);
+        return projections.GetValueOrDefault(projectionName);
     }
     
-    public ProjectionConfiguration<TId, TDocument>? GetProjectionConfiguration<TId, TDocument>(string name)
-        where TId : notnull where TDocument : notnull
+    public override ProjectionsApplication CreateExtension(ExtendedActorSystem system)
     {
-        return _projections.GetValueOrDefault(name) as ProjectionConfiguration<TId, TDocument>;
-    }
-    
-    [PublicAPI]
-    internal class Provider : ExtensionIdProvider<ProjectionsApplication>
-    {
-        public override ProjectionsApplication CreateExtension(ExtendedActorSystem system)
-        {
-            return new ProjectionsApplication(system);
-        }
+        return this;
     }
 }

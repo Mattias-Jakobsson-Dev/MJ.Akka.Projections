@@ -6,10 +6,12 @@ using DC.Akka.Projections.Storage;
 using DC.Akka.Projections.Tests.TestData;
 using JetBrains.Annotations;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace DC.Akka.Projections.Tests;
 
-public abstract class BaseProjectionsTest<TId> : TestKit, IAsyncLifetime where TId : notnull
+public abstract class BaseProjectionsTest<TId>(ITestOutputHelper output) : TestKit(output: output), IAsyncLifetime 
+    where TId : notnull
 {
     private TestProjection<TId> _projection = null!;
     protected TestInMemoryPositionStorage Storage = null!;
@@ -21,8 +23,6 @@ public abstract class BaseProjectionsTest<TId> : TestKit, IAsyncLifetime where T
         _projection = new TestProjection<TId>(WhenEvents());
         Storage = new TestInMemoryPositionStorage();
         PositionStorage = new InMemoryProjectionPositionStorage();
-
-        var projectionsApplication = Sys.Projections();
         
         var documents = GivenDocuments();
 
@@ -33,9 +33,12 @@ public abstract class BaseProjectionsTest<TId> : TestKit, IAsyncLifetime where T
                     .ToImmutableList(),
                 ImmutableList<DocumentToDelete>.Empty);
         
-        var coordinator = await projectionsApplication.WithProjection(_projection, Configure);
+        var projectionsApplication = await Sys
+            .Projections()
+            .WithProjection(_projection, Configure)
+            .Start();
         
-        await coordinator.RunToCompletion(TimeSpan.FromSeconds(5));
+        await projectionsApplication.GetProjection(_projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
     }
 
     public Task DisposeAsync()

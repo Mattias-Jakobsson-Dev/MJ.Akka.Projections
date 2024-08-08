@@ -25,7 +25,8 @@ public abstract class BaseProjectionBenchmarks
     }
 
     protected ActorSystem ActorSystem { get; private set; } = null!;
-    private ProjectionsCoordinator<string, TestProjection.TestDocument>.Proxy _projection = null!;
+    private IProjectionsSetup _projectionSetup = null!;
+    private TestProjection _projection = null!;
     
     [IterationSetup]
     public void Setup()
@@ -34,12 +35,13 @@ public abstract class BaseProjectionBenchmarks
             "projections", 
             "akka.loglevel = ERROR");
 
-        _projection = ActorSystem
+        _projection = new TestProjection(Configuration.NumberOfEvents, Configuration.NumberOfDocuments);
+
+        _projectionSetup = ActorSystem
             .Projections()
             .WithProjection(
-                new TestProjection(Configuration.NumberOfEvents, Configuration.NumberOfDocuments),
-                Configure)
-            .Result;
+                _projection,
+                Configure);
     }
 
     [PublicAPI]
@@ -49,7 +51,9 @@ public abstract class BaseProjectionBenchmarks
     [Benchmark, EventsPerSecond(nameof(Configuration))]
     public async Task ProjectEvents()
     {
-        await _projection.RunToCompletion();
+        var application = await _projectionSetup.Start();
+
+        await application.GetProjection(_projection.Name)!.WaitForCompletion();
     }
 
     protected abstract IProjectionConfigurationSetup<string, TestProjection.TestDocument> Configure(
