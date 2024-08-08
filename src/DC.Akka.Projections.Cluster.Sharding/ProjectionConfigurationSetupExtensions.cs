@@ -18,11 +18,7 @@ public static class ProjectionConfigurationSetupExtensions
         where TId : notnull
         where TDocument : notnull
     {
-        var coordinator = setup.Application.ActorSystem.ActorOf(ClusterSingletonManager.Props(
-                singletonProps: Props.Create(() => new ProjectionsCoordinator<TId, TDocument>(setup.Projection.Name)),
-                terminationMessage: PoisonPill.Instance,
-                settings: (configureCoordinator ?? (x => x))(ClusterSingletonManagerSettings.Create(setup.Application.ActorSystem))),
-            name: setup.Projection.Name);
+        var coordinator = CreateCoordinator(setup, configureCoordinator);
         
         var projectionShard = ClusterSharding.Get(setup.Application.ActorSystem).Start(
             typeName: $"projection-{setup.Projection.Name}",
@@ -37,6 +33,33 @@ public static class ProjectionConfigurationSetupExtensions
             .AutoStart()
             .WithCoordinatorFactory(() => Task.FromResult(coordinator))
             .WithProjectionFactory(_ => Task.FromResult(projectionShard));
+    }
+
+    public static IProjectionConfigurationSetup<TId, TDocument> AsClusterSingleton<TId, TDocument>(
+        this IProjectionConfigurationSetup<TId, TDocument> setup,
+        Func<string, TId> parseId,
+        Func<ClusterSingletonManagerSettings, ClusterSingletonManagerSettings>? configureCoordinator = null)
+        where TId : notnull
+        where TDocument : notnull
+    {
+        var coordinator = CreateCoordinator(setup, configureCoordinator);
+        
+        return setup
+            .AutoStart()
+            .WithCoordinatorFactory(() => Task.FromResult(coordinator));
+    }
+
+    private static IActorRef CreateCoordinator<TId, TDocument>(
+        IProjectionConfigurationSetup<TId, TDocument> setup,
+        Func<ClusterSingletonManagerSettings, ClusterSingletonManagerSettings>? configureCoordinator = null)
+        where TId : notnull
+        where TDocument : notnull
+    {
+        return setup.Application.ActorSystem.ActorOf(ClusterSingletonManager.Props(
+                singletonProps: Props.Create(() => new ProjectionsCoordinator<TId, TDocument>(setup.Projection.Name)),
+                terminationMessage: PoisonPill.Instance,
+                settings: (configureCoordinator ?? (x => x))(ClusterSingletonManagerSettings.Create(setup.Application.ActorSystem))),
+            name: setup.Projection.Name);
     }
     
     private class MessageExtractor<TId, TDocument>(int maxNumberOfShards) 
