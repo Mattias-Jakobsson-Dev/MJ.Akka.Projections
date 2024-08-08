@@ -37,6 +37,15 @@ build:
 test:
 	dotnet test
 
+.PHONY: benchmark
+benchmark:
+ifeq ($(DETECTED_OS), Windows)
+	dotnet run -c Release --project ./benchmarks/DC.Akka.Projections.Benchmarks
+else
+	sudo dotnet run -c Release --project ./benchmarks/DC.Akka.Projections.Benchmarks
+endif
+	$(MAKE) build
+
 .PHONY: package
 package: clean
 	dotnet pack ./src/DC.Akka.Projections -c Release -o ./.packages

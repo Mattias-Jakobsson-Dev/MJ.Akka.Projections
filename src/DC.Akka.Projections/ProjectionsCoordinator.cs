@@ -52,14 +52,14 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     {
         ReceiveAsync<Commands.Start>(async _ =>
         {
-            _logger.Info("Starting projection {Name}", _configuration.Name);
+            _logger.Info("Starting projection {0}", _configuration.Name);
 
             var latestPosition = await _configuration.PositionStorage.LoadLatestPosition(_configuration.Name);
 
             _killSwitch = RestartSource
                 .OnFailuresWithBackoff(() =>
                 {
-                    _logger.Info("Starting projection source for {Name} from {Position}", _configuration.Name, latestPosition);
+                    _logger.Info("Starting projection source for {0} from {1}", _configuration.Name, latestPosition);
                     
                     return _configuration
                         .StartSource(latestPosition)
@@ -110,7 +110,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                             (retries, exception) => _logger
                                                 .Warning(
                                                     exception, 
-                                                    "Failed handling {Count} events for {EntityId}, retrying (tries: {Tries})", 
+                                                    "Failed handling {0} events for {1}, retrying (tries: {2})", 
                                                     data.Events.Count,
                                                     data.Id,
                                                     retries));
@@ -126,7 +126,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                 catch (Exception e)
                                 {
                                     _logger
-                                        .Error(e, "Failed handling {Count} events for {EntityId}", data.Events.Count, data.Id);
+                                        .Error(e, "Failed handling {0} events for {1}", data.Events.Count, data.Id);
 
                                     throw;
                                 }
@@ -162,7 +162,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         Receive<Commands.Stop>(_ =>
         {
-            _logger.Info("Stopping projection {Name}", _configuration.Name);
+            _logger.Info("Stopping projection {0}", _configuration.Name);
 
             _killSwitch?.Shutdown();
 
@@ -176,7 +176,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         Receive<Commands.Fail>(cmd =>
         {
-            _logger.Error(cmd.Cause, "Projection {Name} failed", _configuration.Name);
+            _logger.Error(cmd.Cause, "Projection {0} failed", _configuration.Name);
 
             _killSwitch?.Shutdown();
 
@@ -231,7 +231,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         {
             var response = await coordinator.Ask<Responses.WaitForCompletionResponse>(
                 new Commands.WaitForCompletion(),
-                timeout ?? TimeSpan.MaxValue);
+                timeout ?? Timeout.InfiniteTimeSpan);
 
             if (response.Error != null)
                 throw response.Error;
