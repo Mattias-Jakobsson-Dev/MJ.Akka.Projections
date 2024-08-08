@@ -7,7 +7,7 @@ using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Storage;
 
-public class InMemoryProjectionStorage<TId, TDocument> : IProjectionStorage<TId, TDocument> 
+public class InMemoryPositionStorage<TId, TDocument> : IProjectionStorage<TId, TDocument> 
     where TId : notnull where TDocument : notnull
 {
     protected readonly ConcurrentDictionary<TId, (Type Type, ReadOnlyMemory<byte> Data)> Documents = new();

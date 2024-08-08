@@ -17,7 +17,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
 
     private Func<Task<IActorRef>>? _projectionCoordinatorFactory;
 
-    private IProjectionStorage<TId, TDocument> _storage = new InMemoryProjectionStorage<TId, TDocument>();
+    private IProjectionStorage<TId, TDocument> _storage = new InMemoryPositionStorage<TId, TDocument>();
 
     private IProjectionPositionStorage _positionStorage = new InMemoryProjectionPositionStorage();
 

@@ -12,14 +12,14 @@ namespace DC.Akka.Projections.Tests;
 public abstract class BaseProjectionsTest<TId> : TestKit, IAsyncLifetime where TId : notnull
 {
     private TestProjection<TId> _projection = null!;
-    protected TestInMemoryProjectionStorage<TId, TestDocument<TId>> Storage = null!;
+    protected TestInMemoryPositionStorage<TId, TestDocument<TId>> Storage = null!;
     [PublicAPI]
     protected IProjectionPositionStorage PositionStorage = null!;
     
     public async Task InitializeAsync()
     {
         _projection = new TestProjection<TId>(WhenEvents());
-        Storage = new TestInMemoryProjectionStorage<TId, TestDocument<TId>>();
+        Storage = new TestInMemoryPositionStorage<TId, TestDocument<TId>>();
         PositionStorage = new InMemoryProjectionPositionStorage();
 
         var projectionsApplication = Sys.Projections();

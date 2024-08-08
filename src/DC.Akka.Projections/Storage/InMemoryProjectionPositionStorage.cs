@@ -19,7 +19,10 @@ public class InMemoryProjectionPositionStorage : IProjectionPositionStorage
         CancellationToken cancellationToken = default)
     {
         if (position != null)
-            _positions.AddOrUpdate(projectionName, _ => position.Value, (_, _) => position.Value);
+        {
+            _positions.AddOrUpdate(projectionName, _ => position.Value,
+                (_, current) => current < position.Value ? position.Value : current);
+        }
 
         return LoadLatestPosition(projectionName, cancellationToken);
     }

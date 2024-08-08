@@ -3,7 +3,7 @@ using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections.Tests.TestData;
 
-public class TestInMemoryProjectionStorage<TId, TDocument> : InMemoryProjectionStorage<TId, TDocument> 
+public class TestInMemoryPositionStorage<TId, TDocument> : InMemoryPositionStorage<TId, TDocument> 
     where TId : notnull
     where TDocument : notnull
 {

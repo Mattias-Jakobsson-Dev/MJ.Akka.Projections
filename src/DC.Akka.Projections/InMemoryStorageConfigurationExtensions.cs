@@ -10,7 +10,7 @@ public static class InMemoryStorageConfigurationExtensions
     public static IProjectionStorageConfigurationSetup<string, TDocument> WithInMemoryStorage<TDocument>(
         this IProjectionConfigurationSetup<string, TDocument> setup) where TDocument : notnull
     {
-        return setup.WithProjectionStorage(new InMemoryProjectionStorage<string, TDocument>());
+        return setup.WithProjectionStorage(new InMemoryPositionStorage<string, TDocument>());
     }
     
     public static IProjectionConfigurationSetup<string, TDocument> WithInMemoryPositionStorage<TDocument>(
