@@ -14,24 +14,25 @@ public class BatchedStorageSession : IStorageSession
 
     public BatchedStorageSession(
         ProjectionsApplication application,
-        (int Number, TimeSpan Timeout) batching,
+        int batchSize,
         int parallelism)
     {
         _application = application;
-        _bufferSize = batching.Number * 4;
+        _bufferSize = batchSize * parallelism * 2;
 
         _writeQueue = Source
             .Queue<IStorageTransaction>(_bufferSize, OverflowStrategy.Backpressure)
-            .GroupedWithin(batching.Number, batching.Timeout)
+            .Batch(
+                batchSize,
+                x => x,
+                (current, pending) => current.MergeWith(
+                    pending,
+                    (mergeWith, item) => mergeWith.MergeWith(item, MergedTransactions.Create)))
             .SelectAsync(
                 parallelism,
-                async items =>
+                async transaction =>
                 {
-                    var mergedTransactions = items.Aggregate(
-                        (IStorageTransaction)new MergedTransactions(ImmutableList<IStorageTransaction>.Empty), 
-                        (current, item) => current.MergeWith(item, MergedTransactions.Create));
-
-                    await mergedTransactions.Commit();
+                    await transaction.Commit();
 
                     return NotUsed.Instance;
                 })

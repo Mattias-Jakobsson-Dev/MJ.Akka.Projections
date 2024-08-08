@@ -51,7 +51,7 @@ public abstract class BaseProjectionsTest<TId> : TestKit, IAsyncLifetime where T
             .WithProjectionStorage(Storage)
             .WithPositionStorage(PositionStorage)
             .WithProjectionStreamConfiguration(new ProjectionStreamConfiguration(
-                (10, TimeSpan.FromMilliseconds(100)),
+                10,
                 1,
                 (10, TimeSpan.FromMilliseconds(100)),
                 5,

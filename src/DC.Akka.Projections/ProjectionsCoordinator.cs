@@ -63,9 +63,10 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                     
                     return _configuration
                         .StartSource(latestPosition)
-                        .GroupedWithin(
-                            _configuration.ProjectionStreamConfiguration.EventBatching.Number,
-                            _configuration.ProjectionStreamConfiguration.EventBatching.Timeout)
+                        .Batch(
+                            _configuration.ProjectionStreamConfiguration.EventBatchSize,
+                            ImmutableList.Create,
+                            (current, item) => current.Add(item))
                         .SelectMany(data =>
                         {
                             return data

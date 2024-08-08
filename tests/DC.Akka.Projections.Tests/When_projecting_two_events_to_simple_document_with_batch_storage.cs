@@ -24,7 +24,7 @@ public class When_projecting_two_events_to_simple_document_with_batch_storage
         {
             return base.Configure(config)
                 .WithProjectionStorage(Storage)
-                .Batched((10, TimeSpan.FromMilliseconds(100)));
+                .Batched();
         }
     }
 }
