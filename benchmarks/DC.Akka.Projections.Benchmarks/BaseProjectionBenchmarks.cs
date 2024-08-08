@@ -24,16 +24,17 @@ public abstract class BaseProjectionBenchmarks
         }
     }
 
+    protected ActorSystem ActorSystem { get; private set; } = null!;
     private ProjectionsCoordinator<string, TestProjection.TestDocument>.Proxy _projection = null!;
     
     [IterationSetup]
     public void Setup()
     {
-        var sys = ActorSystem.Create(
+        ActorSystem = ActorSystem.Create(
             "projections", 
             "akka.loglevel = ERROR");
 
-        _projection = sys
+        _projection = ActorSystem
             .Projections()
             .WithProjection(
                 new TestProjection(Configuration.NumberOfEvents, Configuration.NumberOfDocuments),

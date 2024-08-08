@@ -2,36 +2,45 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json;
-using Akka.Actor;
 using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Storage;
 
-public class InMemoryPositionStorage<TId, TDocument> : IProjectionStorage<TId, TDocument> 
-    where TId : notnull where TDocument : notnull
+public class InMemoryPositionStorage : IProjectionStorage
 {
-    protected readonly ConcurrentDictionary<TId, (Type Type, ReadOnlyMemory<byte> Data)> Documents = new();
+    protected readonly ConcurrentDictionary<object, (Type Type, ReadOnlyMemory<byte> Data)> Documents = new();
     
-    public async Task<(TDocument? document, bool requireReload)> LoadDocument(
-        TId id,
+    public async Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
+        object id,
         CancellationToken cancellationToken = default)
     {
-        if (!Documents.TryGetValue(id, out var data))
-            return (default, true);
-
-        return ((TDocument?)await DeserializeData(data.Data, data.Type), true);
+        return Documents.TryGetValue(id, out var data) 
+            ? ((TDocument?)await DeserializeData(data.Data, data.Type), false) : 
+            (default, true);
     }
 
-    public Task<IStorageTransaction> StartTransaction(
-        IImmutableList<(TId Id, TDocument Document, IActorRef ackTo)> toUpsert,
-        IImmutableList<(TId id, IActorRef ackTo)> toDelete,
+    public async Task Store(
+        IImmutableList<DocumentToStore> toUpsert,
+        IImmutableList<DocumentToDelete> toDelete,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<IStorageTransaction>(new InMemoryProjectionStorageTransaction<TId, TDocument>(
-            toUpsert,
-            toDelete,
-            Documents,
-            SerializeData));
+        foreach (var document in toUpsert)
+        {
+            var serialized = await SerializeData(document.Document);
+
+            var result = (document.Document.GetType(), serialized);
+            
+            Documents.AddOrUpdate(document.Id, _ => result, (_, _) => result);
+            
+            document.Ack();
+        }
+
+        foreach (var document in toDelete)
+        {
+            Documents.TryRemove(document.Id, out _);
+
+            document.Ack();
+        }
     }
 
     [PublicAPI]

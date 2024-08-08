@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Akka.Actor;
 using DC.Akka.Projections.Configuration;
+using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections;
 
@@ -13,7 +14,6 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
     }
 
     private readonly ProjectionConfiguration<TId, TDocument> _configuration;
-    private readonly string _projectionName;
     private readonly TId _id;
     private readonly TimeSpan? _passivateAfter;
     
@@ -21,7 +21,6 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
 
     public DocumentProjection(string projectionName, TId id, TimeSpan? passivateAfter)
     {
-        _projectionName = projectionName;
         _id = id;
         _passivateAfter = passivateAfter;
         
@@ -39,7 +38,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
     {
         ReceiveAsync<Commands.ProjectEvents>(async cmd =>
         {
-            var (document, requireReload) = await _configuration.DocumentStorage.LoadDocument(_id);
+            var (document, requireReload) = await _configuration.DocumentStorage.LoadDocument<TDocument>(_id);
 
             document = await ProjectEvents(document, cmd.Events);
             
@@ -81,14 +80,19 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
             if (document != null)
             {
                 await _configuration
-                    .StorageSession
-                    .Store(_projectionName, _id, document, Sender);
+                    .DocumentStorage
+                    .Store(
+                        ImmutableList.Create(
+                            new DocumentToStore(_id, document, Sender)), 
+                        ImmutableList<DocumentToDelete>.Empty);
             }
             else if (exists)
             {
                 await _configuration
-                    .StorageSession
-                    .Delete<TId, TDocument>(_projectionName, _id, Sender);
+                    .DocumentStorage
+                    .Store(
+                        ImmutableList<DocumentToStore>.Empty, 
+                        ImmutableList.Create(new DocumentToDelete(_id, Sender)));
             }
 
             return document;

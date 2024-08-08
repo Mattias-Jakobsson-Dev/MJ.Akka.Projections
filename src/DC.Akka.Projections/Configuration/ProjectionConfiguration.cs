@@ -9,8 +9,7 @@ namespace DC.Akka.Projections.Configuration;
 public record ProjectionConfiguration<TId, TDocument>(
     string Name,
     bool AutoStart,
-    IStorageSession StorageSession,
-    IProjectionStorage<TId, TDocument> DocumentStorage,
+    IProjectionStorage DocumentStorage,
     IProjectionPositionStorage PositionStorage,
     IHandleEventInProjection<TId, TDocument> ProjectionsHandler,
     Func<long?, Source<EventWithPosition, NotUsed>> StartSource,

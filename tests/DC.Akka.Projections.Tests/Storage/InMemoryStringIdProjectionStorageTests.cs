@@ -1,5 +1,4 @@
 using DC.Akka.Projections.Storage;
-using DC.Akka.Projections.Tests.TestData;
 using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Tests.Storage;
@@ -12,8 +11,8 @@ public class InMemoryStringIdProjectionStorageTests : ProjectionStorageTests<str
         return Guid.NewGuid().ToString();
     }
 
-    protected override IProjectionStorage<string, TestDocument<string>> GetStorage()
+    protected override IProjectionStorage GetStorage()
     {
-        return new InMemoryPositionStorage<string, TestDocument<string>>();
+        return new InMemoryPositionStorage();
     }
 }

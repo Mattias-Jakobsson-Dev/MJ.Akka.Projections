@@ -1,6 +1,5 @@
 using DC.Akka.Projections.Storage;
 using DC.Akka.Projections.Storage.RavenDb;
-using DC.Akka.Projections.Tests.TestData;
 using JetBrains.Annotations;
 using Xunit;
 
@@ -15,8 +14,8 @@ public class RavenDbProjectionStorageTests(RavenDbFixture fixture)
         return Guid.NewGuid().ToString();
     }
 
-    protected override IProjectionStorage<string, TestDocument<string>> GetStorage()
+    protected override IProjectionStorage GetStorage()
     {
-        return new RavenDbProjectionStorage<TestDocument<string>>(fixture.OpenDocumentStore());
+        return new RavenDbProjectionStorage(fixture.OpenDocumentStore());
     }
 }

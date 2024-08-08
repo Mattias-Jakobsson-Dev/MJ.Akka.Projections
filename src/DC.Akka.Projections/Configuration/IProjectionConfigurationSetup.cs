@@ -25,8 +25,7 @@ public interface IProjectionConfigurationSetup<TId, TDocument> where TId : notnu
     IProjectionConfigurationSetup<TId, TDocument> WithProjectionStreamConfiguration(
         ProjectionStreamConfiguration projectionStreamConfiguration);
     
-    IProjectionStorageConfigurationSetup<TId, TDocument> WithProjectionStorage(
-        IProjectionStorage<TId, TDocument> storage);
+    IProjectionConfigurationSetup<TId, TDocument> WithProjectionStorage(IProjectionStorage storage);
 
     IProjectionConfigurationSetup<TId, TDocument> WithPositionStorage(IProjectionPositionStorage positionStorage);
 

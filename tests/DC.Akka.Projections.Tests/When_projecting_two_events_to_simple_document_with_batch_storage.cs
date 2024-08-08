@@ -1,4 +1,5 @@
 ﻿using DC.Akka.Projections.Configuration;
+using DC.Akka.Projections.Storage;
 using DC.Akka.Projections.Tests.TestData;
 
 namespace DC.Akka.Projections.Tests;
@@ -23,8 +24,7 @@ public class When_projecting_two_events_to_simple_document_with_batch_storage
             IProjectionConfigurationSetup<TId, TestDocument<TId>> config)
         {
             return base.Configure(config)
-                .WithProjectionStorage(Storage)
-                .Batched();
+                .WithProjectionStorage(Storage.Batched(Sys));
         }
     }
 }

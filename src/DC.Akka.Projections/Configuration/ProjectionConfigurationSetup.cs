@@ -8,7 +8,7 @@ namespace DC.Akka.Projections.Configuration;
 public class ProjectionConfigurationSetup<TId, TDocument>(
     IProjection<TId, TDocument> projection,
     ProjectionsApplication application)
-    : IProjectionStorageConfigurationSetup<TId, TDocument>
+    : IProjectionConfigurationSetup<TId, TDocument>
     where TId : notnull where TDocument : notnull
 {
     private bool _autoStart;
@@ -17,11 +17,9 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
 
     private Func<Task<IActorRef>>? _projectionCoordinatorFactory;
 
-    private IProjectionStorage<TId, TDocument> _storage = new InMemoryPositionStorage<TId, TDocument>();
+    private IProjectionStorage _storage = new InMemoryPositionStorage();
 
     private IProjectionPositionStorage _positionStorage = new InMemoryProjectionPositionStorage();
-
-    private IStorageSession _storageSession = new InProcStorageSession(application);
 
     private ProjectionStreamConfiguration _projectionStreamConfiguration =
         ProjectionStreamConfiguration.Default;
@@ -69,8 +67,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         return this;
     }
 
-    public IProjectionStorageConfigurationSetup<TId, TDocument> WithProjectionStorage(
-        IProjectionStorage<TId, TDocument> storage)
+    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionStorage(IProjectionStorage storage)
     {
         _storage = storage;
 
@@ -80,13 +77,6 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
     public IProjectionConfigurationSetup<TId, TDocument> WithPositionStorage(IProjectionPositionStorage positionStorage)
     {
         _positionStorage = positionStorage;
-
-        return this;
-    }
-    
-    public IProjectionStorageConfigurationSetup<TId, TDocument> WithStorageSession(IStorageSession session)
-    {
-        _storageSession = session;
 
         return this;
     }
@@ -115,7 +105,6 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         return new ProjectionConfiguration<TId, TDocument>(
             Projection.Name,
             _autoStart,
-            _storageSession,
             _storage,
             _positionStorage,
             eventHandler,

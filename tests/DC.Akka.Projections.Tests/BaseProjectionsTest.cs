@@ -12,28 +12,27 @@ namespace DC.Akka.Projections.Tests;
 public abstract class BaseProjectionsTest<TId> : TestKit, IAsyncLifetime where TId : notnull
 {
     private TestProjection<TId> _projection = null!;
-    protected TestInMemoryPositionStorage<TId, TestDocument<TId>> Storage = null!;
+    protected TestInMemoryPositionStorage Storage = null!;
     [PublicAPI]
     protected IProjectionPositionStorage PositionStorage = null!;
     
     public async Task InitializeAsync()
     {
         _projection = new TestProjection<TId>(WhenEvents());
-        Storage = new TestInMemoryPositionStorage<TId, TestDocument<TId>>();
+        Storage = new TestInMemoryPositionStorage();
         PositionStorage = new InMemoryProjectionPositionStorage();
 
         var projectionsApplication = Sys.Projections();
         
         var documents = GivenDocuments();
 
-        var transaction = await Storage.StartTransaction(
-            documents
-                .Select(x => (x.Id, x, ActorRefs.NoSender))
-                .ToImmutableList(),
-            ImmutableList<(TId id, IActorRef ackTo)>.Empty);
-
-        await transaction.Commit();
-
+        await Storage
+            .Store(
+                documents
+                    .Select(x => new DocumentToStore(x.Id, x, ActorRefs.NoSender))
+                    .ToImmutableList(),
+                ImmutableList<DocumentToDelete>.Empty);
+        
         var coordinator = await projectionsApplication.WithProjection(_projection, Configure);
         
         await coordinator.RunToCompletion(TimeSpan.FromSeconds(5));
@@ -68,7 +67,7 @@ public abstract class BaseProjectionsTest<TId> : TestKit, IAsyncLifetime where T
 
     protected async Task<TestDocument<TId>?> LoadDocument(TId id)
     {
-        var (document, _) = await Storage.LoadDocument(id);
+        var (document, _) = await Storage.LoadDocument<TestDocument<TId>>(id);
 
         return document;
     }

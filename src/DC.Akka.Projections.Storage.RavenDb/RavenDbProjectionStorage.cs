@@ -1,29 +1,68 @@
 ﻿using System.Collections.Immutable;
-using Akka.Actor;
 using Raven.Client.Documents;
+using Raven.Client.Documents.BulkInsert;
 
 namespace DC.Akka.Projections.Storage.RavenDb;
 
-public class RavenDbProjectionStorage<TDocument>(IDocumentStore documentStore) 
-    : IProjectionStorage<string, TDocument> where TDocument : notnull
+public class RavenDbProjectionStorage(IDocumentStore documentStore) : IProjectionStorage
 {
-    public async Task<(TDocument? document, bool requireReload)> LoadDocument(
-        string id,
+    public async Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
+        object id, 
         CancellationToken cancellationToken = default)
     {
         using var session = documentStore.OpenAsyncSession();
 
-        return (await session.LoadAsync<TDocument>(id, cancellationToken), true);
+        return (await session.LoadAsync<TDocument>(id.ToString(), cancellationToken), true);
     }
 
-    public Task<IStorageTransaction> StartTransaction(
-        IImmutableList<(string Id, TDocument Document, IActorRef ackTo)> toUpsert,
-        IImmutableList<(string id, IActorRef ackTo)> toDelete,
+    public async Task Store(
+        IImmutableList<DocumentToStore> toUpsert, 
+        IImmutableList<DocumentToDelete> toDelete, 
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult<IStorageTransaction>(new RavenDbStorageTransaction(
-            toUpsert.Select(x => (x.Id, (object)x.Document, x.ackTo)).ToImmutableList(),
-            toDelete.Select(x => (x.id, x.ackTo)).ToImmutableList(),
-            documentStore));
+        if (toUpsert.Any())
+        {
+            try
+            {
+                var bulkInsert = documentStore.BulkInsert(new BulkInsertOptions
+                {
+                    SkipOverwriteIfUnchanged = true
+                }, cancellationToken);
+
+                foreach (var item in toUpsert)
+                    await bulkInsert.StoreAsync(item.Document, item.Id.ToString());
+
+                await bulkInsert.DisposeAsync().ConfigureAwait(false);
+
+                foreach (var item in toUpsert)
+                    item.Ack();
+            }
+            catch (Exception e)
+            {
+                foreach (var item in toUpsert)
+                    item.Reject(e);
+            }
+        }
+
+        if (toDelete.Any())
+        {
+            try
+            {
+                using var session = documentStore.OpenAsyncSession();
+
+                foreach (var item in toDelete)
+                    session.Delete(item.Id.ToString());
+
+                await session.SaveChangesAsync(cancellationToken);
+                
+                foreach (var item in toDelete)
+                    item.Ack();
+            }
+            catch (Exception e)
+            {
+                foreach (var item in toDelete)
+                    item.Reject(e);
+            }
+        }
     }
 }

@@ -7,11 +7,26 @@ namespace DC.Akka.Projections.Storage.RavenDb;
 [PublicAPI]
 public static class ConfigurationExtensions
 {
-    public static IProjectionStorageConfigurationSetup<string, TDocument> WithRavenDbDocumentStorage<TDocument>(
+    public static IProjectionConfigurationSetup<string, TDocument> WithRavenDbDocumentStorage<TDocument>(
         this IProjectionConfigurationSetup<string, TDocument> setup,
         IDocumentStore documentStore) where TDocument : notnull
     {
-        var storage = new RavenDbProjectionStorage<TDocument>(documentStore);
+        var storage = new RavenDbProjectionStorage(documentStore);
+        
+        return setup.WithProjectionStorage(storage);
+    }
+    
+    public static IProjectionConfigurationSetup<string, TDocument> WithBatchedRavenDbDocumentStorage<TDocument>(
+        this IProjectionConfigurationSetup<string, TDocument> setup,
+        IDocumentStore documentStore,
+        int batchSize = 100,
+        int parallelism = 5) where TDocument : notnull
+    {
+        var storage = new RavenDbProjectionStorage(documentStore)
+            .Batched(
+                setup.Application.ActorSystem,
+                batchSize, 
+                parallelism);
         
         return setup.WithProjectionStorage(storage);
     }
