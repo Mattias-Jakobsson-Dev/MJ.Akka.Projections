@@ -34,10 +34,13 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     private UniqueKillSwitch? _killSwitch;
 
     private readonly ProjectionConfiguration<TId, TDocument> _configuration;
+    private readonly ProjectionSequencer<TId, TDocument>.Proxy _sequencer;
 
     public ProjectionsCoordinator(string projectionName)
     {
         _logger = Context.GetLogger();
+
+        _sequencer = ProjectionSequencer<TId, TDocument>.Create(Context);
 
         _configuration = Context
                              .System
@@ -54,6 +57,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             _logger.Info("Starting projection {0}", _configuration.Name);
 
             var latestPosition = await _configuration.PositionStorage.LoadLatestPosition(_configuration.Name);
+            await _sequencer.Clear();
 
             _killSwitch = MaybeCreateRestartSource(() =>
                 {
@@ -80,55 +84,35 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                 .GroupBy(x => x.Id)
                                 .Select(x => (
                                     Events: x.Select(y => y.Event).ToImmutableList(),
-                                    Id: x.Key));
+                                    Id: x.Key))
+                                .Where(x => !x.Events.IsEmpty)
+                                .Select(x => new
+                                {
+                                    x.Events,
+                                    x.Id,
+                                    LowestEventNumber = x.Events.Select(y => y.Position).Min()
+                                })
+                                .OrderBy(x => x.LowestEventNumber)
+                                .Select(x => new ProjectionSequencer<TId, TDocument>.Commands.StartProjecting(
+                                    x.Id,
+                                    x.Events));
                         })
+                        .Ask<ProjectionSequencer<TId, TDocument>.Responses.StartProjectingResponse>(
+                            _sequencer.Ref,
+                            TimeSpan.FromMinutes(1),
+                            1)
                         .SelectAsync(
-                            1,
+                            _configuration.ProjectionStreamConfiguration.ProjectionParallelism,
                             async data =>
                             {
-                                if (data.Events.IsEmpty)
-                                    return null;
-                                
-                                if (!data.Id.HasMatch || data.Id.Id == null)
-                                    return data.Events.Select(x => x.Position).Max();
+                                var response = await data.Task;
 
-                                var projectionRef =
-                                    await _configuration.CreateProjectionRef(data.Id.Id);
-
-                                try
+                                return response switch
                                 {
-                                    var response = await Retries
-                                        .Run<Messages.IProjectEventsResponse, AskTimeoutException>(
-                                            () => projectionRef
-                                                .Ask<Messages.IProjectEventsResponse>(
-                                                    new DocumentProjection<TId, TDocument>.Commands.ProjectEvents(
-                                                        data.Id,
-                                                        data.Events),
-                                                    _configuration.ProjectionStreamConfiguration.ProjectDocumentTimeout),
-                                            _configuration.ProjectionStreamConfiguration.MaxProjectionRetries,
-                                            (retries, exception) => _logger
-                                                .Warning(
-                                                    exception, 
-                                                    "Failed handling {0} events for {1}, retrying (tries: {2})", 
-                                                    data.Events.Count,
-                                                    data.Id,
-                                                    retries));
-
-                                    return response switch
-                                    {
-                                        Messages.Acknowledge => data.Events.Select(x => x.Position).Max(),
-                                        Messages.Reject nack => throw new Exception(
-                                            "Rejected projection", nack.Cause),
-                                        _ => throw new Exception("Unknown projection response")
-                                    };
-                                }
-                                catch (Exception e)
-                                {
-                                    _logger
-                                        .Error(e, "Failed handling {0} events for {1}", data.Events.Count, data.Id);
-
-                                    throw;
-                                }
+                                    Messages.Acknowledge ack => ack.Position,
+                                    Messages.Reject nack => throw new Exception("Rejected projection", nack.Cause),
+                                    _ => throw new Exception("Unknown projection response")
+                                };
                             })
                         .GroupedWithin(
                             _configuration.ProjectionStreamConfiguration.PositionBatching.Number,

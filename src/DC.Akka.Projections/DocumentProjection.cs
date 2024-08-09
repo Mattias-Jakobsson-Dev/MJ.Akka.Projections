@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Akka.Actor;
+using Akka.Event;
 using DC.Akka.Projections.Configuration;
 using DC.Akka.Projections.Storage;
 
@@ -16,6 +17,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
     private readonly ProjectionConfiguration<TId, TDocument> _configuration;
     private readonly TId _id;
     private readonly TimeSpan? _passivateAfter;
+    private readonly ILoggingAdapter _logger;
     
     public ITimerScheduler? Timers { get; set; }
 
@@ -23,6 +25,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
     {
         _id = id;
         _passivateAfter = passivateAfter;
+        _logger = Context.GetLogger();
 
         var configuration = Context.System.GetExtension<ProjectionConfiguration<TId, TDocument>>() ??
                             throw new NoDocumentProjectionException<TDocument>(projectionName);
@@ -63,47 +66,62 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
 
     private async Task<TDocument?> ProjectEvents(TDocument? document, IImmutableList<EventWithPosition> events)
     {
-        var exists = document != null;
+        return await Retries
+            .Run<TDocument?, Exception>(
+                RunProjections,
+                _configuration.ProjectionStreamConfiguration.MaxProjectionRetries,
+                (retries, exception) => _logger
+                    .Warning(
+                        exception, 
+                        "Failed handling {0} events for {1}, retrying (tries: {2})", 
+                        events.Count,
+                        _id,
+                        retries));
         
-        try
+        async Task<TDocument?> RunProjections()
         {
-            if (!events.Any())
+            var exists = document != null;
+        
+            try
             {
-                Sender.Tell(new Messages.Acknowledge(null));
+                if (!events.Any())
+                {
+                    Sender.Tell(new Messages.Acknowledge(null));
                 
+                    return document;
+                }
+            
+                foreach (var evnt in events)
+                    document = await _configuration.ProjectionsHandler.Handle(document, evnt.Event, evnt.Position ?? 0);
+
+                if (document != null)
+                {
+                    await _configuration
+                        .DocumentStorage
+                        .Store(
+                            ImmutableList.Create(
+                                new DocumentToStore(_id, document)), 
+                            ImmutableList<DocumentToDelete>.Empty);
+                }
+                else if (exists)
+                {
+                    await _configuration
+                        .DocumentStorage
+                        .Store(
+                            ImmutableList<DocumentToStore>.Empty, 
+                            ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
+                }
+            
+                Sender.Tell(new Messages.Acknowledge(events.Select(x => x.Position).Max()));
+
                 return document;
             }
-            
-            foreach (var evnt in events)
-                document = await _configuration.ProjectionsHandler.Handle(document, evnt.Event, evnt.Position ?? 0);
-
-            if (document != null)
+            catch (Exception e)
             {
-                await _configuration
-                    .DocumentStorage
-                    .Store(
-                        ImmutableList.Create(
-                            new DocumentToStore(_id, document)), 
-                        ImmutableList<DocumentToDelete>.Empty);
-            }
-            else if (exists)
-            {
-                await _configuration
-                    .DocumentStorage
-                    .Store(
-                        ImmutableList<DocumentToStore>.Empty, 
-                        ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
-            }
+                Sender.Tell(new Messages.Reject(e));
             
-            Sender.Tell(new Messages.Acknowledge(events.Select(x => x.Position).Max()));
-
-            return document;
-        }
-        catch (Exception e)
-        {
-            Sender.Tell(new Messages.Reject(e));
-            
-            throw;
+                throw;
+            }
         }
     }
 
