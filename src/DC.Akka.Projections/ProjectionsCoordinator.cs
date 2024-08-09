@@ -83,7 +83,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                     Id: x.Key));
                         })
                         .SelectAsync(
-                            _configuration.ProjectionStreamConfiguration.ProjectionParallelism,
+                            1,
                             async data =>
                             {
                                 if (data.Events.IsEmpty)

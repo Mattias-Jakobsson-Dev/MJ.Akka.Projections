@@ -68,8 +68,6 @@ public class BatchedProjectionStorage : IProjectionStorage
                         switch (result.Result)
                         {
                             case QueueOfferResult.Enqueued:
-                                promise.SetResult(NotUsed.Instance);
-                                
                                 break;
 
                             case QueueOfferResult.Failure f:
