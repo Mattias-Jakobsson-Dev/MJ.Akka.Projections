@@ -47,11 +47,9 @@ public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
         return Task.CompletedTask;
     }
     
-    public async Task<TDocument?> LoadDocument<TDocument>(object id)
+    public Task<TDocument?> LoadDocument<TDocument>(object id)
     {
-        var (document, _) = await Storage.LoadDocument<TDocument>(id);
-
-        return document;
+        return Storage.LoadDocument<TDocument>(id);
     }
 
     public Task<IImmutableList<object>> LoadAllDocuments()

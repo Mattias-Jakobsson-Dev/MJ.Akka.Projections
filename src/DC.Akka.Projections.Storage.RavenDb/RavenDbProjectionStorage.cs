@@ -6,13 +6,13 @@ namespace DC.Akka.Projections.Storage.RavenDb;
 
 public class RavenDbProjectionStorage(IDocumentStore documentStore) : IProjectionStorage
 {
-    public async Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
+    public async Task<TDocument?> LoadDocument<TDocument>(
         object id,
         CancellationToken cancellationToken = default)
     {
         using var session = documentStore.OpenAsyncSession();
 
-        return (await session.LoadAsync<TDocument>(id.ToString(), cancellationToken), true);
+        return await session.LoadAsync<TDocument>(id.ToString(), cancellationToken);
     }
 
     public async Task Store(

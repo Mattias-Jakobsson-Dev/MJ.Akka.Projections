@@ -7,7 +7,7 @@ namespace DC.Akka.Projections.Storage.InfluxDb;
 [PublicAPI]
 public record InfluxTimeSeries(
     IImmutableList<PointData> Points,
-    IImmutableList<InfluxTimeSeries.DeletePoint> ToDelete)
+    IImmutableList<InfluxTimeSeries.DeletePoint> ToDelete) : IResetDocument<InfluxTimeSeries>
 {
     public InfluxTimeSeries AddPoint(PointData point)
     {
@@ -20,4 +20,11 @@ public record InfluxTimeSeries(
     }
     
     public record DeletePoint(DateTime Start, DateTime Stop, string Predicate);
+
+    public InfluxTimeSeries Reset()
+    {
+        return new InfluxTimeSeries(
+            ImmutableList<PointData>.Empty,
+            ImmutableList<DeletePoint>.Empty);
+    }
 }

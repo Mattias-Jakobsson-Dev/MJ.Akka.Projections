@@ -28,7 +28,7 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
                     })),
                 ImmutableList<DocumentToDelete>.Empty);
         
-        var (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
+        var document = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().NotBeNull();
         document!.Id.Should().Be(id);
@@ -60,7 +60,7 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
 
         foreach (var documentId in documentIds)
         {
-            var (document, _) = await storage.LoadDocument<TestDocument<TId>>(documentId);
+            var document = await storage.LoadDocument<TestDocument<TId>>(documentId);
 
             document.Should().NotBeNull();
             document!.Id.Should().Be(documentId);
@@ -87,7 +87,7 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
                     })),
                 ImmutableList.Create(new DocumentToDelete(id, typeof(TestDocument<TId>))));
         
-        var (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
+        var document = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().BeNull();
     }
@@ -111,7 +111,7 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
                     })),
                 ImmutableList<DocumentToDelete>.Empty);
         
-        var (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
+        var document = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().NotBeNull();
         document!.Id.Should().Be(id);
@@ -122,7 +122,7 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
                 ImmutableList<DocumentToStore>.Empty,
                 ImmutableList.Create(new DocumentToDelete(id, typeof(TestDocument<TId>))));
         
-        (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
+        document = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().BeNull();
     }
@@ -139,7 +139,7 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
                 ImmutableList<DocumentToStore>.Empty,
                 ImmutableList.Create(new DocumentToDelete(id, typeof(TestDocument<TId>))));
         
-        var (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
+        var document = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().BeNull();
     }

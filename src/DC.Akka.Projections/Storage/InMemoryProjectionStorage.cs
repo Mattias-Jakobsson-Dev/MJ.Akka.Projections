@@ -10,13 +10,13 @@ public class InMemoryProjectionStorage : IProjectionStorage
 {
     protected readonly ConcurrentDictionary<object, (Type Type, ReadOnlyMemory<byte> Data)> Documents = new();
     
-    public async Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
+    public async Task<TDocument?> LoadDocument<TDocument>(
         object id,
         CancellationToken cancellationToken = default)
     {
         return Documents.TryGetValue(id, out var data) 
-            ? ((TDocument?)await DeserializeData(data.Data, data.Type), false) : 
-            (default, false);
+            ? (TDocument?)await DeserializeData(data.Data, data.Type) : 
+            default;
     }
 
     public async Task Store(

@@ -7,18 +7,18 @@ namespace DC.Akka.Projections.Storage.InfluxDb;
 public class InfluxDbProjectionStorage(IInfluxDBClient client)
     : IProjectionStorage
 {
-    public Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
+    public Task<TDocument?> LoadDocument<TDocument>(
         object id,
         CancellationToken cancellationToken = default)
     {
         if (!typeof(InfluxTimeSeries).IsAssignableFrom(typeof(TDocument)))
-            return Task.FromResult<(TDocument?, bool)>((default, true));
+            return Task.FromResult<TDocument?>(default);
 
         object emptyTimeSeries = new InfluxTimeSeries(
             ImmutableList<PointData>.Empty,
             ImmutableList<InfluxTimeSeries.DeletePoint>.Empty);
 
-        return Task.FromResult<(TDocument?, bool)>(((TDocument)emptyTimeSeries, true));
+        return Task.FromResult<TDocument?>((TDocument)emptyTimeSeries);
     }
 
     public async Task Store(

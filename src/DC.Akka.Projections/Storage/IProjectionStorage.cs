@@ -4,7 +4,7 @@ namespace DC.Akka.Projections.Storage;
 
 public interface IProjectionStorage
 {
-    Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
+    Task<TDocument?> LoadDocument<TDocument>(
         object id,
         CancellationToken cancellationToken = default);
 

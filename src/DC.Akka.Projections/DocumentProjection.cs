@@ -41,12 +41,11 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
     {
         ReceiveAsync<Commands.ProjectEvents>(async cmd =>
         {
-            var (document, requireReload) = await _configuration.DocumentStorage.LoadDocument<TDocument>(_id);
+            var document = await _configuration.DocumentStorage.LoadDocument<TDocument>(_id);
 
             document = await ProjectEvents(document, cmd.Events);
             
-            if (!requireReload)
-                Become(() => Loaded(document));
+            Become(() => Loaded(document));
             
             HandlePassivation();
         });
@@ -102,6 +101,9 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
                             ImmutableList.Create(
                                 new DocumentToStore(_id, document)), 
                             ImmutableList<DocumentToDelete>.Empty);
+
+                    if (document is IResetDocument<TDocument> reset)
+                        document = reset.Reset();
                 }
                 else if (exists)
                 {

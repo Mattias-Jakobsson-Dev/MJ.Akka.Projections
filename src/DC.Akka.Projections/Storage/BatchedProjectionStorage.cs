@@ -42,7 +42,7 @@ public class BatchedProjectionStorage : IProjectionStorage
             .Run(actorSystem.Materializer());
     }
 
-    public Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
+    public Task<TDocument?> LoadDocument<TDocument>(
         object id,
         CancellationToken cancellationToken = default)
     {
