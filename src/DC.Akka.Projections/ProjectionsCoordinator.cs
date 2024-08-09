@@ -109,7 +109,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
                                 return response switch
                                 {
-                                    Messages.Acknowledge ack => ack.Position,
+                                    Messages.Acknowledge ack => new PositionData(ack.Position),
                                     Messages.Reject nack => throw new Exception("Rejected projection", nack.Cause),
                                     _ => throw new Exception("Unknown projection response")
                                 };
@@ -119,7 +119,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                             _configuration.ProjectionStreamConfiguration.PositionBatching.Timeout)
                         .SelectAsync(1, async positions =>
                         {
-                            var highestPosition = positions.MaxBy(y => y);
+                            var highestPosition = positions.Select(x => x.Position).MaxBy(y => y);
 
                             latestPosition =
                                 await _configuration.PositionStorage.StoreLatestPosition(_configuration.Name,
@@ -228,4 +228,6 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                 throw response.Error;
         }
     }
+
+    private record PositionData(long? Position);
 }
