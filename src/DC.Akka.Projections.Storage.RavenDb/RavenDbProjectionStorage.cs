@@ -7,7 +7,7 @@ namespace DC.Akka.Projections.Storage.RavenDb;
 public class RavenDbProjectionStorage(IDocumentStore documentStore) : IProjectionStorage
 {
     public async Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
-        object id, 
+        object id,
         CancellationToken cancellationToken = default)
     {
         using var session = documentStore.OpenAsyncSession();
@@ -16,53 +16,31 @@ public class RavenDbProjectionStorage(IDocumentStore documentStore) : IProjectio
     }
 
     public async Task Store(
-        IImmutableList<DocumentToStore> toUpsert, 
-        IImmutableList<DocumentToDelete> toDelete, 
+        IImmutableList<DocumentToStore> toUpsert,
+        IImmutableList<DocumentToDelete> toDelete,
         CancellationToken cancellationToken = default)
     {
         if (toUpsert.Any())
         {
-            try
+            var bulkInsert = documentStore.BulkInsert(new BulkInsertOptions
             {
-                var bulkInsert = documentStore.BulkInsert(new BulkInsertOptions
-                {
-                    SkipOverwriteIfUnchanged = true
-                }, cancellationToken);
+                SkipOverwriteIfUnchanged = true
+            }, cancellationToken);
 
-                foreach (var item in toUpsert)
-                    await bulkInsert.StoreAsync(item.Document, item.Id.ToString());
+            foreach (var item in toUpsert)
+                await bulkInsert.StoreAsync(item.Document, item.Id.ToString());
 
-                await bulkInsert.DisposeAsync().ConfigureAwait(false);
-
-                foreach (var item in toUpsert)
-                    item.Ack();
-            }
-            catch (Exception e)
-            {
-                foreach (var item in toUpsert)
-                    item.Reject(e);
-            }
+            await bulkInsert.DisposeAsync().ConfigureAwait(false);
         }
 
         if (toDelete.Any())
         {
-            try
-            {
-                using var session = documentStore.OpenAsyncSession();
+            using var session = documentStore.OpenAsyncSession();
 
-                foreach (var item in toDelete)
-                    session.Delete(item.Id.ToString());
+            foreach (var item in toDelete)
+                session.Delete(item.Id.ToString());
 
-                await session.SaveChangesAsync(cancellationToken);
-                
-                foreach (var item in toDelete)
-                    item.Ack();
-            }
-            catch (Exception e)
-            {
-                foreach (var item in toDelete)
-                    item.Reject(e);
-            }
+            await session.SaveChangesAsync(cancellationToken);
         }
     }
 }

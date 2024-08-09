@@ -69,7 +69,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
         {
             if (!events.Any())
             {
-                Sender.Tell(new Messages.Acknowledge());
+                Sender.Tell(new Messages.Acknowledge(null));
                 
                 return document;
             }
@@ -83,7 +83,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
                     .DocumentStorage
                     .Store(
                         ImmutableList.Create(
-                            new DocumentToStore(_id, document, Sender)), 
+                            new DocumentToStore(_id, document)), 
                         ImmutableList<DocumentToDelete>.Empty);
             }
             else if (exists)
@@ -92,8 +92,10 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
                     .DocumentStorage
                     .Store(
                         ImmutableList<DocumentToStore>.Empty, 
-                        ImmutableList.Create(new DocumentToDelete(_id, Sender)));
+                        ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
             }
+            
+            Sender.Tell(new Messages.Acknowledge(events.Select(x => x.Position).Max()));
 
             return document;
         }

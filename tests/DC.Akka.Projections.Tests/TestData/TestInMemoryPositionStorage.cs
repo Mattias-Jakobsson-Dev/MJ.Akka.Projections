@@ -3,7 +3,7 @@ using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections.Tests.TestData;
 
-public class TestInMemoryPositionStorage : InMemoryPositionStorage
+public class TestInMemoryProjectionStorage : InMemoryProjectionStorage
 {
     public async Task<IImmutableList<object>> LoadAll()
     {

@@ -12,8 +12,6 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
     [Fact]
     public async Task StoreAndLoadSingleDocument()
     {
-        var probe = CreateTestProbe();
-
         var storage = GetStorage();
 
         var id = CreateRandomId();
@@ -27,11 +25,9 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
                     {
                         Id = id,
                         HandledEvents = ImmutableList.Create(eventId)
-                    }, probe.Ref)),
+                    })),
                 ImmutableList<DocumentToDelete>.Empty);
-
-        await probe.ExpectMsgAsync<Messages.Acknowledge>();
-
+        
         var (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().NotBeNull();
@@ -45,9 +41,7 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
         var documentIds = Enumerable.Range(0, 5)
             .Select(_ => CreateRandomId())
             .ToImmutableList();
-
-        var probe = CreateTestProbe();
-
+        
         var storage = GetStorage();
         var eventId = Guid.NewGuid().ToString();
 
@@ -60,12 +54,9 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
                         {
                             Id = x,
                             HandledEvents = ImmutableList.Create(eventId)
-                        }, probe.Ref))
+                        }))
                     .ToImmutableList(),
                 ImmutableList<DocumentToDelete>.Empty);
-
-        foreach (var _ in documentIds)
-            await probe.ExpectMsgAsync<Messages.Acknowledge>();
 
         foreach (var documentId in documentIds)
         {
@@ -80,8 +71,6 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
     [Fact]
     public async Task StoreAndDeleteSingleDocumentInSingleTransaction()
     {
-        var probe = CreateTestProbe();
-
         var storage = GetStorage();
 
         var id = CreateRandomId();
@@ -95,12 +84,9 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
                     {
                         Id = id,
                         HandledEvents = ImmutableList.Create(eventId)
-                    }, probe.Ref)),
-                ImmutableList.Create(new DocumentToDelete(id, probe.Ref)));
-
-        await probe.ExpectMsgAsync<Messages.Acknowledge>();
-        await probe.ExpectMsgAsync<Messages.Acknowledge>();
-
+                    })),
+                ImmutableList.Create(new DocumentToDelete(id, typeof(TestDocument<TId>))));
+        
         var (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().BeNull();
@@ -109,8 +95,6 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
     [Fact]
     public async Task StoreAndDeleteSingleDocumentInTwoTransactions()
     {
-        var probe = CreateTestProbe();
-
         var storage = GetStorage();
 
         var id = CreateRandomId();
@@ -124,11 +108,9 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
                     {
                         Id = id,
                         HandledEvents = ImmutableList.Create(eventId)
-                    }, probe.Ref)),
+                    })),
                 ImmutableList<DocumentToDelete>.Empty);
-
-        await probe.ExpectMsgAsync<Messages.Acknowledge>();
-
+        
         var (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().NotBeNull();
@@ -138,10 +120,8 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
         await storage
             .Store(
                 ImmutableList<DocumentToStore>.Empty,
-                ImmutableList.Create(new DocumentToDelete(id, probe.Ref)));
+                ImmutableList.Create(new DocumentToDelete(id, typeof(TestDocument<TId>))));
         
-        await probe.ExpectMsgAsync<Messages.Acknowledge>();
-
         (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().BeNull();
@@ -150,8 +130,6 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
     [Fact]
     public async Task DeleteNonExistingDocument()
     {
-        var probe = CreateTestProbe();
-
         var storage = GetStorage();
 
         var id = CreateRandomId();
@@ -159,10 +137,8 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
         await storage
             .Store(
                 ImmutableList<DocumentToStore>.Empty,
-                ImmutableList.Create(new DocumentToDelete(id, probe.Ref)));
-
-        await probe.ExpectMsgAsync<Messages.Acknowledge>();
-
+                ImmutableList.Create(new DocumentToDelete(id, typeof(TestDocument<TId>))));
+        
         var (document, _) = await storage.LoadDocument<TestDocument<TId>>(id);
 
         document.Should().BeNull();

@@ -19,7 +19,7 @@ public class BatchedProjectionStorage : IProjectionStorage
         int parallelism)
     {
         _innerStorage = innerStorage;
-        
+
         _bufferSize = batchSize * parallelism * 2;
 
         _writeQueue = Source
@@ -33,56 +33,132 @@ public class BatchedProjectionStorage : IProjectionStorage
                 async write =>
                 {
                     await _innerStorage.Store(write.ToUpsert, write.ToDelete);
+                    
+                    write.Completed();
 
                     return NotUsed.Instance;
                 })
             .ToMaterialized(Sink.Ignore<NotUsed>(), Keep.Left)
             .Run(actorSystem.Materializer());
     }
-    
+
     public Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
-        object id, 
+        object id,
         CancellationToken cancellationToken = default)
     {
         return _innerStorage.LoadDocument<TDocument>(id, cancellationToken);
     }
 
-    public async Task Store(
-        IImmutableList<DocumentToStore> toUpsert, 
-        IImmutableList<DocumentToDelete> toDelete, 
+    public Task Store(
+        IImmutableList<DocumentToStore> toUpsert,
+        IImmutableList<DocumentToDelete> toDelete,
         CancellationToken cancellationToken = default)
     {
-        var result = await _writeQueue.OfferAsync(new PendingWrite(
+        var promise = new TaskCompletionSource<NotUsed>(TaskCreationOptions.RunContinuationsAsynchronously);
+        
+        _writeQueue.OfferAsync(new PendingWrite(
             toUpsert,
-            toDelete));
+            toDelete,
+            promise))
+            .ContinueWith(
+                result =>
+                {
+                    if (result.IsCompletedSuccessfully)
+                    {
+                        switch (result.Result)
+                        {
+                            case QueueOfferResult.Enqueued:
+                                promise.SetResult(NotUsed.Instance);
+                                
+                                break;
 
-        switch (result)
-        {
-            case QueueOfferResult.Enqueued:
-                break;
+                            case QueueOfferResult.Failure f:
+                                promise.TrySetException(new Exception("Failed to write documents", f.Cause));
 
-            case QueueOfferResult.Failure f:
-                throw new Exception("Failed to write documents", f.Cause);
+                                break;
+                            case QueueOfferResult.Dropped:
+                                promise.TrySetException(new Exception(
+                                    $"Failed to enqueue documents batch write, the queue buffer was full ({_bufferSize} elements)"));
+                                
+                                break;
 
-            case QueueOfferResult.Dropped:
-                throw new Exception(
-                    $"Failed to enqueue documents batch write, the queue buffer was full ({_bufferSize} elements)");
+                            case QueueOfferResult.QueueClosed:
+                                promise.TrySetException(new Exception(
+                                    "Failed to enqueue documents batch write, the queue was closed."));
+                                
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        promise.TrySetException(new Exception("Failed to write documents"));
+                    }
+                },
+                cancellationToken: cancellationToken,
+                continuationOptions: TaskContinuationOptions.ExecuteSynchronously,
+                scheduler: TaskScheduler.Default);
 
-            case QueueOfferResult.QueueClosed:
-                throw new Exception(
-                    "Failed to enqueue documents batch write, the queue was closed.");
-        }
+        return promise.Task;
     }
 
-    private record PendingWrite(
-        IImmutableList<DocumentToStore> ToUpsert,
-        IImmutableList<DocumentToDelete> ToDelete)
+    private class PendingWrite
     {
+        private readonly IImmutableList<TaskCompletionSource<NotUsed>> _completions;
+        
+        public PendingWrite(
+            IImmutableList<DocumentToStore> toUpsert,
+            IImmutableList<DocumentToDelete> toDelete,
+            TaskCompletionSource<NotUsed> completion) : this(
+            toUpsert,
+            toDelete,
+            ImmutableList.Create(completion))
+        {
+        }
+
+        private PendingWrite(
+            IImmutableList<DocumentToStore> toUpsert,
+            IImmutableList<DocumentToDelete> toDelete,
+            IImmutableList<TaskCompletionSource<NotUsed>> completions)
+        {
+            ToUpsert = toUpsert;
+            ToDelete = toDelete;
+            _completions = completions;
+        }
+        
+        public IImmutableList<DocumentToStore> ToUpsert { get; }
+        public IImmutableList<DocumentToDelete> ToDelete { get; }
+
         public PendingWrite MergeWith(PendingWrite other)
         {
             return new PendingWrite(
-                ToUpsert.AddRange(other.ToUpsert),
-                ToDelete.AddRange(other.ToDelete));
+                Merge(ToUpsert, other.ToUpsert),
+                Merge(ToDelete, other.ToDelete),
+                _completions.AddRange(other._completions));
+        }
+
+        public void Completed()
+        {
+            foreach (var completion in _completions)
+                completion.SetResult(NotUsed.Instance);
+        }
+
+        private static ImmutableList<T> Merge<T>(
+            IImmutableList<T> existing,
+            IImmutableList<T> newItems) where T : StorageDocument<T>
+        {
+            return existing
+                .AddRange(newItems)
+                .Aggregate(
+                    ImmutableList<T>.Empty,
+                    (current, item) =>
+                    {
+                        var existingItem = current
+                            .FirstOrDefault(x => x.Equals(item));
+
+                        return existingItem != null
+                            ? current.Remove(existingItem).Add(item)
+                            : current.Add(item);
+                    });
         }
     }
 }

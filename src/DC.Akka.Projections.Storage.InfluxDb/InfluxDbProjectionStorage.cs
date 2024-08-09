@@ -8,7 +8,7 @@ public class InfluxDbProjectionStorage(IInfluxDBClient client)
     : IProjectionStorage
 {
     public Task<(TDocument? document, bool requireReload)> LoadDocument<TDocument>(
-        object id, 
+        object id,
         CancellationToken cancellationToken = default)
     {
         if (!typeof(InfluxTimeSeries).IsAssignableFrom(typeof(TDocument)))
@@ -17,13 +17,13 @@ public class InfluxDbProjectionStorage(IInfluxDBClient client)
         object emptyTimeSeries = new InfluxTimeSeries(
             ImmutableList<PointData>.Empty,
             ImmutableList<InfluxTimeSeries.DeletePoint>.Empty);
-        
+
         return Task.FromResult<(TDocument?, bool)>(((TDocument)emptyTimeSeries, true));
     }
 
     public async Task Store(
-        IImmutableList<DocumentToStore> toUpsert, 
-        IImmutableList<DocumentToDelete> toDelete, 
+        IImmutableList<DocumentToStore> toUpsert,
+        IImmutableList<DocumentToDelete> toDelete,
         CancellationToken cancellationToken = default)
     {
         var items = toUpsert
@@ -34,6 +34,13 @@ public class InfluxDbProjectionStorage(IInfluxDBClient client)
                 Source = x
             })
             .ToImmutableList();
+
+        var wrongTypes = items
+            .Where(x => x.Id == null || x.TimeSeries == null)
+            .ToImmutableList();
+
+        if (!wrongTypes.IsEmpty)
+            throw new WrongDocumentTypeException(wrongTypes.Select(x => x.Source.Document.GetType()).ToImmutableList());
         
         var destinations = items
             .Where(x => x.Id != null && x.TimeSeries != null)
@@ -44,10 +51,6 @@ public class InfluxDbProjectionStorage(IInfluxDBClient client)
                 x.Source
             })
             .GroupBy(x => x.Id);
-
-        var wrongTypes = items
-            .Where(x => x.Id == null || x.TimeSeries == null)
-            .ToImmutableList();
 
         var writeApi = client.GetWriteApiAsync();
         var deleteApi = client.GetDeleteApi();
@@ -62,41 +65,25 @@ public class InfluxDbProjectionStorage(IInfluxDBClient client)
                 .SelectMany(x => x.TimeSeries.ToDelete)
                 .ToImmutableList();
 
-            try
+            if (!pointsToAdd.IsEmpty)
             {
-                if (!pointsToAdd.IsEmpty)
-                {
-                    await writeApi
-                        .WritePointsAsync(
-                            pointsToAdd.ToList(),
-                            destination.Key.Bucket,
-                            destination.Key.Organization,
-                            cancellationToken);
-                }
-
-                foreach (var deletePoint in pointsToDelete)
-                {
-                    await deleteApi.Delete(
-                        deletePoint.Start,
-                        deletePoint.Stop,
-                        deletePoint.Predicate,
+                await writeApi
+                    .WritePointsAsync(
+                        pointsToAdd.ToList(),
                         destination.Key.Bucket,
                         destination.Key.Organization,
                         cancellationToken);
-                }
+            }
 
-                foreach (var item in destination)
-                    item.Source.Ack();
-            }
-            catch (Exception e)
+            foreach (var deletePoint in pointsToDelete)
             {
-                foreach (var item in destination)
-                    item.Source.Reject(e);
-            }
-            finally
-            {
-                foreach (var wrongType in wrongTypes)
-                    wrongType.Source.Reject(new WrongDocumentTypeException(wrongType.Source.Document.GetType()));
+                await deleteApi.Delete(
+                    deletePoint.Start,
+                    deletePoint.Stop,
+                    deletePoint.Predicate,
+                    destination.Key.Bucket,
+                    destination.Key.Organization,
+                    cancellationToken);
             }
         }
     }

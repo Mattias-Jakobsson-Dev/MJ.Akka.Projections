@@ -8,6 +8,6 @@ public class InMemoryPositionStorageTests : PositionStorageTests
 {
     protected override IProjectionPositionStorage GetStorage()
     {
-        return new InMemoryProjectionPositionStorage();
+        return new InMemoryPositionStorage();
     }
 }

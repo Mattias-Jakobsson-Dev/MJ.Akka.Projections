@@ -2,7 +2,7 @@ namespace DC.Akka.Projections;
 
 public static class Messages
 {
-    public record Acknowledge : IProjectEventsResponse;
+    public record Acknowledge(long? Position) : IProjectEventsResponse;
 
     public record Reject(Exception? Cause) : IProjectEventsResponse;
 

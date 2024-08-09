@@ -13,6 +13,6 @@ public class InMemoryStringIdProjectionStorageTests : ProjectionStorageTests<str
 
     protected override IProjectionStorage GetStorage()
     {
-        return new InMemoryPositionStorage();
+        return new InMemoryProjectionStorage();
     }
 }

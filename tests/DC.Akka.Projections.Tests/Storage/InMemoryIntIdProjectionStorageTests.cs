@@ -15,6 +15,6 @@ public class InMemoryIntIdProjectionStorageTests : ProjectionStorageTests<int>
 
     protected override IProjectionStorage GetStorage()
     {
-        return new InMemoryPositionStorage();
+        return new InMemoryProjectionStorage();
     }
 }

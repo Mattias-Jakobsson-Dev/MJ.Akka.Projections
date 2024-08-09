@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using DC.Akka.Projections.Configuration;
 using DC.Akka.Projections.Storage;
@@ -14,22 +13,22 @@ public abstract class BaseProjectionsTest<TId>(ITestOutputHelper output) : TestK
     where TId : notnull
 {
     private TestProjection<TId> _projection = null!;
-    protected TestInMemoryPositionStorage Storage = null!;
+    protected TestInMemoryProjectionStorage Storage = null!;
     [PublicAPI]
     protected IProjectionPositionStorage PositionStorage = null!;
     
     public async Task InitializeAsync()
     {
         _projection = new TestProjection<TId>(WhenEvents());
-        Storage = new TestInMemoryPositionStorage();
-        PositionStorage = new InMemoryProjectionPositionStorage();
+        Storage = new TestInMemoryProjectionStorage();
+        PositionStorage = new InMemoryPositionStorage();
         
         var documents = GivenDocuments();
 
         await Storage
             .Store(
                 documents
-                    .Select(x => new DocumentToStore(x.Id, x, ActorRefs.NoSender))
+                    .Select(x => new DocumentToStore(x.Id, x))
                     .ToImmutableList(),
                 ImmutableList<DocumentToDelete>.Empty);
         

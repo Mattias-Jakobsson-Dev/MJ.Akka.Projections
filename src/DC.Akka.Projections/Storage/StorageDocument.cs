@@ -1,18 +1,27 @@
-using Akka.Actor;
-
 namespace DC.Akka.Projections.Storage;
 
-public abstract class StorageDocument(object id, IActorRef ackTo)
+public abstract class StorageDocument<T>(object id)
+    where T : StorageDocument<T>
 {
     public object Id { get; } = id;
+
+    protected abstract Type DocumentType { get; }
     
-    public void Ack()
+    public override bool Equals(object? obj)
     {
-        ackTo.Tell(new Messages.Acknowledge());
+        if (ReferenceEquals(null, obj)) return false;
+        if (ReferenceEquals(this, obj)) return true;
+        
+        return obj.GetType() == GetType() && Equals((StorageDocument<T>)obj);
     }
 
-    public void Reject(Exception cause)
+    public override int GetHashCode()
     {
-        ackTo.Tell(new Messages.Reject(cause));
+        return HashCode.Combine(Id, DocumentType);
+    }
+    
+    private bool Equals(StorageDocument<T> other)
+    {
+        return Id.Equals(other.Id) && DocumentType == other.DocumentType;
     }
 }

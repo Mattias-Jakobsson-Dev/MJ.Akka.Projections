@@ -7,7 +7,12 @@ namespace DC.Akka.Projections.Tests.TestData;
 public class TestProjection<TId>(IImmutableList<object> events) : IProjection<TId, TestDocument<TId>> 
     where TId : notnull
 {
-    public string Name => nameof(TestProjection<TId>);
+    public static string GetName()
+    {
+        return nameof(TestProjection<TId>);
+    }
+    
+    public string Name => GetName();
 
     public ISetupProjection<TId, TestDocument<TId>> Configure(ISetupProjection<TId, TestDocument<TId>> config)
     {

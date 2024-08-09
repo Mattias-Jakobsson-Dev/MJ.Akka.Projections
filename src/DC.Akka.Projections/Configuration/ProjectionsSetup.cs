@@ -72,8 +72,8 @@ internal record ProjectionsSetup(
             null,
             null,
             ProjectionStreamConfiguration.Default,
+            new InMemoryProjectionStorage(),
             new InMemoryPositionStorage(),
-            new InMemoryProjectionPositionStorage(),
             ImmutableDictionary<string, Func<IProjectionsSetup, Task<IProjectionProxy>>>.Empty);
     }
 
@@ -116,7 +116,7 @@ internal record ProjectionsSetup(
             results[projectionSetup.Key] = await projectionSetup.Value(this);
         }
 
-        var application = new ProjectionsApplication(ActorSystem, results.ToImmutableDictionary());
+        var application = new ProjectionsApplication(results.ToImmutableDictionary());
 
         ActorSystem.RegisterExtension(application);
 
