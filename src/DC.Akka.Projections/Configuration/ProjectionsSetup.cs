@@ -79,7 +79,7 @@ internal record ProjectionsSetup(
 
     public IProjectionsSetup WithProjection<TId, TDocument>(
         IProjection<TId, TDocument> projection,
-        Func<IProjectionConfigurationSetup<TId, TDocument>, IProjectionConfigurationSetup<TId, TDocument>> configure) 
+        Func<IProjectionConfigurationSetup<TId, TDocument>, IProjectionConfigurationSetup<TId, TDocument>>? configure = null) 
         where TId : notnull where TDocument : notnull
     {
         return this with
@@ -89,7 +89,7 @@ internal record ProjectionsSetup(
                     projection.Name,
                     async x =>
                     {
-                        var configuration = configure(new ProjectionConfigurationSetup<TId, TDocument>(
+                        var configuration = (configure ?? (y => y))(new ProjectionConfigurationSetup<TId, TDocument>(
                                 projection, 
                                 ActorSystem))
                             .Build(x);
