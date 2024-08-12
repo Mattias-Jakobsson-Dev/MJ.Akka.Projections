@@ -230,9 +230,14 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                     !ids.IsEmpty);
             }
 
-            public async Task<TDocument?> Handle(TDocument? document, object evnt, long position)
+            public async Task<(TDocument? document, bool hasHandler)> Handle(
+                TDocument? document,
+                object evnt,
+                long position)
             {
                 var typesToCheck = evnt.GetType().GetInheritedTypes();
+
+                var handled = false;
 
                 foreach (var type in typesToCheck)
                 {
@@ -240,12 +245,14 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                         continue;
 
                     if (!handler.Filter(evnt, document))
-                        return document;
+                        return (document, handled);
 
                     document = await handler.Handle(evnt, document, position);
+
+                    handled = true;
                 }
 
-                return document;
+                return (document, handled);
             }
         }
     }

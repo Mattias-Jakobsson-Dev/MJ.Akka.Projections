@@ -89,31 +89,40 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
                 
                     return document;
                 }
-            
+
+                var wasHandled = false;
+
                 foreach (var evnt in events)
-                    document = await _configuration.ProjectionsHandler.Handle(document, evnt.Event, evnt.Position ?? 0);
-
-                if (document != null)
                 {
-                    await _configuration
-                        .DocumentStorage
-                        .Store(
-                            ImmutableList.Create(
-                                new DocumentToStore(_id, document)), 
-                            ImmutableList<DocumentToDelete>.Empty);
+                    (document, var hasHandler) = await _configuration.ProjectionsHandler.Handle(document, evnt.Event, evnt.Position ?? 0);
 
-                    if (document is IResetDocument<TDocument> reset)
-                        document = reset.Reset();
+                    wasHandled = wasHandled || hasHandler;
                 }
-                else if (exists)
+
+                if (wasHandled)
                 {
-                    await _configuration
-                        .DocumentStorage
-                        .Store(
-                            ImmutableList<DocumentToStore>.Empty, 
-                            ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
+                    if (document != null)
+                    {
+                        await _configuration
+                            .DocumentStorage
+                            .Store(
+                                ImmutableList.Create(
+                                    new DocumentToStore(_id, document)),
+                                ImmutableList<DocumentToDelete>.Empty);
+
+                        if (document is IResetDocument<TDocument> reset)
+                            document = reset.Reset();
+                    }
+                    else if (exists)
+                    {
+                        await _configuration
+                            .DocumentStorage
+                            .Store(
+                                ImmutableList<DocumentToStore>.Empty,
+                                ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
+                    }
                 }
-            
+
                 Sender.Tell(new Messages.Acknowledge(events.Select(x => x.Position).Max()));
 
                 return document;
