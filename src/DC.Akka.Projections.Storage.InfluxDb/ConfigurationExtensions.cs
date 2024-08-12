@@ -7,8 +7,8 @@ namespace DC.Akka.Projections.Storage.InfluxDb;
 [PublicAPI]
 public static class ConfigurationExtensions
 {
-    public static IProjectionConfigurationSetup<InfluxDbTimeSeriesId, InfluxTimeSeries> WithInfluxDbStorage(
-        this IProjectionConfigurationSetup<InfluxDbTimeSeriesId, InfluxTimeSeries> setup,
+    public static IProjectionsSetup WithInfluxDbStorage(
+        this IProjectionsSetup setup,
         IInfluxDBClient client)
     {
         var storage = new InfluxDbProjectionStorage(client);
@@ -16,8 +16,8 @@ public static class ConfigurationExtensions
         return setup.WithProjectionStorage(storage);
     }
     
-    public static IProjectionConfigurationSetup<InfluxDbTimeSeriesId, InfluxTimeSeries> WithBatchedInfluxDbStorage(
-        this IProjectionConfigurationSetup<InfluxDbTimeSeriesId, InfluxTimeSeries> setup,
+    public static IProjectionsSetup WithBatchedInfluxDbStorage(
+        this IProjectionsSetup setup,
         IInfluxDBClient client,
         int batchSize = 100,
         int parallelism = 5)

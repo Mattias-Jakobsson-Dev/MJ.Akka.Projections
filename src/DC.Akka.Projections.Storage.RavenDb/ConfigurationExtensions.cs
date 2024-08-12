@@ -7,20 +7,20 @@ namespace DC.Akka.Projections.Storage.RavenDb;
 [PublicAPI]
 public static class ConfigurationExtensions
 {
-    public static IProjectionConfigurationSetup<string, TDocument> WithRavenDbDocumentStorage<TDocument>(
-        this IProjectionConfigurationSetup<string, TDocument> setup,
-        IDocumentStore documentStore) where TDocument : notnull
+    public static IProjectionsSetup WithRavenDbDocumentStorage(
+        this IProjectionsSetup setup,
+        IDocumentStore documentStore)
     {
         var storage = new RavenDbProjectionStorage(documentStore);
         
         return setup.WithProjectionStorage(storage);
     }
     
-    public static IProjectionConfigurationSetup<string, TDocument> WithBatchedRavenDbDocumentStorage<TDocument>(
-        this IProjectionConfigurationSetup<string, TDocument> setup,
+    public static IProjectionsSetup WithBatchedRavenDbDocumentStorage(
+        this IProjectionsSetup setup,
         IDocumentStore documentStore,
         int batchSize = 100,
-        int parallelism = 5) where TDocument : notnull
+        int parallelism = 5)
     {
         var storage = new RavenDbProjectionStorage(documentStore)
             .Batched(
@@ -31,9 +31,9 @@ public static class ConfigurationExtensions
         return setup.WithProjectionStorage(storage);
     }
     
-    public static IProjectionConfigurationSetup<string, TDocument> WithRavenDbPositionStorage<TDocument>(
-        this IProjectionConfigurationSetup<string, TDocument> setup,
-        IDocumentStore documentStore) where TDocument : notnull
+    public static IProjectionsSetup WithRavenDbPositionStorage(
+        this IProjectionsSetup setup,
+        IDocumentStore documentStore)
     {
         var storage = new RavenDbProjectionPositionStorage(documentStore);
         
