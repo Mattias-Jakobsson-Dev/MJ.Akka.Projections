@@ -10,7 +10,7 @@
     <PropertyGroup>
         <Copyright>Copyright © 2024 Digital Creation Sweden AB</Copyright>
         <Authors>Team Digital Creation</Authors>
-        <Version>0.16.0</Version>
+        <Version>0.17.0</Version>
         <PackageProjectUrl>
             https://github.com/DigitalCreationAb/DC.Akka.Projections
         </PackageProjectUrl>

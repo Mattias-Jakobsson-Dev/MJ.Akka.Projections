@@ -283,7 +283,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         {
             Receive<Queries.GetProjectionRef>(cmd =>
             {
-                var id = cmd.Id.ToString();
+                var id = SanitizeActorName(cmd.Id.ToString() ?? "");
 
                 if (string.IsNullOrEmpty(id))
                 {
@@ -303,7 +303,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                                     projectionName,
                                     cmd.Id,
                                     TimeSpan.FromMinutes(2))),
-                            SanitizeActorName(id));
+                            id);
                 }
 
                 Sender.Tell(new Responses.GetProjectionRefResponse(projectionRef));
