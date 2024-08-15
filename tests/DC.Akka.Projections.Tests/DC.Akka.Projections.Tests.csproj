@@ -7,6 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\src\DC.Akka.Projections.Storage.InfluxDb\DC.Akka.Projections.Storage.InfluxDb.csproj" />
       <ProjectReference Include="..\..\src\DC.Akka.Projections.Storage.RavenDb\DC.Akka.Projections.Storage.RavenDb.csproj" />
       <ProjectReference Include="..\..\src\DC.Akka.Projections\DC.Akka.Projections.csproj" />
     </ItemGroup>
@@ -14,6 +15,7 @@
     <ItemGroup>
       <PackageReference Include="Akka.TestKit.Xunit2" Version="1.5.15" />
       <PackageReference Include="AutoFixture" Version="4.18.1" />
+      <PackageReference Include="Docker.DotNet" Version="3.125.15" />
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
       <PackageReference Include="RavenDB.TestDriver" Version="6.0.105" />
     </ItemGroup>

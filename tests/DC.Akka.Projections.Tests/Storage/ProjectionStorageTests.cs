@@ -12,7 +12,7 @@ public abstract class ProjectionStorageTests<TId, TDocument> : TestKit where TId
     private readonly Fixture _fixture = new();
     
     [Fact]
-    public async Task StoreAndLoadSingleDocument()
+    public virtual async Task StoreAndLoadSingleDocument()
     {
         var storage = GetStorage();
 
@@ -33,7 +33,7 @@ public abstract class ProjectionStorageTests<TId, TDocument> : TestKit where TId
     }
 
     [Fact]
-    public async Task StoreAndLoadMultipleDocuments()
+    public virtual async Task StoreAndLoadMultipleDocuments()
     {
         var originalDocuments = Enumerable.Range(0, 5)
             .Select(_ => CreateRandomId())
@@ -64,7 +64,7 @@ public abstract class ProjectionStorageTests<TId, TDocument> : TestKit where TId
     }
 
     [Fact]
-    public async Task StoreAndDeleteSingleDocumentInSingleTransaction()
+    public virtual async Task StoreAndDeleteSingleDocumentInSingleTransaction()
     {
         var storage = GetStorage();
 
@@ -81,7 +81,7 @@ public abstract class ProjectionStorageTests<TId, TDocument> : TestKit where TId
     }
 
     [Fact]
-    public async Task StoreAndDeleteSingleDocumentInTwoTransactions()
+    public virtual async Task StoreAndDeleteSingleDocumentInTwoTransactions()
     {
         var storage = GetStorage();
 
@@ -111,7 +111,7 @@ public abstract class ProjectionStorageTests<TId, TDocument> : TestKit where TId
     }
 
     [Fact]
-    public async Task DeleteNonExistingDocument()
+    public virtual async Task DeleteNonExistingDocument()
     {
         var storage = GetStorage();
 
@@ -133,7 +133,7 @@ public abstract class ProjectionStorageTests<TId, TDocument> : TestKit where TId
     
     protected abstract Task VerifyDocument(TDocument original, TDocument loaded);
 
-    private TId CreateRandomId()
+    protected virtual TId CreateRandomId()
     {
         return _fixture.Create<TId>();
     }
