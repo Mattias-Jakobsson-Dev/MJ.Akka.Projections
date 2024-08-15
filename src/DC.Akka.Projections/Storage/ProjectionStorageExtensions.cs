@@ -7,8 +7,8 @@ public static class ProjectionStorageExtensions
     public static IProjectionStorage Batched(
         this IProjectionStorage storage,
         ActorSystem actorSystem,
-        int batchSize = 100,
-        int parallelism = 5)
+        int batchSize,
+        int parallelism)
     {
         return storage is BatchedProjectionStorage 
             ? storage 

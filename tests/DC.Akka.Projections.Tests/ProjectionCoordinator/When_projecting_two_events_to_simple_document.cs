@@ -107,7 +107,9 @@ public class When_projecting_two_events_to_simple_document
             IProjectionConfigurationSetup<TId, TestDocument<TId>> setup)
         {
             return setup
-                .WithProjectionStorage(Storage.Batched(Sys));
+                .WithProjectionStorage(Storage)
+                .Batched()
+                .Config;
         }
     }
 

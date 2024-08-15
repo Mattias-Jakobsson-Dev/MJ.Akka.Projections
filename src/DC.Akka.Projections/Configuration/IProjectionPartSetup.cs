@@ -18,7 +18,7 @@ public interface IProjectionPartSetup<out T> where T : IProjectionPartSetup<T>
     
     T WithProjectionStreamConfiguration(ProjectionStreamConfiguration projectionStreamConfiguration);
     
-    T WithProjectionStorage(IProjectionStorage storage);
+    IProjectionStoragePartSetup<T> WithProjectionStorage(IProjectionStorage storage);
 
     T WithPositionStorage(IProjectionPositionStorage positionStorage);
 }

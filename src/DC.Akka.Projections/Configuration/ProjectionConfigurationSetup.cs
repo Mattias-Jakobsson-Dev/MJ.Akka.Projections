@@ -8,7 +8,8 @@ namespace DC.Akka.Projections.Configuration;
 public class ProjectionConfigurationSetup<TId, TDocument>(
     IProjection<TId, TDocument> projection,
     ActorSystem actorSystem)
-    : IProjectionConfigurationSetup<TId, TDocument>
+    : IProjectionConfigurationSetup<TId, TDocument>, 
+        IProjectionStoragePartSetup<IProjectionConfigurationSetup<TId, TDocument>>
     where TId : notnull where TDocument : notnull
 {
     private IKeepTrackOfProjectors? _projectionFactory;
@@ -55,12 +56,24 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         return this;
     }
 
-    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionStorage(IProjectionStorage storage)
+    public IProjectionStoragePartSetup<IProjectionConfigurationSetup<TId, TDocument>> WithProjectionStorage(
+        IProjectionStorage storage)
     {
         _storage = storage;
 
         return this;
     }
+    
+    public IProjectionStoragePartSetup<IProjectionConfigurationSetup<TId, TDocument>> Batched(
+        int batchSize = 100,
+        int parallelism = 5)
+    {
+        _storage = _storage?.Batched(actorSystem, batchSize, parallelism);
+
+        return this;
+    }
+
+    public IProjectionConfigurationSetup<TId, TDocument> Config => this;
 
     public IProjectionConfigurationSetup<TId, TDocument> WithPositionStorage(IProjectionPositionStorage positionStorage)
     {

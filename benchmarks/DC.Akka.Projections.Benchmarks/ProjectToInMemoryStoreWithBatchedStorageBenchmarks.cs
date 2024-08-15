@@ -10,6 +10,8 @@ public class ProjectToInMemoryStoreWithBatchedStorageBenchmarks : BaseProjection
         IProjectionConfigurationSetup<string, TestProjection.TestDocument> config)
     {
         return config
-            .WithBatchedInMemoryStorage(ActorSystem);
+            .WithInMemoryStorage()
+            .Batched()
+            .Config;
     }
 }

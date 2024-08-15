@@ -1,42 +1,41 @@
 using DC.Akka.Projections.Configuration;
 using JetBrains.Annotations;
 using Raven.Client.Documents;
+using Raven.Client.Documents.BulkInsert;
 
 namespace DC.Akka.Projections.Storage.RavenDb;
 
 [PublicAPI]
 public static class ConfigurationExtensions
 {
-    public static IProjectionsSetup WithRavenDbDocumentStorage(
-        this IProjectionsSetup setup,
-        IDocumentStore documentStore)
-    {
-        var storage = new RavenDbProjectionStorage(documentStore);
-        
-        return setup.WithProjectionStorage(storage);
-    }
-    
-    public static IProjectionsSetup WithBatchedRavenDbDocumentStorage(
-        this IProjectionsSetup setup,
+    public static IProjectionStoragePartSetup<T> WithRavenDbDocumentStorage<T>(
+        this IProjectionPartSetup<T> setup,
         IDocumentStore documentStore,
-        int batchSize = 100,
-        int parallelism = 5)
+        BulkInsertOptions? insertOptions = null)
+        where T : IProjectionPartSetup<T>
     {
-        var storage = new RavenDbProjectionStorage(documentStore)
-            .Batched(
-                setup.ActorSystem,
-                batchSize, 
-                parallelism);
-        
-        return setup.WithProjectionStorage(storage);
+        return setup.WithProjectionStorage(CreateStorage(documentStore, insertOptions));
     }
     
-    public static IProjectionsSetup WithRavenDbPositionStorage(
-        this IProjectionsSetup setup,
+    public static IProjectionPartSetup<T> WithRavenDbPositionStorage<T>(
+        this IProjectionPartSetup<T> setup,
         IDocumentStore documentStore)
+        where T : IProjectionPartSetup<T>
     {
         var storage = new RavenDbProjectionPositionStorage(documentStore);
-        
+
         return setup.WithPositionStorage(storage);
+    }
+
+    private static RavenDbProjectionStorage CreateStorage(
+        IDocumentStore documentStore,
+        BulkInsertOptions? insertOptions)
+    {
+        return new RavenDbProjectionStorage(
+            documentStore,
+            insertOptions ?? new BulkInsertOptions
+            {
+                SkipOverwriteIfUnchanged = true
+            });
     }
 }

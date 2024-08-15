@@ -73,7 +73,9 @@ public class When_projecting_two_events_that_doesnt_match_projection
             IProjectionConfigurationSetup<TId, TestDocument<TId>> setup)
         {
             return setup
-                .WithProjectionStorage(Storage.Batched(Sys));
+                .WithProjectionStorage(Storage)
+                .Batched()
+                .Config;
         }
     }
 

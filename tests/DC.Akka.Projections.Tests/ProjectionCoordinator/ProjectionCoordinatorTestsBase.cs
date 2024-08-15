@@ -33,8 +33,8 @@ public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
 
         var setup = Configure(Sys
             .Projections()
-            .WithPositionStorage(_positionStorage)
-            .WithProjectionStorage(Storage));
+            .WithProjectionStorage(Storage)
+            .WithPositionStorage(_positionStorage));
 
         var projections = (await setup.Start()).GetProjections();
 

@@ -5,5 +5,5 @@ public class DocumentToStore(object id, object document)
 {
     public object Document { get; } = document;
 
-    protected override Type DocumentType => Document.GetType();
+    public override Type DocumentType => Document.GetType();
 }

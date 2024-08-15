@@ -123,7 +123,9 @@ public class When_projecting_two_events_to_two_simple_documents
             IProjectionConfigurationSetup<TId, TestDocument<TId>> setup)
         {
             return setup
-                .WithProjectionStorage(Storage.Batched(Sys));
+                .WithProjectionStorage(Storage)
+                .Batched()
+                .Config;
         }
     }
 

@@ -1,14 +1,16 @@
 using System.Collections.Immutable;
 using Akka.TestKit.Xunit2;
+using AutoFixture;
 using DC.Akka.Projections.Storage;
-using DC.Akka.Projections.Tests.TestData;
 using FluentAssertions;
 using Xunit;
 
 namespace DC.Akka.Projections.Tests.Storage;
 
-public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
+public abstract class ProjectionStorageTests<TId, TDocument> : TestKit where TId : notnull where TDocument : notnull
 {
+    private readonly Fixture _fixture = new();
+    
     [Fact]
     public async Task StoreAndLoadSingleDocument()
     {
@@ -16,55 +18,48 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
 
         var id = CreateRandomId();
 
-        var eventId = Guid.NewGuid().ToString();
-
+        var original = CreateTestDocument(id);
+        
         await storage
             .Store(
-                ImmutableList.Create(new DocumentToStore(
-                    id, new TestDocument<TId>
-                    {
-                        Id = id,
-                        HandledEvents = ImmutableList.Create(eventId)
-                    })),
+                ImmutableList.Create(new DocumentToStore(id, original)),
                 ImmutableList<DocumentToDelete>.Empty);
         
-        var document = await storage.LoadDocument<TestDocument<TId>>(id);
+        var document = await storage.LoadDocument<TDocument>(id);
 
         document.Should().NotBeNull();
-        document!.Id.Should().Be(id);
-        document.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(eventId));
+
+        await VerifyDocument(original, document!);
     }
 
     [Fact]
     public async Task StoreAndLoadMultipleDocuments()
     {
-        var documentIds = Enumerable.Range(0, 5)
+        var originalDocuments = Enumerable.Range(0, 5)
             .Select(_ => CreateRandomId())
+            .Select(x => new
+            {
+                Id = x,
+                Document = CreateTestDocument(x)
+            })
             .ToImmutableList();
         
         var storage = GetStorage();
-        var eventId = Guid.NewGuid().ToString();
 
         await storage
             .Store(
-                documentIds
-                    .Select(x => new DocumentToStore(
-                        x,
-                        new TestDocument<TId>
-                        {
-                            Id = x,
-                            HandledEvents = ImmutableList.Create(eventId)
-                        }))
+                originalDocuments
+                    .Select(x => new DocumentToStore(x.Id, x.Document))
                     .ToImmutableList(),
                 ImmutableList<DocumentToDelete>.Empty);
 
-        foreach (var documentId in documentIds)
+        foreach (var originalData in originalDocuments)
         {
-            var document = await storage.LoadDocument<TestDocument<TId>>(documentId);
+            var document = await storage.LoadDocument<TDocument>(originalData.Id);
 
             document.Should().NotBeNull();
-            document!.Id.Should().Be(documentId);
-            document.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(eventId));
+            
+            await VerifyDocument(originalData.Document, document!);
         }
     }
 
@@ -75,19 +70,12 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
 
         var id = CreateRandomId();
 
-        var eventId = Guid.NewGuid().ToString();
-        
         await storage
             .Store(
-                ImmutableList.Create(new DocumentToStore(
-                    id, new TestDocument<TId>
-                    {
-                        Id = id,
-                        HandledEvents = ImmutableList.Create(eventId)
-                    })),
-                ImmutableList.Create(new DocumentToDelete(id, typeof(TestDocument<TId>))));
+                ImmutableList.Create(new DocumentToStore(id, CreateTestDocument(id))),
+                ImmutableList.Create(new DocumentToDelete(id, typeof(TDocument))));
         
-        var document = await storage.LoadDocument<TestDocument<TId>>(id);
+        var document = await storage.LoadDocument<TDocument>(id);
 
         document.Should().BeNull();
     }
@@ -99,30 +87,25 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
 
         var id = CreateRandomId();
 
-        var eventId = Guid.NewGuid().ToString();
+        var testDocument = CreateTestDocument(id);
 
         await storage
             .Store(
-                ImmutableList.Create(new DocumentToStore(
-                    id, new TestDocument<TId>
-                    {
-                        Id = id,
-                        HandledEvents = ImmutableList.Create(eventId)
-                    })),
+                ImmutableList.Create(new DocumentToStore(id, testDocument)),
                 ImmutableList<DocumentToDelete>.Empty);
         
-        var document = await storage.LoadDocument<TestDocument<TId>>(id);
+        var document = await storage.LoadDocument<TDocument>(id);
 
         document.Should().NotBeNull();
-        document!.Id.Should().Be(id);
-        document.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(eventId));
+        
+        await VerifyDocument(testDocument, document!);
 
         await storage
             .Store(
                 ImmutableList<DocumentToStore>.Empty,
-                ImmutableList.Create(new DocumentToDelete(id, typeof(TestDocument<TId>))));
+                ImmutableList.Create(new DocumentToDelete(id, typeof(TDocument))));
         
-        document = await storage.LoadDocument<TestDocument<TId>>(id);
+        document = await storage.LoadDocument<TDocument>(id);
 
         document.Should().BeNull();
     }
@@ -137,14 +120,21 @@ public abstract class ProjectionStorageTests<TId> : TestKit where TId : notnull
         await storage
             .Store(
                 ImmutableList<DocumentToStore>.Empty,
-                ImmutableList.Create(new DocumentToDelete(id, typeof(TestDocument<TId>))));
+                ImmutableList.Create(new DocumentToDelete(id, typeof(TDocument))));
         
-        var document = await storage.LoadDocument<TestDocument<TId>>(id);
+        var document = await storage.LoadDocument<TDocument>(id);
 
         document.Should().BeNull();
     }
 
-    protected abstract TId CreateRandomId();
-
     protected abstract IProjectionStorage GetStorage();
+    
+    protected abstract TDocument CreateTestDocument(TId id);
+    
+    protected abstract Task VerifyDocument(TDocument original, TDocument loaded);
+
+    private TId CreateRandomId()
+    {
+        return _fixture.Create<TId>();
+    }
 }

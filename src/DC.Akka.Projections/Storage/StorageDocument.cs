@@ -5,7 +5,7 @@ public abstract class StorageDocument<T>(object id)
 {
     public object Id { get; } = id;
 
-    protected abstract Type DocumentType { get; }
+    public abstract Type DocumentType { get; }
     
     public override bool Equals(object? obj)
     {

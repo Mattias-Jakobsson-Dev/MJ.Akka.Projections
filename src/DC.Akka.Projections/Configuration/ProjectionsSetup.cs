@@ -13,7 +13,8 @@ internal record ProjectionsSetup(
     ProjectionStreamConfiguration ProjectionStreamConfiguration,
     IProjectionStorage Storage,
     IProjectionPositionStorage PositionStorage,
-    IImmutableDictionary<string, Func<IProjectionsSetup, Task<IProjectionProxy>>> ProjectionSetups) : IProjectionsSetup
+    IImmutableDictionary<string, Func<IProjectionsSetup, Task<IProjectionProxy>>> ProjectionSetups) 
+    : IProjectionsSetup, IProjectionStoragePartSetup<IProjectionsSetup>
 {
     public IProjectionsSetup WithCoordinatorFactory(IStartProjectionCoordinator factory)
     {
@@ -48,13 +49,23 @@ internal record ProjectionsSetup(
         };
     }
 
-    public IProjectionsSetup WithProjectionStorage(IProjectionStorage storage)
+    public IProjectionStoragePartSetup<IProjectionsSetup> WithProjectionStorage(IProjectionStorage storage)
     {
         return this with
         {
             Storage = storage
         };
     }
+    
+    public IProjectionStoragePartSetup<IProjectionsSetup> Batched(int batchSize = 100, int parallelism = 5)
+    {
+        return this with
+        {
+            Storage = Storage.Batched(ActorSystem, batchSize, parallelism)
+        };
+    }
+
+    public IProjectionsSetup Config => this;
 
     public IProjectionsSetup WithPositionStorage(IProjectionPositionStorage positionStorage)
     {
