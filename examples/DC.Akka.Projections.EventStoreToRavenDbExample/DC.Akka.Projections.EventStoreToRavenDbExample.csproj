@@ -7,4 +7,14 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\DC.Akka.Projections.Storage.RavenDb\DC.Akka.Projections.Storage.RavenDb.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Akka.Persistence.EventStore" Version="1.5.26" />
+      <PackageReference Include="Docker.DotNet" Version="3.125.15" />
+      <PackageReference Include="Sharprompt" Version="2.4.5" />
+    </ItemGroup>
+
 </Project>
