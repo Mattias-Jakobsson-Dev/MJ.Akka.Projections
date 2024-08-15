@@ -5,7 +5,7 @@ using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Benchmarks;
 
-public class TestProjection : IProjection<string, TestProjection.TestDocument>
+public class TestProjection : StringIdProjection<TestProjection.TestDocument>
 {
     private readonly IImmutableList<TestEvent> _events;
 
@@ -30,7 +30,7 @@ public class TestProjection : IProjection<string, TestProjection.TestDocument>
 
     public string Name => nameof(TestProjection);
     
-    public ISetupProjection<string, TestDocument> Configure(ISetupProjection<string, TestDocument> config)
+    public override ISetupProjection<string, TestDocument> Configure(ISetupProjection<string, TestDocument> config)
     {
         return config
             .On<TestEvent>(
@@ -47,7 +47,7 @@ public class TestProjection : IProjection<string, TestProjection.TestDocument>
                 });
     }
 
-    public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
+    public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
     {
         return Source.From(_events
             .Select((evnt, index) => new EventWithPosition(evnt, index + 1)));

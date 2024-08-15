@@ -7,15 +7,15 @@ namespace DC.Akka.Projections.Configuration;
 
 internal record ProjectionsSetup(
     ActorSystem ActorSystem,
-    Func<Task<IActorRef>>? CoordinatorFactory,
-    Func<object, Task<IActorRef>>? ProjectionFactory,
+    IStartProjectionCoordinator CoordinatorFactory,
+    IKeepTrackOfProjectors ProjectionFactory,
     RestartSettings? RestartSettings,
     ProjectionStreamConfiguration ProjectionStreamConfiguration,
     IProjectionStorage Storage,
     IProjectionPositionStorage PositionStorage,
     IImmutableDictionary<string, Func<IProjectionsSetup, Task<IProjectionProxy>>> ProjectionSetups) : IProjectionsSetup
 {
-    public IProjectionsSetup WithCoordinatorFactory(Func<Task<IActorRef>> factory)
+    public IProjectionsSetup WithCoordinatorFactory(IStartProjectionCoordinator factory)
     {
         return this with
         {
@@ -23,7 +23,7 @@ internal record ProjectionsSetup(
         };
     }
 
-    public IProjectionsSetup WithProjectionFactory(Func<object, Task<IActorRef>> factory)
+    public IProjectionsSetup WithProjectionFactory(IKeepTrackOfProjectors factory)
     {
         return this with
         {
@@ -68,8 +68,8 @@ internal record ProjectionsSetup(
     {
         return new ProjectionsSetup(
             actorSystem,
-            null,
-            null,
+            new InProcessSingletonProjectionCoordinator(actorSystem),
+            new KeepTrackOfProjectorsInProc(actorSystem),
             null,
             ProjectionStreamConfiguration.Default,
             new InMemoryProjectionStorage(),
@@ -96,7 +96,7 @@ internal record ProjectionsSetup(
 
                         ActorSystem.RegisterExtension(configuration);
                         
-                        var coordinator = await configuration.CreateProjectionCoordinator();
+                        var coordinator = await configuration.ProjectionCoordinatorStarter.Start(configuration);
                         
                         var proxy = new ProjectionsCoordinator<TId, TDocument>.Proxy(coordinator);
                         

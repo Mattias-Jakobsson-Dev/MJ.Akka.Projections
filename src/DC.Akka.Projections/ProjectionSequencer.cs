@@ -128,18 +128,15 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
 
     private async Task<Messages.IProjectEventsResponse> Run(TId id, IImmutableList<EventWithPosition> events)
     {
-        var projectionRef =
-            await _configuration.CreateProjectionRef(id);
+        var projector = await _configuration.ProjectorFactory.GetProjector(id, _configuration);
 
-        return await projectionRef
-            .Ask<Messages.IProjectEventsResponse>(
-                new DocumentProjection<TId, TDocument>.Commands.ProjectEvents(id, events),
-                _configuration.ProjectionStreamConfiguration.ProjectDocumentTimeout);
+        return await projector.ProjectEvents(events);
     }
 
     public static Proxy Create(IActorRefFactory refFactory)
     {
-        var sequencer = refFactory.ActorOf(Props.Create(() => new ProjectionSequencer<TId, TDocument>()));
+        var sequencer = refFactory.ActorOf(
+            Props.Create(() => new ProjectionSequencer<TId, TDocument>()));
 
         return new Proxy(sequencer);
     }

@@ -4,7 +4,19 @@ using Akka.Streams.Dsl;
 
 namespace DC.Akka.Projections.Tests.TestData;
 
-public class TestProjection<TId>(IImmutableList<object> events) : IProjection<TId, TestDocument<TId>> 
+public static class TestProjection
+{
+    public static readonly IImmutableDictionary<Type, Func<string, object>> IdFromStringParsers =
+        new Dictionary<Type, Func<string, object>>
+            {
+                [typeof(string)] = id => id.ToString(),
+                [typeof(int)] = id => int.Parse(id)
+            }
+            .ToImmutableDictionary();
+}
+
+public class TestProjection<TId>(IImmutableList<object> events) 
+    : IProjection<TId, TestDocument<TId>> 
     where TId : notnull
 {
     public static string GetName()
@@ -13,6 +25,16 @@ public class TestProjection<TId>(IImmutableList<object> events) : IProjection<TI
     }
     
     public string Name => GetName();
+    
+    public TId IdFromString(string id)
+    {
+        return (TId)TestProjection.IdFromStringParsers[typeof(TId)](id);
+    }
+
+    public string IdToString(TId id)
+    {
+        return id.ToString() ?? "";
+    }
 
     public ISetupProjection<TId, TestDocument<TId>> Configure(ISetupProjection<TId, TestDocument<TId>> config)
     {

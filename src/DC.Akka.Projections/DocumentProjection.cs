@@ -11,7 +11,12 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
 {
     public static class Commands
     {
-        public record ProjectEvents(object Id, IImmutableList<EventWithPosition> Events);
+        public interface IMessageWithId
+        {
+            TId Id { get; }
+        }
+        
+        public record ProjectEvents(TId Id, IImmutableList<EventWithPosition> Events) : IMessageWithId;
     }
 
     private readonly ProjectionConfiguration<TId, TDocument> _configuration;

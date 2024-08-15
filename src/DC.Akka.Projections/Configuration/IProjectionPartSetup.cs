@@ -10,17 +10,13 @@ public interface IProjectionPartSetup<out T> where T : IProjectionPartSetup<T>
 {
     ActorSystem ActorSystem { get; }
 
-    T WithCoordinatorFactory(
-        Func<Task<IActorRef>> factory);
+    T WithCoordinatorFactory(IStartProjectionCoordinator factory);
     
-    T WithProjectionFactory(
-        Func<object, Task<IActorRef>> factory);
+    T WithProjectionFactory(IKeepTrackOfProjectors factory);
 
-    T WithRestartSettings(
-        RestartSettings restartSettings);
+    T WithRestartSettings(RestartSettings restartSettings);
     
-    T WithProjectionStreamConfiguration(
-        ProjectionStreamConfiguration projectionStreamConfiguration);
+    T WithProjectionStreamConfiguration(ProjectionStreamConfiguration projectionStreamConfiguration);
     
     T WithProjectionStorage(IProjectionStorage storage);
 

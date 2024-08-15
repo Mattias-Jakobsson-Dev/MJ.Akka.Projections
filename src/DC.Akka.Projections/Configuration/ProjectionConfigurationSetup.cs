@@ -11,9 +11,9 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
     : IProjectionConfigurationSetup<TId, TDocument>
     where TId : notnull where TDocument : notnull
 {
-    private Func<object, Task<IActorRef>>? _projectionRefFactory;
+    private IKeepTrackOfProjectors? _projectionFactory;
 
-    private Func<Task<IActorRef>>? _projectionCoordinatorFactory;
+    private IStartProjectionCoordinator? _projectionCoordinatorFactory;
 
     private IProjectionStorage? _storage;
 
@@ -26,16 +26,16 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
     public IProjection<TId, TDocument> Projection { get; } = projection;
     public ActorSystem ActorSystem => actorSystem;
 
-    public IProjectionConfigurationSetup<TId, TDocument> WithCoordinatorFactory(Func<Task<IActorRef>> factory)
+    public IProjectionConfigurationSetup<TId, TDocument> WithCoordinatorFactory(IStartProjectionCoordinator factory)
     {
         _projectionCoordinatorFactory = factory;
 
         return this;
     }
 
-    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionFactory(Func<object, Task<IActorRef>> factory)
+    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionFactory(IKeepTrackOfProjectors factory)
     {
-        _projectionRefFactory = factory;
+        _projectionFactory = factory;
 
         return this;
     }
@@ -75,36 +75,17 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
 
         var eventHandler = Projection.Configure(setup).Build();
 
-        var projectionRefFactory = _projectionRefFactory ?? projectionsSetup.ProjectionFactory;
-
-        if (projectionRefFactory == null)
-        {
-            var documentProjectionCoordinator =
-                ActorSystem.ActorOf(Props.Create(() => new InProcDocumentProjectionCoordinator(Projection.Name)));
-
-            projectionRefFactory = async id =>
-            {
-                var response = await documentProjectionCoordinator
-                    .Ask<InProcDocumentProjectionCoordinator.Responses.GetProjectionRefResponse>(
-                        new InProcDocumentProjectionCoordinator.Queries.GetProjectionRef((TId)id));
-
-                return response.ProjectionRef ?? throw new NoDocumentProjectionException<TId, TDocument>((TId)id);
-            };
-        }
-
-        var projectionCoordinatorFactory = (_projectionCoordinatorFactory ?? projectionsSetup.CoordinatorFactory) ??
-                                           (() => Task.FromResult(ActorSystem.ActorOf(
-                                               Props.Create(() =>
-                                                   new ProjectionsCoordinator<TId, TDocument>(Projection.Name)),
-                                               Projection.Name)));
+        var projectionFactory = _projectionFactory ?? projectionsSetup.ProjectionFactory;
+        
+        var projectionCoordinatorFactory = _projectionCoordinatorFactory ?? projectionsSetup.CoordinatorFactory;
 
         return new ProjectionConfiguration<TId, TDocument>(
-            Projection.Name,
+            Projection,
             _storage ?? projectionsSetup.Storage,
             _positionStorage ?? projectionsSetup.PositionStorage,
             eventHandler,
             Projection.StartSource,
-            projectionRefFactory,
+            projectionFactory,
             projectionCoordinatorFactory,
             _restartSettings ?? projectionsSetup.RestartSettings,
             _projectionStreamConfiguration ?? projectionsSetup.ProjectionStreamConfiguration);
@@ -264,63 +245,6 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
 
                 return (document, handled);
             }
-        }
-    }
-
-    private class InProcDocumentProjectionCoordinator : ReceiveActor
-    {
-        public static class Queries
-        {
-            public record GetProjectionRef(TId Id);
-        }
-
-        public static class Responses
-        {
-            public record GetProjectionRefResponse(IActorRef? ProjectionRef);
-        }
-
-        public InProcDocumentProjectionCoordinator(string projectionName)
-        {
-            Receive<Queries.GetProjectionRef>(cmd =>
-            {
-                var id = SanitizeActorName(cmd.Id.ToString() ?? "");
-
-                if (string.IsNullOrEmpty(id))
-                {
-                    Sender.Tell(new Responses.GetProjectionRefResponse(null));
-
-                    return;
-                }
-
-                var projectionRef = Context.Child(id);
-
-                if (projectionRef.IsNobody())
-                {
-                    projectionRef =
-                        Context.ActorOf(
-                            Props.Create(
-                                () => new DocumentProjection<TId, TDocument>(
-                                    projectionName,
-                                    cmd.Id,
-                                    TimeSpan.FromMinutes(2))),
-                            id);
-                }
-
-                Sender.Tell(new Responses.GetProjectionRefResponse(projectionRef));
-            });
-        }
-
-        private static string SanitizeActorName(string id)
-        {
-            const string validSymbols = "\"-_.*$+:@&=,!~';()";
-
-            if (id.StartsWith('$'))
-                id = id[1..];
-
-            var chars = id
-                .Where(x => char.IsAsciiLetter(x) || char.IsAsciiDigit(x) || validSymbols.Contains(x));
-
-            return string.Join("", chars);
         }
     }
 }
