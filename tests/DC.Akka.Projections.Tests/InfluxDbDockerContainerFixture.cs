@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using Docker.DotNet.Models;
 using InfluxDB.Client;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Tests;
 
+[PublicAPI]
 public class InfluxDbDockerContainerFixture : DockerContainerFixture
 {
     private static readonly Random Random = new();
@@ -21,9 +23,7 @@ public class InfluxDbDockerContainerFixture : DockerContainerFixture
 
     public IInfluxDBClient CreateClient()
     {
-        return new InfluxDBClient(
-            $"http://localhost:{DbPort}",
-            Token);
+        return new InfluxDBClient($"http://localhost:{DbPort}", Token);
     }
 
     protected override CreateContainerParameters Configure(CreateContainerParameters defaultConfig)

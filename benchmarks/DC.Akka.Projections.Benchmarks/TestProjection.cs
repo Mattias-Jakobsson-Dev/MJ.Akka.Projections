@@ -27,8 +27,6 @@ public class TestProjection : StringIdProjection<TestProjection.TestDocument>
 
         _events = events.ToImmutableList();
     }
-
-    public string Name => nameof(TestProjection);
     
     public override ISetupProjection<string, TestDocument> Configure(ISetupProjection<string, TestDocument> config)
     {

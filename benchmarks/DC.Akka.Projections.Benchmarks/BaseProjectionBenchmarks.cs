@@ -24,12 +24,12 @@ public abstract class BaseProjectionBenchmarks
         }
     }
 
-    protected ActorSystem ActorSystem { get; private set; } = null!;
+    private ActorSystem ActorSystem { get; set; } = null!;
     private IProjectionsSetup _projectionSetup = null!;
     private TestProjection _projection = null!;
     
     [IterationSetup]
-    public void Setup()
+    public virtual void Setup()
     {
         ActorSystem = ActorSystem.Create(
             "projections", 

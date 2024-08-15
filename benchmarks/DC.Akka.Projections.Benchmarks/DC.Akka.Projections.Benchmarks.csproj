@@ -13,6 +13,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\DC.Akka.Projections\DC.Akka.Projections.csproj" />
+      <ProjectReference Include="..\..\tests\DC.Akka.Projections.Tests\DC.Akka.Projections.Tests.csproj" />
     </ItemGroup>
 
 </Project>
