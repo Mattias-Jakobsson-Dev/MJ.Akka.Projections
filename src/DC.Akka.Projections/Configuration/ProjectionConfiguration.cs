@@ -16,10 +16,11 @@ public class ProjectionConfiguration<TId, TDocument>(
     IStartProjectionCoordinator projectionCoordinatorStarter,
     RestartSettings? restartSettings,
     ProjectionStreamConfiguration projectionStreamConfiguration) 
-    : ExtensionIdProvider<ProjectionConfiguration<TId, TDocument>>, IExtension
+    : ExtensionIdProvider<ProjectionConfiguration<TId, TDocument>>, IExtension, IProjectionConfiguration
     where TId : notnull where TDocument : notnull
 {
     public IProjection<TId, TDocument> Projection { get; } = projection;
+    IProjection IProjectionConfiguration.Projection { get; } = projection;
     public IProjectionStorage DocumentStorage { get; } = documentStorage;
     public IProjectionPositionStorage PositionStorage { get; } = positionStorage;
     public IHandleEventInProjection<TId, TDocument> ProjectionsHandler { get; } = projectionsHandler;

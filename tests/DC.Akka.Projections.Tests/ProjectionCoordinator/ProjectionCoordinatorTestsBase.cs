@@ -57,9 +57,11 @@ public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
         return Storage.LoadAll();
     }
 
-    public Task<long?> LoadPosition(string projectionName)
+    public async Task<long?> LoadPosition(string projectionName)
     {
-        return _positionStorage.LoadLatestPosition(projectionName);
+        var position = await _positionStorage.LoadLatestPosition(projectionName);
+
+        return position;
     }
 
     protected abstract IProjectionsSetup Configure(IProjectionsSetup setup);

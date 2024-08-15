@@ -6,7 +6,7 @@ using JetBrains.Annotations;
 namespace DC.Akka.Projections.Cluster.Sharding;
 
 [PublicAPI]
-public static class ProjectionConfigurationSetupExtensions
+public static class ConfigurationExtensions
 {
     public static IProjectionPartSetup<T> WithSharding<T>(
         this IProjectionPartSetup<T> setup,
@@ -33,5 +33,19 @@ public static class ProjectionConfigurationSetupExtensions
                 setup.ActorSystem,
                 (configureCoordinator ?? (x => x))(
                     ClusterSingletonManagerSettings.Create(setup.ActorSystem))));
+    }
+
+    public static IProjectionPartSetup<T> AsShardedDaemon<T>(
+        this IProjectionPartSetup<T> setup,
+        string name = "ProjectionsCoordinatorDaemon",
+        Func<ShardedDaemonProcessSettings, ShardedDaemonProcessSettings>? configureDaemon = null)
+        where T : IProjectionPartSetup<T>
+    {
+        return setup
+            .WithCoordinatorFactory(new ShardedDaemonProjectionCoordinator(
+                setup.ActorSystem,
+                name,
+                (configureDaemon ?? (x => x))(
+                    ShardedDaemonProcessSettings.Create(setup.ActorSystem))));
     }
 }

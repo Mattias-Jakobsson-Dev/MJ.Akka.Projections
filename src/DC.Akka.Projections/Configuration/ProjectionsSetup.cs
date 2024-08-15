@@ -13,7 +13,7 @@ internal record ProjectionsSetup(
     ProjectionStreamConfiguration ProjectionStreamConfiguration,
     IProjectionStorage Storage,
     IProjectionPositionStorage PositionStorage,
-    IImmutableDictionary<string, Func<IProjectionsSetup, Task<IProjectionProxy>>> ProjectionSetups) 
+    IImmutableDictionary<string, Func<IProjectionsSetup, Task<IProjectionConfiguration>>> ProjectionSetups) 
     : IProjectionsSetup, IProjectionStoragePartSetup<IProjectionsSetup>
 {
     public IProjectionsSetup WithCoordinatorFactory(IStartProjectionCoordinator factory)
@@ -85,7 +85,7 @@ internal record ProjectionsSetup(
             ProjectionStreamConfiguration.Default,
             new InMemoryProjectionStorage(),
             new InMemoryPositionStorage(),
-            ImmutableDictionary<string, Func<IProjectionsSetup, Task<IProjectionProxy>>>.Empty);
+            ImmutableDictionary<string, Func<IProjectionsSetup, Task<IProjectionConfiguration>>>.Empty);
     }
 
     public IProjectionsSetup WithProjection<TId, TDocument>(
@@ -107,13 +107,9 @@ internal record ProjectionsSetup(
 
                         ActorSystem.RegisterExtension(configuration);
                         
-                        var coordinator = await configuration.ProjectionCoordinatorStarter.Start(configuration);
-                        
-                        var proxy = new ProjectionsCoordinator<TId, TDocument>.Proxy(coordinator);
-                        
-                        proxy.Start();
+                        await configuration.ProjectionCoordinatorStarter.IncludeProjection(configuration);
 
-                        return proxy;
+                        return configuration;
                     })
         };
     }
@@ -124,7 +120,15 @@ internal record ProjectionsSetup(
 
         foreach (var projectionSetup in ProjectionSetups)
         {
-            results[projectionSetup.Key] = await projectionSetup.Value(this);
+            var configuration = await projectionSetup.Value(this);
+
+            await configuration.ProjectionCoordinatorStarter.Start();
+
+            var proxy = await configuration.ProjectionCoordinatorStarter.GetCoordinatorFor(
+                configuration.Projection);
+            
+            if (proxy != null)
+                results[projectionSetup.Key] = proxy;
         }
 
         var application = new ProjectionsApplication(results.ToImmutableDictionary());

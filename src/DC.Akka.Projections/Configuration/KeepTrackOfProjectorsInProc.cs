@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Akka.Actor;
+using Akka.Util;
 
 namespace DC.Akka.Projections.Configuration;
 
@@ -43,9 +44,14 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem) : IKeepTrackOf
 
         public InProcDocumentProjectionCoordinator(string projectionName)
         {
+            var projectionConfiguration = Context.System.GetExtension<ProjectionConfiguration<TId, TDocument>>();
+            
             Receive<Queries.GetProjectionRef>(cmd =>
             {
-                var id = SanitizeActorName(cmd.Id.ToString() ?? "");
+                var id = MurmurHash.StringHash(projectionConfiguration
+                        .Projection
+                        .IdToString(cmd.Id))
+                    .ToString();
                 
                 var projectionRef = Context.Child(id);
 
@@ -63,19 +69,6 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem) : IKeepTrackOf
 
                 Sender.Tell(new Responses.GetProjectionRefResponse(projectionRef));
             });
-        }
-
-        private static string SanitizeActorName(string id)
-        {
-            const string validSymbols = "\"-_.*$+:@&=,!~';()";
-
-            if (id.StartsWith('$'))
-                id = id[1..];
-
-            var chars = id
-                .Where(x => char.IsAsciiLetter(x) || char.IsAsciiDigit(x) || validSymbols.Contains(x));
-
-            return string.Join("", chars);
         }
     }
 }

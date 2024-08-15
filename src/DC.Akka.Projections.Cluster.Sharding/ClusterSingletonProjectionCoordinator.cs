@@ -7,17 +7,40 @@ namespace DC.Akka.Projections.Cluster.Sharding;
 public class ClusterSingletonProjectionCoordinator(ActorSystem actorSystem, ClusterSingletonManagerSettings settings)
     : IStartProjectionCoordinator
 {
-    public Task<IActorRef> Start<TId, TDocument>(ProjectionConfiguration<TId, TDocument>  configuration)
+    private readonly Dictionary<string, IProjection> _projections = new();
+
+    private readonly Dictionary<string, IProjectionProxy> _projectionProxies = new();
+
+    public Task IncludeProjection<TId, TDocument>(ProjectionConfiguration<TId, TDocument> configuration) 
         where TId : notnull where TDocument : notnull
     {
-        var coordinator = actorSystem
-            .ActorOf(ClusterSingletonManager.Props(
-                    singletonProps: Props.Create(
-                        () => new ProjectionsCoordinator<TId, TDocument>(configuration.Projection.Name)),
-                    terminationMessage: PoisonPill.Instance,
-                    settings: settings),
-                name: configuration.Projection.Name);
+        _projections[configuration.Projection.Name] = configuration.Projection;
         
-        return Task.FromResult(coordinator);
+        return Task.CompletedTask;
+    }
+
+    public Task Start()
+    {
+        foreach (var projection in _projections)
+        {
+            if (_projectionProxies.ContainsKey(projection.Value.Name)) 
+                continue;
+            
+            var coordinator = actorSystem
+                .ActorOf(ClusterSingletonManager.Props(
+                        singletonProps: projection.Value.CreateCoordinatorProps(),
+                        terminationMessage: new ProjectionsCoordinator.Commands.Kill(),
+                        settings: settings),
+                    name: projection.Value.Name);
+            
+            _projectionProxies[projection.Value.Name] = new ActorRefProjectionProxy(coordinator);
+        }
+        
+        return Task.CompletedTask;
+    }
+
+    public Task<IProjectionProxy?> GetCoordinatorFor(IProjection projection)
+    {
+        return Task.FromResult(_projectionProxies.GetValueOrDefault(projection.Name));
     }
 }

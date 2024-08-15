@@ -6,6 +6,7 @@ using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections;
 
+
 public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers 
     where TId : notnull where TDocument : notnull
 {

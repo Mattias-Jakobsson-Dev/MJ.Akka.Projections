@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using AutoFixture;
 using DC.Akka.Projections.Configuration;
-using DC.Akka.Projections.Storage;
 using DC.Akka.Projections.Tests.TestData;
 using FluentAssertions;
 using JetBrains.Annotations;

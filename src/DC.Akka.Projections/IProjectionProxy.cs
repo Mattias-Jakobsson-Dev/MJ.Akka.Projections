@@ -5,6 +5,6 @@ namespace DC.Akka.Projections;
 [PublicAPI]
 public interface IProjectionProxy
 {
-    void Stop();
+    Task Stop();
     Task WaitForCompletion(TimeSpan? timeout = null);
 }

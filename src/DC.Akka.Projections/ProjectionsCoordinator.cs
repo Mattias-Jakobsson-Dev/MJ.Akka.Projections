@@ -9,13 +9,15 @@ using JetBrains.Annotations;
 
 namespace DC.Akka.Projections;
 
-public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : notnull where TDocument : notnull
+public static class ProjectionsCoordinator
 {
-    private static class Commands
+    public static class Commands
     {
         public record Start;
 
         public record Stop;
+
+        public record Kill;
 
         public record Fail(Exception Cause);
 
@@ -24,11 +26,15 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         public record WaitForCompletion;
     }
 
-    private static class Responses
+    public static class Responses
     {
         public record WaitForCompletionResponse(Exception? Error = null);
     }
+}
 
+[PublicAPI]
+public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : notnull where TDocument : notnull
+{
     private readonly ILoggingAdapter _logger;
 
     private UniqueKillSwitch? _killSwitch;
@@ -36,23 +42,28 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     private readonly ProjectionConfiguration<TId, TDocument> _configuration;
     private readonly ProjectionSequencer<TId, TDocument>.Proxy _sequencer;
 
-    public ProjectionsCoordinator(string projectionName)
+    public ProjectionsCoordinator()
     {
         _logger = Context.GetLogger();
         
         _configuration = Context
                              .System
                              .GetExtension<ProjectionConfiguration<TId, TDocument>>() ??
-                         throw new NoDocumentProjectionException<TDocument>(projectionName);
+                         throw new NoDocumentProjectionException<TDocument>();
 
         _sequencer = ProjectionSequencer<TId, TDocument>.Create(Context);
 
         Become(Stopped);
     }
 
+    public static Props Init()
+    {
+        return Props.Create(() => new ProjectionsCoordinator<TId, TDocument>());
+    }
+
     private void Stopped()
     {
-        ReceiveAsync<Commands.Start>(async _ =>
+        ReceiveAsync<ProjectionsCoordinator.Commands.Start>(async _ =>
         {
             _logger.Info("Starting projection {0}", _configuration.Projection.Name);
 
@@ -131,11 +142,16 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                 .ViaMaterialized(KillSwitches.Single<NotUsed>(), Keep.Right)
                 .ToMaterialized(Sink.ActorRef<NotUsed>(
                     Self,
-                    new Commands.Complete(),
-                    ex => new Commands.Fail(ex)), Keep.Left)
+                    new ProjectionsCoordinator.Commands.Complete(),
+                    ex => new ProjectionsCoordinator.Commands.Fail(ex)), Keep.Left)
                 .Run(Context.System.Materializer());
 
             Become(Started);
+        });
+
+        Receive<ProjectionsCoordinator.Commands.Kill>(_ =>
+        {
+            Context.Stop(Self);
         });
     }
 
@@ -143,55 +159,72 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     {
         var waitingForCompletion = new HashSet<IActorRef>();
 
-        Receive<Commands.Stop>(_ =>
+        Receive<ProjectionsCoordinator.Commands.Stop>(_ =>
         {
             _logger.Info("Stopping projection {0}", _configuration.Projection.Name);
 
             _killSwitch?.Shutdown();
 
             foreach (var item in waitingForCompletion)
-                item.Tell(new Responses.WaitForCompletionResponse());
+                item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
 
             waitingForCompletion.Clear();
 
             Become(Stopped);
         });
 
-        Receive<Commands.Fail>(cmd =>
+        Receive<ProjectionsCoordinator.Commands.Fail>(cmd =>
         {
             _logger.Error(cmd.Cause, "Projection {0} failed", _configuration.Projection.Name);
 
             _killSwitch?.Shutdown();
 
             foreach (var item in waitingForCompletion)
-                item.Tell(new Responses.WaitForCompletionResponse(cmd.Cause));
+                item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse(cmd.Cause));
 
             waitingForCompletion.Clear();
 
             Become(Stopped);
         });
 
-        Receive<Commands.WaitForCompletion>(_ => { waitingForCompletion.Add(Sender); });
+        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ => { waitingForCompletion.Add(Sender); });
 
-        Receive<Commands.Complete>(_ =>
+        Receive<ProjectionsCoordinator.Commands.Complete>(_ =>
         {
             foreach (var item in waitingForCompletion)
-                item.Tell(new Responses.WaitForCompletionResponse());
+                item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
 
             waitingForCompletion.Clear();
 
             Become(Completed);
         });
+        
+        Receive<ProjectionsCoordinator.Commands.Kill>(_ =>
+        {
+            _logger.Info("Killing projection {0}", _configuration.Projection.Name);
+
+            _killSwitch?.Shutdown();
+            
+            Context.Stop(Self);
+        });
     }
 
     private void Completed()
     {
-        Receive<Commands.WaitForCompletion>(_ => { Sender.Tell(new Responses.WaitForCompletionResponse()); });
+        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ =>
+        {
+            Sender.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
+        });
+        
+        Receive<ProjectionsCoordinator.Commands.Kill>(_ =>
+        {
+            Context.Stop(Self);
+        });
     }
 
     protected override void PreStart()
     {
-        Self.Tell(new Commands.Start());
+        Self.Tell(new ProjectionsCoordinator.Commands.Start());
 
         base.PreStart();
     }
@@ -203,30 +236,6 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         return restartSettings != null
             ? RestartSource.OnFailuresWithBackoff(createSource, restartSettings)
             : createSource();
-    }
-
-    [PublicAPI]
-    public class Proxy(IActorRef coordinator) : IProjectionProxy
-    {
-        internal void Start()
-        {
-            coordinator.Tell(new Commands.Start());
-        }
-
-        public void Stop()
-        {
-            coordinator.Tell(new Commands.Stop());
-        }
-
-        public async Task WaitForCompletion(TimeSpan? timeout = null)
-        {
-            var response = await coordinator.Ask<Responses.WaitForCompletionResponse>(
-                new Commands.WaitForCompletion(),
-                timeout ?? Timeout.InfiniteTimeSpan);
-
-            if (response.Error != null)
-                throw response.Error;
-        }
     }
 
     private record PositionData(long? Position);

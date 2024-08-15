@@ -16,27 +16,27 @@ public static class TestProjection
 }
 
 public class TestProjection<TId>(IImmutableList<object> events) 
-    : IProjection<TId, TestDocument<TId>> 
+    : BaseProjection<TId, TestDocument<TId>> 
     where TId : notnull
 {
     public static string GetName()
     {
-        return nameof(TestProjection<TId>);
+        return $"TestProjectionOf{typeof(TId).Name}";
     }
-    
-    public string Name => GetName();
-    
-    public TId IdFromString(string id)
+
+    public override string Name => GetName();
+
+    public override TId IdFromString(string id)
     {
         return (TId)TestProjection.IdFromStringParsers[typeof(TId)](id);
     }
 
-    public string IdToString(TId id)
+    public override string IdToString(TId id)
     {
         return id.ToString() ?? "";
     }
 
-    public ISetupProjection<TId, TestDocument<TId>> Configure(ISetupProjection<TId, TestDocument<TId>> config)
+    public override ISetupProjection<TId, TestDocument<TId>> Configure(ISetupProjection<TId, TestDocument<TId>> config)
     {
         return config
             .TransformUsing<Events<TId>.TransformToMultipleEvents>(
@@ -69,7 +69,7 @@ public class TestProjection<TId>(IImmutableList<object> events)
                 });
     }
 
-    public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
+    public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
     {
         return Source.From(events
             .Select((x, i) => new EventWithPosition(x, i + 1))
