@@ -73,6 +73,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             _killSwitch = MaybeCreateRestartSource(() =>
                 {
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Projection.Name, latestPosition);
+
+                    _sequencer.Clear();
                     
                     return _configuration
                         .StartSource(latestPosition)
