@@ -245,7 +245,23 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         base.PreStart();
     }
-    
+
+    protected override void PreRestart(Exception reason, object message)
+    {
+        _killSwitch?.Shutdown();
+        
+        Self.Tell(new ProjectionsCoordinator.Commands.Start());
+        
+        base.PreRestart(reason, message);
+    }
+
+    protected override void PostStop()
+    {
+        _killSwitch?.Shutdown();
+        
+        base.PostStop();
+    }
+
     private static Source<NotUsed, NotUsed> MaybeCreateRestartSource(
         Func<Source<NotUsed, NotUsed>> createSource,
         RestartSettings? restartSettings)
