@@ -18,17 +18,12 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             public long? HighestEventNumber => Events.Select(x => x.Position).Max();
         }
 
-        public record Clear;
-
         public record IdFinished(TId Id);
     }
 
     public static class Responses
     {
         public record StartProjectingResponse(Task<Messages.IProjectEventsResponse> Task);
-
-        [PublicAPI]
-        public record ClearResponse;
     }
 
     private readonly List<TId> _inprogressIds = [];
@@ -84,13 +79,6 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             }
         });
 
-        Receive<Commands.Clear>(_ =>
-        {
-            _inprogressIds.Clear();
-            
-            Sender.Tell(new Responses.ClearResponse());
-        });
-
         Receive<Commands.IdFinished>(cmd =>
         {
             if (_queues.TryGetValue(cmd.Id, out var value))
@@ -133,21 +121,9 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
         return await projector.ProjectEvents(events);
     }
 
-    public static Proxy Create(IActorRefFactory refFactory)
+    public static IActorRef Create(IActorRefFactory refFactory)
     {
-        var sequencer = refFactory.ActorOf(
+        return refFactory.ActorOf(
             Props.Create(() => new ProjectionSequencer<TId, TDocument>()));
-
-        return new Proxy(sequencer);
-    }
-    
-    public class Proxy(IActorRef sequencer)
-    {
-        public IActorRef Ref => sequencer;
-
-        public Task Clear()
-        {
-            return sequencer.Ask<Responses.ClearResponse>(new Commands.Clear());
-        }
     }
 }

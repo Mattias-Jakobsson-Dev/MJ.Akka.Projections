@@ -40,7 +40,6 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     private UniqueKillSwitch? _killSwitch;
 
     private readonly ProjectionConfiguration<TId, TDocument> _configuration;
-    private readonly ProjectionSequencer<TId, TDocument>.Proxy _sequencer;
 
     public ProjectionsCoordinator()
     {
@@ -50,8 +49,6 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                              .System
                              .GetExtension<ProjectionConfiguration<TId, TDocument>>() ??
                          throw new NoDocumentProjectionException<TDocument>();
-
-        _sequencer = ProjectionSequencer<TId, TDocument>.Create(Context);
 
         Become(Stopped);
     }
@@ -68,13 +65,17 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             _logger.Info("Starting projection {0}", _configuration.Projection.Name);
 
             var latestPosition = await _configuration.PositionStorage.LoadLatestPosition(_configuration.Projection.Name);
-            await _sequencer.Clear();
+
+            IActorRef? sequencer = null;
 
             _killSwitch = MaybeCreateRestartSource(() =>
                 {
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Projection.Name, latestPosition);
+                    
+                    if (sequencer != null)
+                        Context.Stop(sequencer);
 
-                    _sequencer.Clear();
+                    sequencer = ProjectionSequencer<TId, TDocument>.Create(Context);
                     
                     return _configuration
                         .StartSource(latestPosition)
@@ -111,7 +112,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                     x.Events));
                         })
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.StartProjectingResponse>(
-                            _sequencer.Ref,
+                            sequencer,
                             TimeSpan.FromMinutes(1),
                             1)
                         .SelectAsync(
