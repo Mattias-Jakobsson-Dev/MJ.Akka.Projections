@@ -41,6 +41,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
     private readonly ProjectionConfiguration<TId, TDocument> _configuration;
 
+    private IActorRef? _sequencer;
+    
     public ProjectionsCoordinator()
     {
         _logger = Context.GetLogger();
@@ -66,16 +68,16 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
             var latestPosition = await _configuration.PositionStorage.LoadLatestPosition(_configuration.Projection.Name);
 
-            IActorRef? sequencer = null;
-
             _killSwitch = MaybeCreateRestartSource(() =>
                 {
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Projection.Name, latestPosition);
                     
-                    if (sequencer != null)
-                        Context.Stop(sequencer);
+                    if (_sequencer != null)
+                        Context.Stop(_sequencer);
 
-                    sequencer = ProjectionSequencer<TId, TDocument>.Create(Context);
+                    var sequencer = ProjectionSequencer<TId, TDocument>.Create(Context);
+
+                    _sequencer = sequencer;
                     
                     return _configuration
                         .StartSource(latestPosition)
@@ -167,6 +169,9 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             _logger.Info("Stopping projection {0}", _configuration.Projection.Name);
 
             _killSwitch?.Shutdown();
+            
+            if (_sequencer != null)
+                Context.Stop(_sequencer);
 
             foreach (var item in waitingForCompletion)
                 item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
@@ -181,6 +186,9 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             _logger.Error(cmd.Cause, "Projection {0} failed", _configuration.Projection.Name);
 
             _killSwitch?.Shutdown();
+            
+            if (_sequencer != null)
+                Context.Stop(_sequencer);
 
             foreach (var item in waitingForCompletion)
                 item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse(cmd.Cause));
@@ -194,6 +202,9 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         Receive<ProjectionsCoordinator.Commands.Complete>(_ =>
         {
+            if (_sequencer != null)
+                Context.Stop(_sequencer);
+            
             foreach (var item in waitingForCompletion)
                 item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
 
