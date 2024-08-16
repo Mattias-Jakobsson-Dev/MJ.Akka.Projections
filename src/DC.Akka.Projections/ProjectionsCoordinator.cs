@@ -19,10 +19,6 @@ public static class ProjectionsCoordinator
 
         public record Kill;
 
-        public record Fail(Exception Cause);
-
-        public record Complete;
-
         public record WaitForCompletion;
     }
 
@@ -35,6 +31,13 @@ public static class ProjectionsCoordinator
 [PublicAPI]
 public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : notnull where TDocument : notnull
 {
+    private static class InternalCommands
+    {
+        public record Fail(Exception Cause);
+
+        public record Complete;
+    }
+    
     private readonly ILoggingAdapter _logger;
 
     private UniqueKillSwitch? _killSwitch;
@@ -147,8 +150,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                 .ViaMaterialized(KillSwitches.Single<NotUsed>(), Keep.Right)
                 .ToMaterialized(Sink.ActorRef<NotUsed>(
                     Self,
-                    new ProjectionsCoordinator.Commands.Complete(),
-                    ex => new ProjectionsCoordinator.Commands.Fail(ex)), Keep.Left)
+                    new InternalCommands.Complete(),
+                    ex => new InternalCommands.Fail(ex)), Keep.Left)
                 .Run(Context.System.Materializer());
 
             Become(Started);
@@ -181,7 +184,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             Become(Stopped);
         });
 
-        Receive<ProjectionsCoordinator.Commands.Fail>(cmd =>
+        Receive<InternalCommands.Fail>(cmd =>
         {
             _logger.Error(cmd.Cause, "Projection {0} failed", _configuration.Projection.Name);
 
@@ -200,7 +203,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ => { waitingForCompletion.Add(Sender); });
 
-        Receive<ProjectionsCoordinator.Commands.Complete>(_ =>
+        Receive<InternalCommands.Complete>(_ =>
         {
             if (_sequencer != null)
                 Context.Stop(_sequencer);
