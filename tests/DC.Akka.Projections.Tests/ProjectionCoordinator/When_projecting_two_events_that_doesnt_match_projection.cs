@@ -51,6 +51,15 @@ public class When_projecting_two_events_that_doesnt_match_projection
 
             position.Should().Be(2);
         }
+        
+        [Fact]
+        public void Then_projection_should_complete_successfully()
+        {
+            fixture
+                .GetExceptionFor(TestProjection<TId>.GetName())
+                .Should()
+                .BeNull();
+        }
     }
 
     [PublicAPI]

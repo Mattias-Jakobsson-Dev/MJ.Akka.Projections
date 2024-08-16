@@ -11,6 +11,13 @@ public static class Events<TId>
     public record UnHandledEvent(TId DocId);
 
     public record TransformToMultipleEvents(IImmutableList<IEvent> Events);
+
+    public record FailProjection(
+        TId DocId,
+        string EventId,
+        string FailureKey,
+        int ConsecutiveFailures,
+        Exception FailWith);
     
     public interface IEvent;
 }

@@ -101,6 +101,15 @@ public class When_projecting_two_events_to_two_simple_documents
 
             doc!.HandledEvents[0].Should().Be(fixture.SecondEventId);
         }
+        
+        [Fact]
+        public void Then_projection_should_complete_successfully()
+        {
+            fixture
+                .GetExceptionFor(TestProjection<TId>.GetName())
+                .Should()
+                .BeNull();
+        }
     }
 
     [PublicAPI]

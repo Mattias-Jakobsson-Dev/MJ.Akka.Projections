@@ -38,6 +38,8 @@ public class TestProjection<TId>(IImmutableList<object> events)
 
     public override ISetupProjection<TId, TestDocument<TId>> Configure(ISetupProjection<TId, TestDocument<TId>> config)
     {
+        var failures = new Dictionary<string, int>();
+        
         return config
             .TransformUsing<Events<TId>.TransformToMultipleEvents>(
                 evnt => evnt.Events.OfType<object>().ToImmutableList())
@@ -63,6 +65,28 @@ public class TestProjection<TId>(IImmutableList<object> events)
                         Id = evnt.DocId
                     };
 
+                    doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
+
+                    return doc;
+                })
+            .On<Events<TId>.FailProjection>(
+                x => x.DocId,
+                (evnt, doc) =>
+                {
+                    doc ??= new TestDocument<TId>
+                    {
+                        Id = evnt.DocId
+                    };
+                    
+                    failures.TryAdd(evnt.FailureKey, 0);
+
+                    if (failures[evnt.FailureKey] < evnt.ConsecutiveFailures)
+                    {
+                        failures[evnt.FailureKey]++;
+
+                        throw evnt.FailWith;
+                    }
+                    
                     doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
 
                     return doc;

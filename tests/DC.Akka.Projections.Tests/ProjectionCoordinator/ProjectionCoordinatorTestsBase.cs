@@ -11,6 +11,7 @@ namespace DC.Akka.Projections.Tests.ProjectionCoordinator;
 public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
 {
     private InMemoryPositionStorage _positionStorage = null!;
+    private readonly Dictionary<string, Exception> _projectionExceptions = new();
     protected TestInMemoryProjectionStorage Storage = null!;
 
     public async Task InitializeAsync()
@@ -39,7 +40,16 @@ public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
         var projections = (await setup.Start()).GetProjections();
 
         foreach (var projection in projections)
-            await projection.Value.WaitForCompletion(TimeSpan.FromSeconds(5));
+        {
+            try
+            {
+                await projection.Value.WaitForCompletion(TimeSpan.FromSeconds(5));
+            }
+            catch (Exception e)
+            {
+                _projectionExceptions[projection.Key] = e;
+            }
+        }
     }
 
     public Task DisposeAsync()
@@ -62,6 +72,11 @@ public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
         var position = await _positionStorage.LoadLatestPosition(projectionName);
 
         return position;
+    }
+
+    public Exception? GetExceptionFor(string projection)
+    {
+        return _projectionExceptions.GetValueOrDefault(projection);
     }
 
     protected abstract IProjectionsSetup Configure(IProjectionsSetup setup);
