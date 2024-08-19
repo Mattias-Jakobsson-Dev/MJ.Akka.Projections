@@ -5,11 +5,11 @@ namespace DC.Akka.Projections.Tests.TestData;
 
 public static class TestProjectionConfigurationExtensions
 {
-    public static IProjectionsSetup WithTestProjection<TId>(
-        this IProjectionsSetup setup,
+    public static IHaveConfiguration<ProjectionSystemConfiguration> WithTestProjection<TId>(
+        this IHaveConfiguration<ProjectionSystemConfiguration> setup,
         IImmutableList<object> initialEvents,
-        Func<IProjectionConfigurationSetup<TId, TestDocument<TId>>,
-            IProjectionConfigurationSetup<TId, TestDocument<TId>>>? configure = null)
+        Func<IHaveConfiguration<ProjectionInstanceConfiguration>,
+            IHaveConfiguration<ProjectionInstanceConfiguration>>? configure = null)
         where TId : notnull
     {
         return setup

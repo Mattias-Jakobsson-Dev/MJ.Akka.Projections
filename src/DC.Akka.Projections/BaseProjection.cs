@@ -12,11 +12,16 @@ public abstract class BaseProjection<TId, TDocument> : IProjection<TId, TDocumen
 
     public abstract ISetupProjection<TId, TDocument> Configure(ISetupProjection<TId, TDocument> config);
     public abstract Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
+    
+    public virtual Props CreateCoordinatorProps()
+    {
+        return ProjectionsCoordinator<TId, TDocument>.Init(Name);
+    }
+
+    public virtual Props CreateProjectorProps(object id, TimeSpan? passivateAfter)
+    {
+        return DocumentProjection<TId, TDocument>.Init(Name, (TId)id, passivateAfter);
+    }
 
     public virtual string Name => GetType().Name;
-
-    public Props CreateCoordinatorProps()
-    {
-        return ProjectionsCoordinator<TId, TDocument>.Init();
-    }
 }

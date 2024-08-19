@@ -12,7 +12,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     public static class Commands
     {
         public record StartProjecting(
-            IHandleEventInProjection<TId, TDocument>.DocumentIdResponse Id,
+            DocumentId Id,
             IImmutableList<EventWithPosition> Events)
         {
             public long? HighestEventNumber => Events.Select(x => x.Position).Max();
@@ -27,36 +27,39 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     }
 
     private readonly List<TId> _inprogressIds = [];
-    private readonly ProjectionConfiguration<TId, TDocument> _configuration;
+    
+    private readonly ProjectionConfiguration _configuration;
 
     private readonly
         Dictionary<TId, Queue<(IImmutableList<EventWithPosition> events, TaskCompletionSource<Messages.IProjectEventsResponse>
             task)>> _queues = new();
 
-    public ProjectionSequencer()
+    public ProjectionSequencer(ProjectionConfiguration configuration)
     {
-        _configuration = Context.System.GetExtension<ProjectionConfiguration<TId, TDocument>>();
-
+        _configuration = configuration;
+        
         Receive<Commands.StartProjecting>(cmd =>
         {
-            if (!cmd.Id.HasMatch || cmd.Id.Id == null)
+            if (!cmd.Id.IsUsable)
             {
                 Sender.Tell(new Responses.StartProjectingResponse(
                     Task.FromResult<Messages.IProjectEventsResponse>(new Messages.Acknowledge(cmd.HighestEventNumber))));
 
                 return;
             }
+
+            var id = (TId)cmd.Id.Id;
             
-            if (!_inprogressIds.Contains(cmd.Id.Id))
+            if (!_inprogressIds.Contains(id))
             {
                 var self = Self;
 
-                var task = Run(cmd.Id.Id, cmd.Events);
+                var task = Run(id, cmd.Events);
 
                 task
-                    .ContinueWith(_ => self.Tell(new Commands.IdFinished(cmd.Id.Id)));
+                    .ContinueWith(_ => self.Tell(new Commands.IdFinished(id)));
 
-                _inprogressIds.Add(cmd.Id.Id);
+                _inprogressIds.Add(id);
                 
                 Sender.Tell(new Responses.StartProjectingResponse(task));
             }
@@ -66,11 +69,11 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                     new TaskCompletionSource<Messages.IProjectEventsResponse>(TaskCreationOptions
                         .RunContinuationsAsynchronously);
 
-                if (!_queues.TryGetValue(cmd.Id.Id, out var value))
+                if (!_queues.TryGetValue(id, out var value))
                 {
                     value = new Queue<(IImmutableList<EventWithPosition>, TaskCompletionSource<Messages.IProjectEventsResponse>)>();
                     
-                    _queues[cmd.Id.Id] = value;
+                    _queues[id] = value;
                 }
 
                 value.Enqueue((cmd.Events, promise));
@@ -116,14 +119,14 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
 
     private async Task<Messages.IProjectEventsResponse> Run(TId id, IImmutableList<EventWithPosition> events)
     {
-        var projector = await _configuration.ProjectorFactory.GetProjector(id, _configuration);
+        var projector = await _configuration.ProjectorFactory.GetProjector<TId, TDocument>(id, _configuration);
 
         return await projector.ProjectEvents(events);
     }
 
-    public static IActorRef Create(IActorRefFactory refFactory)
+    public static IActorRef Create(IActorRefFactory refFactory, ProjectionConfiguration configuration)
     {
         return refFactory.ActorOf(
-            Props.Create(() => new ProjectionSequencer<TId, TDocument>()));
+            Props.Create(() => new ProjectionSequencer<TId, TDocument>(configuration)));
     }
 }

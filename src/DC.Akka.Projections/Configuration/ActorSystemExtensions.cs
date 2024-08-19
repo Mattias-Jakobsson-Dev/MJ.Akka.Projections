@@ -4,9 +4,28 @@ namespace DC.Akka.Projections.Configuration;
 
 public static class ActorSystemExtensions
 {
-    public static IProjectionsSetup Projections(this ActorSystem actorSystem)
+    public static async Task<IProjectionsCoordinator> StartProjections(
+        this ActorSystem actorSystem,
+        Func<IHaveConfiguration<ProjectionSystemConfiguration>, IHaveConfiguration<ProjectionSystemConfiguration>>
+            configure)
     {
-        return ProjectionsSetup.CreateDefault(actorSystem);
+        var defaultConfiguration = ProjectionSystemConfiguration.CreateDefaultConfiguration(actorSystem);
+        
+        return await configure(new ConfigureProjectionSystem(actorSystem, defaultConfiguration)).Build();
+    }
+
+    private record ConfigureProjectionSystem(
+        ActorSystem ActorSystem,
+        ProjectionSystemConfiguration Config)
+        : IHaveConfiguration<ProjectionSystemConfiguration>
+    {
+        public IHaveConfiguration<ProjectionSystemConfiguration> WithModifiedConfig(
+            Func<ProjectionSystemConfiguration, ProjectionSystemConfiguration> modify)
+        {
+            return this with
+            {
+                Config = modify(Config)
+            };
+        }
     }
 }
-

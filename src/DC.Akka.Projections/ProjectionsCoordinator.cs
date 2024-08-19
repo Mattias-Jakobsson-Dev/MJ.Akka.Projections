@@ -37,51 +37,52 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         public record Complete;
     }
-    
+
     private readonly ILoggingAdapter _logger;
 
     private UniqueKillSwitch? _killSwitch;
 
-    private readonly ProjectionConfiguration<TId, TDocument> _configuration;
+    private readonly ProjectionConfiguration _configuration;
 
     private IActorRef? _sequencer;
-    
-    public ProjectionsCoordinator()
+
+    public ProjectionsCoordinator(string projectionName)
     {
         _logger = Context.GetLogger();
-        
+
         _configuration = Context
                              .System
-                             .GetExtension<ProjectionConfiguration<TId, TDocument>>() ??
-                         throw new NoDocumentProjectionException<TDocument>();
+                             .GetExtension<ProjectionConfigurationsSupplier>()?
+                             .GetConfigurationFor(projectionName) ??
+                         throw new NoDocumentProjectionException<TDocument>(projectionName);
 
         Become(Stopped);
     }
 
-    public static Props Init()
+    public static Props Init(string projectionName)
     {
-        return Props.Create(() => new ProjectionsCoordinator<TId, TDocument>());
+        return Props.Create(() => new ProjectionsCoordinator<TId, TDocument>(projectionName));
     }
 
     private void Stopped()
     {
         ReceiveAsync<ProjectionsCoordinator.Commands.Start>(async _ =>
         {
-            _logger.Info("Starting projection {0}", _configuration.Projection.Name);
+            _logger.Info("Starting projection {0}", _configuration.Name);
 
-            var latestPosition = await _configuration.PositionStorage.LoadLatestPosition(_configuration.Projection.Name);
+            var latestPosition = await _configuration.PositionStorage.LoadLatestPosition(_configuration.Name);
 
             _killSwitch = MaybeCreateRestartSource(() =>
                 {
-                    _logger.Info("Starting projection source for {0} from {1}", _configuration.Projection.Name, latestPosition);
-                    
+                    _logger.Info("Starting projection source for {0} from {1}", _configuration.Name, latestPosition);
+
                     if (_sequencer != null)
                         Context.Stop(_sequencer);
 
-                    var sequencer = ProjectionSequencer<TId, TDocument>.Create(Context);
+                    var sequencer = ProjectionSequencer<TId, TDocument>.Create(Context, _configuration);
 
                     _sequencer = sequencer;
-                    
+
                     return _configuration
                         .StartSource(latestPosition)
                         .Batch(
@@ -92,13 +93,12 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         {
                             return data
                                 .SelectMany(x => _configuration
-                                    .ProjectionsHandler
-                                    .Transform(x.Event)
+                                    .TransformEvent(x.Event)
                                     .Select(y => x with { Event = y }))
                                 .Select(x => new
                                 {
                                     Event = x,
-                                    Id = _configuration.ProjectionsHandler.GetDocumentIdFrom(x.Event)
+                                    Id = _configuration.GetDocumentIdFrom(x.Event)
                                 })
                                 .GroupBy(x => x.Id)
                                 .Select(x => (
@@ -140,9 +140,9 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         {
                             var highestPosition = positions.Select(x => x.Position).MaxBy(y => y);
 
-                            latestPosition =
-                                await _configuration.PositionStorage.StoreLatestPosition(_configuration.Projection.Name,
-                                    highestPosition);
+                            latestPosition = await _configuration.PositionStorage.StoreLatestPosition(
+                                _configuration.Name,
+                                highestPosition);
 
                             return NotUsed.Instance;
                         });
@@ -157,10 +157,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             Become(Started);
         });
 
-        Receive<ProjectionsCoordinator.Commands.Kill>(_ =>
-        {
-            Context.Stop(Self);
-        });
+        Receive<ProjectionsCoordinator.Commands.Kill>(_ => { Context.Stop(Self); });
     }
 
     private void Started()
@@ -169,10 +166,10 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         Receive<ProjectionsCoordinator.Commands.Stop>(_ =>
         {
-            _logger.Info("Stopping projection {0}", _configuration.Projection.Name);
+            _logger.Info("Stopping projection {0}", _configuration.Name);
 
             _killSwitch?.Shutdown();
-            
+
             if (_sequencer != null)
                 Context.Stop(_sequencer);
 
@@ -186,10 +183,10 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         Receive<InternalCommands.Fail>(cmd =>
         {
-            _logger.Error(cmd.Cause, "Projection {0} failed", _configuration.Projection.Name);
+            _logger.Error(cmd.Cause, "Projection {0} failed", _configuration.Name);
 
             _killSwitch?.Shutdown();
-            
+
             if (_sequencer != null)
                 Context.Stop(_sequencer);
 
@@ -207,7 +204,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         {
             if (_sequencer != null)
                 Context.Stop(_sequencer);
-            
+
             foreach (var item in waitingForCompletion)
                 item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
 
@@ -215,13 +212,13 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
             Become(Completed);
         });
-        
+
         Receive<ProjectionsCoordinator.Commands.Kill>(_ =>
         {
-            _logger.Info("Killing projection {0}", _configuration.Projection.Name);
+            _logger.Info("Killing projection {0}", _configuration.Name);
 
             _killSwitch?.Shutdown();
-            
+
             Context.Stop(Self);
         });
     }
@@ -232,11 +229,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         {
             Sender.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
         });
-        
-        Receive<ProjectionsCoordinator.Commands.Kill>(_ =>
-        {
-            Context.Stop(Self);
-        });
+
+        Receive<ProjectionsCoordinator.Commands.Kill>(_ => { Context.Stop(Self); });
     }
 
     protected override void PreStart()
@@ -249,16 +243,16 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     protected override void PreRestart(Exception reason, object message)
     {
         _killSwitch?.Shutdown();
-        
+
         Self.Tell(new ProjectionsCoordinator.Commands.Start());
-        
+
         base.PreRestart(reason, message);
     }
 
     protected override void PostStop()
     {
         _killSwitch?.Shutdown();
-        
+
         base.PostStop();
     }
 

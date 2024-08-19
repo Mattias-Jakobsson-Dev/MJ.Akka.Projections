@@ -40,7 +40,8 @@ public abstract class When_projecting_transformation_to_two_events_to_simple_doc
     public class NormalStorageFixture<TId> : When_projecting_two_events_to_simple_document.NormalStorageFixture<TId>
         where TId : notnull
     {
-        protected override IProjectionsSetup Configure(IProjectionsSetup setup)
+        protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
+            IHaveConfiguration<ProjectionSystemConfiguration> setup)
         {
             return setup
                 .WithTestProjection<TId>(
@@ -56,7 +57,8 @@ public abstract class When_projecting_transformation_to_two_events_to_simple_doc
     public class BatchedStorageFixture<TId> : When_projecting_two_events_to_simple_document.BatchedStorageFixture<TId>
         where TId : notnull
     {
-        protected override IProjectionsSetup Configure(IProjectionsSetup setup)
+        protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
+            IHaveConfiguration<ProjectionSystemConfiguration> setup)
         {
             return setup
                 .WithTestProjection<TId>(

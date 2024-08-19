@@ -23,8 +23,8 @@ public class ProjectToRavenDbStoreWithNormalStorageBenchmarks : BaseProjectionBe
         await _containerFixture.DisposeAsync();
     }
     
-    protected override IProjectionConfigurationSetup<string, TestProjection.TestDocument> Configure(
-        IProjectionConfigurationSetup<string, TestProjection.TestDocument> config)
+    protected override IHaveConfiguration<ProjectionInstanceConfiguration> Configure(
+        IHaveConfiguration<ProjectionInstanceConfiguration> config)
     {
         var databaseName = Guid.NewGuid().ToString();
 
@@ -34,7 +34,6 @@ public class ProjectToRavenDbStoreWithNormalStorageBenchmarks : BaseProjectionBe
 
         return config
             .WithRavenDbPositionStorage(documentStore)
-            .WithRavenDbDocumentStorage(documentStore)
-            .Config;
+            .WithRavenDbDocumentStorage(documentStore);
     }
 }

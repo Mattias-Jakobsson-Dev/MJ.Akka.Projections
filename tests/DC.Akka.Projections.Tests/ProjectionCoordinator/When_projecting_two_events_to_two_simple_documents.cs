@@ -116,8 +116,8 @@ public class When_projecting_two_events_to_two_simple_documents
     public class NormalStorageFixture<TId> : BaseFixture<TId>
         where TId : notnull
     {
-        protected override IProjectionConfigurationSetup<TId, TestDocument<TId>> ConfigureProjection(
-            IProjectionConfigurationSetup<TId, TestDocument<TId>> setup)
+        protected override IHaveConfiguration<ProjectionInstanceConfiguration> ConfigureProjection(
+            IHaveConfiguration<ProjectionInstanceConfiguration> setup)
         {
             return setup;
         }
@@ -127,13 +127,12 @@ public class When_projecting_two_events_to_two_simple_documents
     public class BatchedStorageFixture<TId> : BaseFixture<TId>
         where TId : notnull
     {
-        protected override IProjectionConfigurationSetup<TId, TestDocument<TId>> ConfigureProjection(
-            IProjectionConfigurationSetup<TId, TestDocument<TId>> setup)
+        protected override IHaveConfiguration<ProjectionInstanceConfiguration> ConfigureProjection(
+            IHaveConfiguration<ProjectionInstanceConfiguration> setup)
         {
             return setup
                 .WithProjectionStorage(Storage)
-                .Batched()
-                .Config;
+                .Batched();
         }
     }
 
@@ -145,7 +144,8 @@ public class When_projecting_two_events_to_two_simple_documents
         public string FirstEventId { get; } = Guid.NewGuid().ToString();
         public string SecondEventId { get; } = Guid.NewGuid().ToString();
 
-        protected override IProjectionsSetup Configure(IProjectionsSetup setup)
+        protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
+            IHaveConfiguration<ProjectionSystemConfiguration> setup)
         {
             return setup
                 .WithTestProjection<TId>(
@@ -155,7 +155,7 @@ public class When_projecting_two_events_to_two_simple_documents
                     ConfigureProjection);
         }
 
-        protected abstract IProjectionConfigurationSetup<TId, TestDocument<TId>> ConfigureProjection(
-            IProjectionConfigurationSetup<TId, TestDocument<TId>> setup);
+        protected abstract IHaveConfiguration<ProjectionInstanceConfiguration> ConfigureProjection(
+            IHaveConfiguration<ProjectionInstanceConfiguration> setup);
     }
 }

@@ -32,22 +32,23 @@ public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
                     .ToImmutableList(),
                 ImmutableList<DocumentToDelete>.Empty);
 
-        var setup = Configure(Sys
-            .Projections()
-            .WithProjectionStorage(Storage)
-            .WithPositionStorage(_positionStorage));
+        var projectionsCoordinator = await Sys
+            .StartProjections(
+                conf => Configure(conf)
+                    .WithProjectionStorage(Storage)
+                    .WithPositionStorage(_positionStorage));
 
-        var projections = (await setup.Start()).GetProjections();
+        var projections = await projectionsCoordinator.GetAll();
 
         foreach (var projection in projections)
         {
             try
             {
-                await projection.Value.WaitForCompletion(TimeSpan.FromSeconds(5));
+                await projection.WaitForCompletion(TimeSpan.FromSeconds(5));
             }
             catch (Exception e)
             {
-                _projectionExceptions[projection.Key] = e;
+                _projectionExceptions[projection.Projection.Name] = e;
             }
         }
     }
@@ -79,7 +80,8 @@ public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
         return _projectionExceptions.GetValueOrDefault(projection);
     }
 
-    protected abstract IProjectionsSetup Configure(IProjectionsSetup setup);
+    protected abstract IHaveConfiguration<ProjectionSystemConfiguration> Configure(
+        IHaveConfiguration<ProjectionSystemConfiguration> setup);
 
     [PublicAPI]
     protected virtual GivenConfiguration Given(GivenConfiguration config)

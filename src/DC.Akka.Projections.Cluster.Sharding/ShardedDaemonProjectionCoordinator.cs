@@ -6,70 +6,73 @@ using DC.Akka.Projections.Configuration;
 namespace DC.Akka.Projections.Cluster.Sharding;
 
 public class ShardedDaemonProjectionCoordinator(
-    ActorSystem actorSystem,
-    string name,
-    ShardedDaemonProcessSettings settings) : IStartProjectionCoordinator
+    IImmutableDictionary<string, IProjectionProxy> projections) : IProjectionsCoordinator
 {
-    private readonly Dictionary<string, IProjection> _projections = new();
-
-    private readonly Dictionary<string, IProjectionProxy> _projectionProxies = new();
-
-    private bool _hasStarted;
+    public Task<IImmutableList<IProjectionProxy>> GetAll()
+    {
+        return Task.FromResult<IImmutableList<IProjectionProxy>>(projections.Values.ToImmutableList());
+    }
     
-    public Task IncludeProjection<TId, TDocument>(ProjectionConfiguration<TId, TDocument> configuration) 
-        where TId : notnull where TDocument : notnull
+    public Task<IProjectionProxy?> Get(string projectionName)
     {
-        _projections[configuration.Projection.Name] = configuration.Projection;
-        
-        return Task.CompletedTask;
+        return Task.FromResult(projections.GetValueOrDefault(projectionName));
     }
-
-    public Task<IProjectionProxy?> GetCoordinatorFor(IProjection projection)
+    
+    public class Setup(
+        ActorSystem actorSystem,
+        string name,
+        ShardedDaemonProcessSettings settings) : IConfigureProjectionCoordinator
     {
-        return Task.FromResult(_projectionProxies.GetValueOrDefault(projection.Name));
-    }
-
-    public async Task Start()
-    {
-        if (_hasStarted)
-            return;
+        private readonly Dictionary<string, IProjection> _projections = new();
         
-        var sortedProjections = _projections
-            .Select(x => x.Value)
-            .OrderBy(x => x.Name)
-            .ToImmutableList();
-        
-        ShardedDaemonProcess
-            .Get(actorSystem)
-            .Init(
-                name,
-                sortedProjections.Count,
-                id => sortedProjections[id].CreateCoordinatorProps(),
-                settings,
-                new ProjectionsCoordinator.Commands.Kill());
-
-        var shardingBaseSettings = settings.ShardingSettings;
-        
-        if (shardingBaseSettings == null)
+        public Task WithProjection(IProjection projection)
         {
-            var shardingConfig = actorSystem.Settings.Config.GetConfig("akka.cluster.sharded-daemon-process.sharding");
-            var coordinatorSingletonConfig = actorSystem.Settings.Config.GetConfig(shardingConfig.GetString("coordinator-singleton"));
-            shardingBaseSettings = ClusterShardingSettings.Create(shardingConfig, coordinatorSingletonConfig);
+            _projections[projection.Name] = projection;
+
+            return Task.CompletedTask;
         }
-        
-        foreach (var sortedProjection in sortedProjections)
+
+        public async Task<IProjectionsCoordinator> Start()
         {
-            var proxy = await ClusterSharding
+            var sortedProjections = _projections
+                .Select(x => x.Value)
+                .OrderBy(x => x.Name)
+                .ToImmutableList();
+        
+            ShardedDaemonProcess
                 .Get(actorSystem)
-                .StartProxyAsync(
-                    $"sharded-daemon-process-{name}",
-                    settings.Role ?? shardingBaseSettings.Role,
-                    new MessageExtractor(sortedProjections.Count));
+                .Init(
+                    name,
+                    sortedProjections.Count,
+                    id => sortedProjections[id].CreateCoordinatorProps(),
+                    settings,
+                    new ProjectionsCoordinator.Commands.Kill());
 
-            _projectionProxies[sortedProjection.Name] = new ActorRefProjectionProxy(proxy);
+            var projectionProxies = new Dictionary<string, IProjectionProxy>();
+
+            var shardingBaseSettings = settings.ShardingSettings;
+        
+            if (shardingBaseSettings == null)
+            {
+                var shardingConfig = actorSystem.Settings.Config.GetConfig("akka.cluster.sharded-daemon-process.sharding");
+                var coordinatorSingletonConfig = actorSystem.Settings.Config.GetConfig(shardingConfig.GetString("coordinator-singleton"));
+                shardingBaseSettings = ClusterShardingSettings.Create(shardingConfig, coordinatorSingletonConfig);
+            }
+        
+            foreach (var sortedProjection in sortedProjections)
+            {
+                var proxy = await ClusterSharding
+                    .Get(actorSystem)
+                    .StartProxyAsync(
+                        $"sharded-daemon-process-{name}",
+                        settings.Role ?? shardingBaseSettings.Role,
+                        new MessageExtractor(sortedProjections.Count));
+
+                projectionProxies[sortedProjection.Name] = new ActorRefProjectionProxy(proxy, sortedProjection);
+            }
+
+            return new ShardedDaemonProjectionCoordinator(projectionProxies.ToImmutableDictionary());
         }
-
-        _hasStarted = true;
     }
     
     private sealed class MessageExtractor(int maxNumberOfShards) : HashCodeMessageExtractor(maxNumberOfShards)

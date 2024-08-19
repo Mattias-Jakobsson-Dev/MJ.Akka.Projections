@@ -1,110 +1,57 @@
 using System.Collections.Immutable;
 using Akka.Actor;
-using Akka.Streams;
-using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections.Configuration;
 
-public class ProjectionConfigurationSetup<TId, TDocument>(
-    IProjection<TId, TDocument> projection,
-    ActorSystem actorSystem)
-    : IProjectionConfigurationSetup<TId, TDocument>, 
-        IProjectionStoragePartSetup<IProjectionConfigurationSetup<TId, TDocument>>
-    where TId : notnull where TDocument : notnull
+public static class ProjectionSetupConfigurationExtensions
 {
-    private IKeepTrackOfProjectors? _projectionFactory;
-
-    private IStartProjectionCoordinator? _projectionCoordinatorFactory;
-
-    private IProjectionStorage? _storage;
-
-    private IProjectionPositionStorage? _positionStorage;
-
-    private ProjectionStreamConfiguration? _projectionStreamConfiguration;
-
-    private RestartSettings? _restartSettings;
-
-    public IProjection<TId, TDocument> Projection { get; } = projection;
-    public ActorSystem ActorSystem => actorSystem;
-
-    public IProjectionConfigurationSetup<TId, TDocument> WithCoordinatorFactory(IStartProjectionCoordinator factory)
+    public static IHaveConfiguration<ProjectionSystemConfiguration> WithProjection<TId, TDocument>(
+        this IHaveConfiguration<ProjectionSystemConfiguration> source,
+        IProjection<TId, TDocument> projection,
+        Func<IHaveConfiguration<ProjectionInstanceConfiguration>, IHaveConfiguration<ProjectionInstanceConfiguration>>?
+            configure = null)
+        where TId : notnull where TDocument : notnull
     {
-        _projectionCoordinatorFactory = factory;
+        return source
+            .WithModifiedConfig(x => x with
+            {
+                Projections = x.Projections.SetItem(
+                    projection.Name,
+                    conf =>
+                    {
+                        var configuredProjection = (configure ?? (c => c))(new ConfigureProjection(
+                                source.ActorSystem,
+                                ProjectionInstanceConfiguration.Empty))
+                            .Config
+                            .MergeWith(conf);
 
-        return this;
-    }
-
-    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionFactory(IKeepTrackOfProjectors factory)
-    {
-        _projectionFactory = factory;
-
-        return this;
-    }
-
-    public IProjectionConfigurationSetup<TId, TDocument> WithRestartSettings(RestartSettings restartSettings)
-    {
-        _restartSettings = restartSettings;
-
-        return this;
-    }
-
-    public IProjectionConfigurationSetup<TId, TDocument> WithProjectionStreamConfiguration(
-        ProjectionStreamConfiguration projectionStreamConfiguration)
-    {
-        _projectionStreamConfiguration = projectionStreamConfiguration;
-
-        return this;
-    }
-
-    public IProjectionStoragePartSetup<IProjectionConfigurationSetup<TId, TDocument>> WithProjectionStorage(
-        IProjectionStorage storage)
-    {
-        _storage = storage;
-
-        return this;
+                        return new ProjectionConfiguration<TId, TDocument>(
+                            projection,
+                            configuredProjection.ProjectionStorage!,
+                            configuredProjection.PositionStorage!,
+                            conf.ProjectorFactory,
+                            configuredProjection.RestartSettings,
+                            configuredProjection.StreamConfiguration!,
+                            projection.Configure(new SetupProjection<TId, TDocument>()).Build());
+                    })
+            });
     }
     
-    public IProjectionStoragePartSetup<IProjectionConfigurationSetup<TId, TDocument>> Batched(
-        int batchSize = 100,
-        int parallelism = 5)
+    private record ConfigureProjection(ActorSystem ActorSystem, ProjectionInstanceConfiguration Config) 
+        : IHaveConfiguration<ProjectionInstanceConfiguration>
     {
-        _storage = _storage?.Batched(actorSystem, batchSize, parallelism);
-
-        return this;
+        public IHaveConfiguration<ProjectionInstanceConfiguration> WithModifiedConfig(
+            Func<ProjectionInstanceConfiguration, ProjectionInstanceConfiguration> modify)
+        {
+            return this with
+            {
+                Config = modify(Config)
+            };
+        }
     }
 
-    public IProjectionConfigurationSetup<TId, TDocument> Config => this;
-
-    public IProjectionConfigurationSetup<TId, TDocument> WithPositionStorage(IProjectionPositionStorage positionStorage)
-    {
-        _positionStorage = positionStorage;
-
-        return this;
-    }
-
-    public ProjectionConfiguration<TId, TDocument> Build(IProjectionsSetup projectionsSetup)
-    {
-        var setup = new SetupProjection();
-
-        var eventHandler = Projection.Configure(setup).Build();
-
-        var projectionFactory = _projectionFactory ?? projectionsSetup.ProjectionFactory;
-        
-        var projectionCoordinatorFactory = _projectionCoordinatorFactory ?? projectionsSetup.CoordinatorFactory;
-
-        return new ProjectionConfiguration<TId, TDocument>(
-            Projection,
-            _storage ?? projectionsSetup.Storage,
-            _positionStorage ?? projectionsSetup.PositionStorage,
-            eventHandler,
-            Projection.StartSource,
-            projectionFactory,
-            projectionCoordinatorFactory,
-            _restartSettings ?? projectionsSetup.RestartSettings,
-            _projectionStreamConfiguration ?? projectionsSetup.ProjectionStreamConfiguration);
-    }
-
-    private class SetupProjection : ISetupProjection<TId, TDocument>
+    private class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument>
+        where TId : notnull where TDocument : notnull
     {
         private readonly IImmutableDictionary<Type, Handler> _handlers;
 
@@ -128,14 +75,15 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
             Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, long, Task<TDocument?>> handler,
-            Func<IProjectionFilterSetup<TDocument, TProjectedEvent>, IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
+            Func<IProjectionFilterSetup<TDocument, TProjectedEvent>,
+                IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
         {
-            IProjectionFilterSetup<TDocument, TProjectedEvent> projectionFilterSetup 
+            IProjectionFilterSetup<TDocument, TProjectedEvent> projectionFilterSetup
                 = ProjectionFilterSetup<TDocument, TProjectedEvent>.Create();
 
             projectionFilterSetup = filter?.Invoke(projectionFilterSetup) ?? projectionFilterSetup;
-            
-            return new SetupProjection(
+
+            return new SetupProjection<TId, TDocument>(
                 _handlers.SetItem(typeof(TProjectedEvent), new Handler(
                     evnt => getId((TProjectedEvent)evnt),
                     (evnt, doc, position) => handler((TProjectedEvent)evnt, doc, position),
@@ -146,7 +94,8 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
             Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, Task<TDocument?>> handler,
-            Func<IProjectionFilterSetup<TDocument, TProjectedEvent>, IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
+            Func<IProjectionFilterSetup<TDocument, TProjectedEvent>,
+                IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
         {
             return On(
                 getId,
@@ -157,7 +106,8 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
             Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, TDocument?> handler,
-            Func<IProjectionFilterSetup<TDocument, TProjectedEvent>, IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
+            Func<IProjectionFilterSetup<TDocument, TProjectedEvent>,
+                IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
         {
             return On(
                 getId,
@@ -168,7 +118,8 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
             Func<TProjectedEvent, TId> getId,
             Func<TProjectedEvent, TDocument?, long, TDocument?> handler,
-            Func<IProjectionFilterSetup<TDocument, TProjectedEvent>, IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
+            Func<IProjectionFilterSetup<TDocument, TProjectedEvent>,
+                IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
         {
             return On(
                 getId,
@@ -179,16 +130,16 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         public ISetupProjection<TId, TDocument> TransformUsing<TEvent>(
             Func<TEvent, IImmutableList<object>> transform)
         {
-            return new SetupProjection(
+            return new SetupProjection<TId, TDocument>(
                 _handlers,
                 _transformers.SetItem(typeof(TEvent), evnt => transform((TEvent)evnt)));
         }
-        
-        public IHandleEventInProjection<TId, TDocument> Build()
+
+        public IHandleEventInProjection<TDocument> Build()
         {
             return new EventHandler(_handlers, _transformers);
         }
-        
+
         private record Handler(
             Func<object, TId> GetId,
             Func<object, TDocument?, long, Task<TDocument?>> Handle,
@@ -197,7 +148,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
         private class EventHandler(
             IImmutableDictionary<Type, Handler> handlers,
             IImmutableDictionary<Type, Func<object, IImmutableList<object>>> transformers)
-            : IHandleEventInProjection<TId, TDocument>
+            : IHandleEventInProjection<TDocument>
         {
             public IImmutableList<object> Transform(object evnt)
             {
@@ -218,7 +169,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                 return hasTransformed ? results : ImmutableList.Create(evnt);
             }
 
-            public IHandleEventInProjection<TId, TDocument>.DocumentIdResponse GetDocumentIdFrom(object evnt)
+            public DocumentId GetDocumentIdFrom(object evnt)
             {
                 var typesToCheck = evnt.GetType().GetInheritedTypes();
 
@@ -229,7 +180,7 @@ public class ProjectionConfigurationSetup<TId, TDocument>(
                         select handler.GetId(evnt))
                     .ToImmutableList();
 
-                return new IHandleEventInProjection<TId, TDocument>.DocumentIdResponse(
+                return new DocumentId(
                     ids.FirstOrDefault(),
                     !ids.IsEmpty);
             }

@@ -10,19 +10,17 @@ public class ShardedProjectors(ActorSystem actorSystem, ClusterShardingSettings 
 {
     private readonly ConcurrentDictionary<string, Task<IActorRef>> _projectors = new();
 
-    public async Task<IProjectorProxy> GetProjector<TId, TDocument>(
-        TId id,
-        ProjectionConfiguration<TId, TDocument> configuration)
+    public async Task<IProjectorProxy> GetProjector<TId, TDocument>(TId id, ProjectionConfiguration configuration)
         where TId : notnull where TDocument : notnull
     {
         var projector = await _projectors
             .GetOrAdd(
-                configuration.Projection.Name,
+                configuration.Name,
                 name => ClusterSharding.Get(actorSystem).StartAsync(
                     typeName: $"projection-{name}",
                     entityPropsFactory: documentId => Props.Create(() => new DocumentProjection<TId, TDocument>(
                         name,
-                        configuration.Projection.IdFromString(documentId),
+                        (TId)configuration.IdFromString(documentId),
                         null)),
                     settings: settings,
                     messageExtractor: new MessageExtractor<TId, TDocument>(maxNumberOfShards, configuration)));
@@ -32,16 +30,16 @@ public class ShardedProjectors(ActorSystem actorSystem, ClusterShardingSettings 
             projector,
             configuration.ProjectionStreamConfiguration.ProjectDocumentTimeout);
     }
-    
+
     private class MessageExtractor<TId, TDocument>(
         int maxNumberOfShards,
-        ProjectionConfiguration<TId, TDocument> configuration)
+        ProjectionConfiguration configuration)
         : HashCodeMessageExtractor(maxNumberOfShards) where TId : notnull where TDocument : notnull
     {
         public override string EntityId(object message)
         {
             return message is DocumentProjection<TId, TDocument>.Commands.IMessageWithId messageWithId 
-                ? configuration.Projection.IdToString(messageWithId.Id) 
+                ? configuration.IdToString(messageWithId.Id) 
                 : "";
         }
     }

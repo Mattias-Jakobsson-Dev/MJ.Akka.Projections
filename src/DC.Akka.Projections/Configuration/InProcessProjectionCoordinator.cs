@@ -1,45 +1,52 @@
+using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.Util;
 
 namespace DC.Akka.Projections.Configuration;
 
-public class InProcessSingletonProjectionCoordinator(ActorSystem actorSystem) : IStartProjectionCoordinator
+public class InProcessSingletonProjectionCoordinator(IImmutableDictionary<string, IProjectionProxy> coordinators) 
+    : IProjectionsCoordinator
 {
-    private readonly Dictionary<string, IProjection> _projections = new();
-
-    private readonly Dictionary<string, IProjectionProxy> _projectionProxies = new();
-
-    public Task IncludeProjection<TId, TDocument>(ProjectionConfiguration<TId, TDocument> configuration) 
-        where TId : notnull where TDocument : notnull
+    public Task<IImmutableList<IProjectionProxy>> GetAll()
     {
-        _projections[configuration.Projection.Name] = configuration.Projection;
-        
-        return Task.CompletedTask;
+        return Task.FromResult<IImmutableList<IProjectionProxy>>(coordinators.Values.ToImmutableList());
     }
 
-    public Task Start()
+    public Task<IProjectionProxy?> Get(string projectionName)
     {
-        foreach (var projection in _projections)
+        return Task.FromResult(coordinators.GetValueOrDefault(projectionName));
+    }
+    
+    public class Setup(ActorSystem actorSystem) : IConfigureProjectionCoordinator
+    {
+        private readonly Dictionary<string, IProjection> _projections = new();
+        
+        public Task WithProjection(IProjection projection)
         {
-            if (_projectionProxies.ContainsKey(projection.Value.Name)) 
-                continue;
-
-            var actorName = MurmurHash.StringHash(projection.Value.Name).ToString();
+            _projections[projection.Name] = projection;
             
-            var coordinator = actorSystem.ActorOf(
-                projection.Value.CreateCoordinatorProps(),
-                actorName);
-                
-            coordinator.Tell(new ProjectionsCoordinator.Commands.Start());
-
-            _projectionProxies[projection.Value.Name] = new ActorRefProjectionProxy(coordinator);
+            return Task.CompletedTask;
         }
-        
-        return Task.CompletedTask;
-    }
 
-    public Task<IProjectionProxy?> GetCoordinatorFor(IProjection projection)
-    {
-        return Task.FromResult(_projectionProxies.GetValueOrDefault(projection.Name));
+        public Task<IProjectionsCoordinator> Start()
+        {
+            var result = new Dictionary<string, IProjectionProxy>();
+            
+            foreach (var projection in _projections)
+            {
+                var actorName = MurmurHash.StringHash(projection.Value.Name).ToString();
+            
+                var coordinator = actorSystem.ActorOf(
+                    projection.Value.CreateCoordinatorProps(),
+                    actorName);
+                
+                coordinator.Tell(new ProjectionsCoordinator.Commands.Start());
+
+                result[projection.Value.Name] = new ActorRefProjectionProxy(coordinator, projection.Value);
+            }
+
+            return Task.FromResult<IProjectionsCoordinator>(
+                new InProcessSingletonProjectionCoordinator(result.ToImmutableDictionary()));
+        }
     }
 }

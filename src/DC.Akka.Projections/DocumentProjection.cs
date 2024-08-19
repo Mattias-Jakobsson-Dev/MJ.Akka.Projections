@@ -6,8 +6,7 @@ using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections;
 
-
-public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers 
+public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
     where TId : notnull where TDocument : notnull
 {
     public static class Commands
@@ -16,15 +15,15 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
         {
             TId Id { get; }
         }
-        
+
         public record ProjectEvents(TId Id, IImmutableList<EventWithPosition> Events) : IMessageWithId;
     }
 
-    private readonly ProjectionConfiguration<TId, TDocument> _configuration;
+    private readonly ProjectionConfiguration _configuration;
     private readonly TId _id;
     private readonly TimeSpan? _passivateAfter;
     private readonly ILoggingAdapter _logger;
-    
+
     public ITimerScheduler? Timers { get; set; }
 
     public DocumentProjection(string projectionName, TId id, TimeSpan? passivateAfter)
@@ -33,10 +32,11 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
         _passivateAfter = passivateAfter;
         _logger = Context.GetLogger();
 
-        var configuration = Context.System.GetExtension<ProjectionConfiguration<TId, TDocument>>() ??
-                            throw new NoDocumentProjectionException<TDocument>(projectionName);
-
-        _configuration = configuration ?? throw new NoDocumentProjectionException<TId, TDocument>(id);
+        _configuration = Context
+                             .System
+                             .GetExtension<ProjectionConfigurationsSupplier>()?
+                             .GetConfigurationFor(projectionName) ??
+                         throw new NoDocumentProjectionException<TDocument>(projectionName);
 
         Become(NotLoaded);
 
@@ -50,9 +50,9 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
             var document = await _configuration.DocumentStorage.LoadDocument<TDocument>(_id);
 
             document = await ProjectEvents(document, cmd.Events);
-            
+
             Become(() => Loaded(document));
-            
+
             HandlePassivation();
         });
     }
@@ -62,83 +62,86 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
         ReceiveAsync<Commands.ProjectEvents>(async cmd =>
         {
             document = await ProjectEvents(document, cmd.Events);
-            
+
             Become(() => Loaded(document));
-            
+
             HandlePassivation();
         });
     }
 
     private async Task<TDocument?> ProjectEvents(TDocument? document, IImmutableList<EventWithPosition> events)
     {
-        return await Retries
-            .Run<TDocument?, Exception>(
-                RunProjections,
-                _configuration.ProjectionStreamConfiguration.MaxProjectionRetries,
-                (retries, exception) => _logger
-                    .Warning(
-                        exception, 
-                        "Failed handling {0} events for {1}, retrying (tries: {2})", 
-                        events.Count,
-                        _id,
-                        retries));
-        
-        async Task<TDocument?> RunProjections()
+        try
+        {
+            var result = await Retries
+                .Run<(TDocument? document, long? position), Exception>(
+                    RunProjections,
+                    _configuration.ProjectionStreamConfiguration.MaxProjectionRetries,
+                    (retries, exception) => _logger
+                        .Warning(
+                            exception,
+                            "Failed handling {0} events for {1}, retrying (tries: {2})",
+                            events.Count,
+                            _id,
+                            retries));
+            
+            Sender.Tell(new Messages.Acknowledge(result.position));
+
+            return result.document;
+        }
+        catch (Exception e)
+        {
+            Sender.Tell(new Messages.Reject(e));
+            
+            _logger.Error(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, _id);
+
+            return document;
+        }
+
+        async Task<(TDocument? document, long? position)> RunProjections()
         {
             var exists = document != null;
-        
-            try
+
+            if (!events.Any())
+                return (document, null);
+
+            var wasHandled = false;
+
+            foreach (var evnt in events)
             {
-                if (!events.Any())
-                {
-                    Sender.Tell(new Messages.Acknowledge(null));
-                
-                    return document;
-                }
+                var (projectionResult, hasHandler) =
+                    await _configuration.HandleEvent(document, evnt.Event, evnt.Position ?? 0);
 
-                var wasHandled = false;
+                document = (TDocument?)projectionResult;
 
-                foreach (var evnt in events)
-                {
-                    (document, var hasHandler) = await _configuration.ProjectionsHandler.Handle(document, evnt.Event, evnt.Position ?? 0);
-
-                    wasHandled = wasHandled || hasHandler;
-                }
-
-                if (wasHandled)
-                {
-                    if (document != null)
-                    {
-                        await _configuration
-                            .DocumentStorage
-                            .Store(
-                                ImmutableList.Create(
-                                    new DocumentToStore(_id, document)),
-                                ImmutableList<DocumentToDelete>.Empty);
-
-                        if (document is IResetDocument<TDocument> reset)
-                            document = reset.Reset();
-                    }
-                    else if (exists)
-                    {
-                        await _configuration
-                            .DocumentStorage
-                            .Store(
-                                ImmutableList<DocumentToStore>.Empty,
-                                ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
-                    }
-                }
-
-                Sender.Tell(new Messages.Acknowledge(events.Select(x => x.Position).Max()));
-
-                return document;
+                wasHandled = wasHandled || hasHandler;
             }
-            catch (Exception e)
-            {
-                Sender.Tell(new Messages.Reject(e));
+
+            if (!wasHandled) 
+                return (document, events.Select(x => x.Position).Max());
             
-                throw;
+            if (document != null)
+            {
+                await _configuration
+                    .DocumentStorage
+                    .Store(
+                        ImmutableList.Create(
+                            new DocumentToStore(_id, document)),
+                        ImmutableList<DocumentToDelete>.Empty);
+
+                if (document is IResetDocument<TDocument> reset)
+                    document = reset.Reset();
             }
+            else if (exists)
+            {
+                await _configuration
+                    .DocumentStorage
+                    .Store(
+                        ImmutableList<DocumentToStore>.Empty,
+                        ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
+            }
+
+            return (document, events.Select(x => x.Position).Max());
         }
     }
 
@@ -146,10 +149,15 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
     {
         if (_passivateAfter == null || Timers == null)
             return;
-        
+
         Timers.StartSingleTimer(
             "passivation",
             PoisonPill.Instance,
             _passivateAfter.Value);
+    }
+
+    public static Props Init(string projectionName, TId id, TimeSpan? passivateAfter)
+    {
+        return Props.Create(() => new DocumentProjection<TId, TDocument>(projectionName, id, passivateAfter));
     }
 }

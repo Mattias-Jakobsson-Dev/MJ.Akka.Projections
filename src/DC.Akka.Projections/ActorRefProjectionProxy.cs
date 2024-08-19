@@ -2,8 +2,10 @@ using Akka.Actor;
 
 namespace DC.Akka.Projections;
 
-public class ActorRefProjectionProxy(IActorRef coordinator) : IProjectionProxy
+public class ActorRefProjectionProxy(IActorRef coordinator, IProjection projection) : IProjectionProxy
 {
+    public IProjection Projection { get; } = projection;
+
     public Task Stop()
     {
         coordinator.Tell(new ProjectionsCoordinator.Commands.Stop());

@@ -8,14 +8,12 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem) : IKeepTrackOf
 {
     private readonly ConcurrentDictionary<string, IActorRef> _coordinators = new();
     
-    public async Task<IProjectorProxy> GetProjector<TId, TDocument>(
-        TId id,
-        ProjectionConfiguration<TId, TDocument> configuration) 
+    public async Task<IProjectorProxy> GetProjector<TId, TDocument>(TId id, ProjectionConfiguration configuration) 
         where TId : notnull where TDocument : notnull
     {
         var coordinator = _coordinators
             .GetOrAdd(
-                configuration.Projection.Name,
+                configuration.Name,
                 name => actorSystem.ActorOf(Props.Create(() =>
                     new InProcDocumentProjectionCoordinator<TId, TDocument>(name))));
         
@@ -44,12 +42,14 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem) : IKeepTrackOf
 
         public InProcDocumentProjectionCoordinator(string projectionName)
         {
-            var projectionConfiguration = Context.System.GetExtension<ProjectionConfiguration<TId, TDocument>>();
+            var projectionConfiguration = Context
+                .System
+                .GetExtension<ProjectionConfigurationsSupplier>()
+                .GetConfigurationFor(projectionName);
             
             Receive<Queries.GetProjectionRef>(cmd =>
             {
                 var id = MurmurHash.StringHash(projectionConfiguration
-                        .Projection
                         .IdToString(cmd.Id))
                     .ToString();
                 

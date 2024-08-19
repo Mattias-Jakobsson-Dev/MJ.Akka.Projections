@@ -142,17 +142,18 @@ async Task RunProjection()
 
     documentStore.EnsureDatabaseExists();
 
-    var application = await actorSystem
-        .Projections()
-        .WithProjection(projection)
-        .WithRavenDbPositionStorage(documentStore)
-        .WithRavenDbDocumentStorage(documentStore)
-        .Batched()
-        .Config
-        .Start();
+    var projectionsCoordinator = await actorSystem
+        .StartProjections(
+            conf => conf
+                .WithProjection(projection)
+                .WithRavenDbDocumentStorage(documentStore)
+                .Batched()
+                .WithRavenDbPositionStorage(documentStore));
 
-    await application
-        .GetProjection(projection.Name)!
+    var proxy = await projectionsCoordinator
+        .Get(projection.Name);
+    
+    await proxy!
         .WaitForCompletion();
 }
 

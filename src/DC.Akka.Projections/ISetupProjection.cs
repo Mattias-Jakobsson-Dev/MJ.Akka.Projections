@@ -4,7 +4,7 @@ using JetBrains.Annotations;
 namespace DC.Akka.Projections;
 
 [PublicAPI]
-public interface ISetupProjection<TId, TDocument> where TId : notnull where TDocument : notnull
+public interface ISetupProjection<in TId, TDocument> where TId : notnull where TDocument : notnull
 {
     ISetupProjection<TId, TDocument> TransformUsing<TEvent>(
         Func<TEvent, IImmutableList<object>> transform);
@@ -29,5 +29,5 @@ public interface ISetupProjection<TId, TDocument> where TId : notnull where TDoc
         Func<TEvent, TDocument?, long, Task<TDocument?>> handler,
         Func<IProjectionFilterSetup<TDocument, TEvent>, IProjectionFilterSetup<TDocument, TEvent>>? filter = null);
         
-    IHandleEventInProjection<TId, TDocument> Build();
+    IHandleEventInProjection<TDocument> Build();
 }

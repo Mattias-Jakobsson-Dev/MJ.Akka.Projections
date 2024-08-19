@@ -25,7 +25,6 @@ public abstract class BaseProjectionBenchmarks
     }
 
     private ActorSystem ActorSystem { get; set; } = null!;
-    private IProjectionsSetup _projectionSetup = null!;
     private TestProjection _projection = null!;
     
     [IterationSetup]
@@ -36,12 +35,6 @@ public abstract class BaseProjectionBenchmarks
             "akka.loglevel = ERROR");
 
         _projection = new TestProjection(Configuration.NumberOfEvents, Configuration.NumberOfDocuments);
-
-        _projectionSetup = ActorSystem
-            .Projections()
-            .WithProjection(
-                _projection,
-                Configure);
     }
 
     [PublicAPI]
@@ -51,13 +44,17 @@ public abstract class BaseProjectionBenchmarks
     [Benchmark, EventsPerSecond(nameof(Configuration))]
     public async Task ProjectEvents()
     {
-        var application = await _projectionSetup.Start();
+        var coordinator = await ActorSystem
+            .StartProjections(conf => conf
+                .WithProjection(_projection, Configure));
 
-        await application.GetProjection(_projection.Name)!.WaitForCompletion();
+        var projection = await coordinator.Get(_projection.Name);
+        
+        await projection!.WaitForCompletion();
     }
 
-    protected abstract IProjectionConfigurationSetup<string, TestProjection.TestDocument> Configure(
-        IProjectionConfigurationSetup<string, TestProjection.TestDocument> config);
+    protected abstract IHaveConfiguration<ProjectionInstanceConfiguration> Configure(
+        IHaveConfiguration<ProjectionInstanceConfiguration> config);
 
     public static IImmutableList<ProjectEventsConfiguration> GetAvailableConfigurations()
     {

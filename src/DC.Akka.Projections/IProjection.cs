@@ -7,7 +7,9 @@ namespace DC.Akka.Projections;
 public interface IProjection
 {
     string Name { get; }
+    Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
     Props CreateCoordinatorProps();
+    Props CreateProjectorProps(object id, TimeSpan? passivateAfter);
 }
 
 public interface IProjection<TId, TDocument> : IProjection where TId : notnull where TDocument : notnull
@@ -15,5 +17,4 @@ public interface IProjection<TId, TDocument> : IProjection where TId : notnull w
     TId IdFromString(string id);
     string IdToString(TId id);
     ISetupProjection<TId, TDocument> Configure(ISetupProjection<TId, TDocument> config);
-    Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
 }

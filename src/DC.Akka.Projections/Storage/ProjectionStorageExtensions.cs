@@ -4,14 +4,13 @@ namespace DC.Akka.Projections.Storage;
 
 public static class ProjectionStorageExtensions
 {
-    public static IProjectionStorage Batched(
+    public static BatchedProjectionStorage Batched(
         this IProjectionStorage storage,
         ActorSystem actorSystem,
         int batchSize,
         int parallelism)
     {
-        return storage is BatchedProjectionStorage 
-            ? storage 
-            : new BatchedProjectionStorage(actorSystem, storage, batchSize, parallelism);
+        return storage as BatchedProjectionStorage 
+               ?? new BatchedProjectionStorage(actorSystem, storage, batchSize, parallelism);
     }
 }

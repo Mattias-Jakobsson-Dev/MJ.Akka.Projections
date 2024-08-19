@@ -66,8 +66,8 @@ public class When_projecting_two_events_that_doesnt_match_projection
     public class NormalStorageFixture<TId> : BaseFixture<TId>
         where TId : notnull
     {
-        protected override IProjectionConfigurationSetup<TId, TestDocument<TId>> ConfigureProjection(
-            IProjectionConfigurationSetup<TId, TestDocument<TId>> setup)
+        protected override IHaveConfiguration<ProjectionInstanceConfiguration> ConfigureProjection(
+            IHaveConfiguration<ProjectionInstanceConfiguration> setup)
         {
             return setup;
         }
@@ -77,13 +77,12 @@ public class When_projecting_two_events_that_doesnt_match_projection
     public class BatchedStorageFixture<TId> : BaseFixture<TId>
         where TId : notnull
     {
-        protected override IProjectionConfigurationSetup<TId, TestDocument<TId>> ConfigureProjection(
-            IProjectionConfigurationSetup<TId, TestDocument<TId>> setup)
+        protected override IHaveConfiguration<ProjectionInstanceConfiguration> ConfigureProjection(
+            IHaveConfiguration<ProjectionInstanceConfiguration> setup)
         {
             return setup
                 .WithProjectionStorage(Storage)
-                .Batched()
-                .Config;
+                .Batched();
         }
     }
 
@@ -92,7 +91,8 @@ public class When_projecting_two_events_that_doesnt_match_projection
     {
         private TId DocumentId { get; } = new Fixture().Create<TId>();
 
-        protected override IProjectionsSetup Configure(IProjectionsSetup setup)
+        protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
+            IHaveConfiguration<ProjectionSystemConfiguration> setup)
         {
             return setup
                 .WithTestProjection<TId>(
@@ -102,7 +102,7 @@ public class When_projecting_two_events_that_doesnt_match_projection
                     ConfigureProjection);
         }
 
-        protected abstract IProjectionConfigurationSetup<TId, TestDocument<TId>> ConfigureProjection(
-            IProjectionConfigurationSetup<TId, TestDocument<TId>> setup);
+        protected abstract IHaveConfiguration<ProjectionInstanceConfiguration> ConfigureProjection(
+            IHaveConfiguration<ProjectionInstanceConfiguration> setup);
     }
 }

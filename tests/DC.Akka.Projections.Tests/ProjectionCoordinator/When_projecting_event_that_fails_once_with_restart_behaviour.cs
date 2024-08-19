@@ -68,7 +68,8 @@ public class When_projecting_event_that_fails_once_with_restart_behaviour(
         public string DocumentId { get; } = new Fixture().Create<string>();
         public string EventId { get; } = Guid.NewGuid().ToString();
 
-        protected override IProjectionsSetup Configure(IProjectionsSetup setup)
+        protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
+            IHaveConfiguration<ProjectionSystemConfiguration> setup)
         {
             return setup
                 .WithRestartSettings(RestartSettings.Create(

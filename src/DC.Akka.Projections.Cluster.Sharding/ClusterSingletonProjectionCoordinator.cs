@@ -1,46 +1,54 @@
+using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.Cluster.Tools.Singleton;
 using DC.Akka.Projections.Configuration;
 
 namespace DC.Akka.Projections.Cluster.Sharding;
 
-public class ClusterSingletonProjectionCoordinator(ActorSystem actorSystem, ClusterSingletonManagerSettings settings)
-    : IStartProjectionCoordinator
+public class ClusterSingletonProjectionCoordinator(
+    IImmutableDictionary<string, IProjectionProxy> projections) : IProjectionsCoordinator
 {
-    private readonly Dictionary<string, IProjection> _projections = new();
-
-    private readonly Dictionary<string, IProjectionProxy> _projectionProxies = new();
-
-    public Task IncludeProjection<TId, TDocument>(ProjectionConfiguration<TId, TDocument> configuration) 
-        where TId : notnull where TDocument : notnull
+    public Task<IImmutableList<IProjectionProxy>> GetAll()
     {
-        _projections[configuration.Projection.Name] = configuration.Projection;
-        
-        return Task.CompletedTask;
+        return Task.FromResult<IImmutableList<IProjectionProxy>>(projections.Values.ToImmutableList());
     }
 
-    public Task Start()
+    public Task<IProjectionProxy?> Get(string projectionName)
     {
-        foreach (var projection in _projections)
+        return Task.FromResult(projections.GetValueOrDefault(projectionName));
+    }
+    
+    public class Setup(
+        ActorSystem actorSystem,
+        ClusterSingletonManagerSettings settings) : IConfigureProjectionCoordinator
+    {
+        private readonly Dictionary<string, IProjection> _projections = new();
+        
+        public Task WithProjection(IProjection projection)
         {
-            if (_projectionProxies.ContainsKey(projection.Value.Name)) 
-                continue;
-            
-            var coordinator = actorSystem
-                .ActorOf(ClusterSingletonManager.Props(
-                        singletonProps: projection.Value.CreateCoordinatorProps(),
-                        terminationMessage: new ProjectionsCoordinator.Commands.Kill(),
-                        settings: settings),
-                    name: projection.Value.Name);
-            
-            _projectionProxies[projection.Value.Name] = new ActorRefProjectionProxy(coordinator);
-        }
-        
-        return Task.CompletedTask;
-    }
+            _projections[projection.Name] = projection;
 
-    public Task<IProjectionProxy?> GetCoordinatorFor(IProjection projection)
-    {
-        return Task.FromResult(_projectionProxies.GetValueOrDefault(projection.Name));
+            return Task.CompletedTask;
+        }
+
+        public Task<IProjectionsCoordinator> Start()
+        {
+            var projectionProxies = new Dictionary<string, IProjectionProxy>();
+            
+            foreach (var projection in _projections)
+            {
+                var coordinator = actorSystem
+                    .ActorOf(ClusterSingletonManager.Props(
+                            singletonProps: projection.Value.CreateCoordinatorProps(),
+                            terminationMessage: new ProjectionsCoordinator.Commands.Kill(),
+                            settings: settings),
+                        name: projection.Value.Name);
+            
+                projectionProxies[projection.Value.Name] = new ActorRefProjectionProxy(coordinator, projection.Value);
+            }
+
+            return Task.FromResult<IProjectionsCoordinator>(
+                new ClusterSingletonProjectionCoordinator(projectionProxies.ToImmutableDictionary()));
+        }
     }
 }

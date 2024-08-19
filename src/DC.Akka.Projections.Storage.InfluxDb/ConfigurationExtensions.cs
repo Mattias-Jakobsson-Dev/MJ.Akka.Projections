@@ -7,13 +7,10 @@ namespace DC.Akka.Projections.Storage.InfluxDb;
 [PublicAPI]
 public static class ConfigurationExtensions
 {
-    public static IProjectionStoragePartSetup<T> WithInfluxDbStorage<T>(
-        this IProjectionPartSetup<T> setup,
-        IInfluxDBClient client)
-        where T : IProjectionPartSetup<T>
+    public static IConfigurePart<TConfig, InfluxDbProjectionStorage> WithRavenDbDocumentStorage<TConfig>(
+        this IHaveConfiguration<TConfig> source,
+        IInfluxDBClient client) where TConfig : ProjectionConfig
     {
-        var storage = new InfluxDbProjectionStorage(client);
-
-        return setup.WithProjectionStorage(storage);
+        return source.WithProjectionStorage( new InfluxDbProjectionStorage(client));
     }
 }
