@@ -11,6 +11,6 @@ public static class ConfigurationExtensions
         this IHaveConfiguration<TConfig> source,
         IInfluxDBClient client) where TConfig : ProjectionConfig
     {
-        return source.WithProjectionStorage( new InfluxDbProjectionStorage(client));
+        return source.WithProjectionStorage(new InfluxDbProjectionStorage(client));
     }
 }

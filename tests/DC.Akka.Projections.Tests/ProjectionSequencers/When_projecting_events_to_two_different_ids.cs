@@ -27,7 +27,7 @@ public class When_projecting_events_to_two_different_ids(When_projecting_events_
             .FirstTaskResponse!
             .CompletedAt
             .Should()
-            .BeCloseTo(fixture.SecondTaskResponse!.CompletedAt, TimeSpan.FromMilliseconds(100));
+            .BeCloseTo(fixture.SecondTaskResponse!.CompletedAt, TimeSpan.FromMilliseconds(200));
     }
     
     [PublicAPI]

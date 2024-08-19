@@ -5,7 +5,7 @@ using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Tests.ProjectionCoordinator;
 
-public abstract class When_projecting_transformation_to_two_events_to_simple_document
+public class When_projecting_transformation_to_two_events_to_simple_document
 {
     public class With_normal_storage
     {

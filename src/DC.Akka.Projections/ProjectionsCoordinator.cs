@@ -104,12 +104,13 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                 .Select(x => (
                                     Events: x.Select(y => y.Event).ToImmutableList(),
                                     Id: x.Key))
-                                .Where(x => !x.Events.IsEmpty)
                                 .Select(x => new
                                 {
                                     x.Events,
                                     x.Id,
-                                    LowestEventNumber = x.Events.Select(y => y.Position).Min()
+                                    LowestEventNumber = !x.Events.IsEmpty 
+                                        ? x.Events.Select(y => y.Position).Min() 
+                                        : null
                                 })
                                 .OrderBy(x => x.LowestEventNumber)
                                 .Select(x => new ProjectionSequencer<TId, TDocument>.Commands.StartProjecting(
