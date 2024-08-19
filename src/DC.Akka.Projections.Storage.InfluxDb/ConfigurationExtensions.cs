@@ -7,7 +7,7 @@ namespace DC.Akka.Projections.Storage.InfluxDb;
 [PublicAPI]
 public static class ConfigurationExtensions
 {
-    public static IConfigurePart<TConfig, InfluxDbProjectionStorage> WithRavenDbDocumentStorage<TConfig>(
+    public static IConfigurePart<TConfig, InfluxDbProjectionStorage> WithInfluxDbDocumentStorage<TConfig>(
         this IHaveConfiguration<TConfig> source,
         IInfluxDBClient client) where TConfig : ProjectionConfig
     {
