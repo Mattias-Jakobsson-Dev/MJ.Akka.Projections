@@ -18,6 +18,10 @@ public static class Events<TId>
         string FailureKey,
         int ConsecutiveFailures,
         Exception FailWith);
-    
-    public interface IEvent;
+
+    public interface IEvent
+    {
+        TId DocId { get; }
+        string EventId { get; }
+    }
 }

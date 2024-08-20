@@ -48,6 +48,7 @@ public class RavenDbDockerContainerFixture : DockerContainerFixture
 
     protected override async Task WaitForStart()
     {
+#pragma warning disable CS0618 // Type or member is obsolete
         var logStream = await Client.Containers.GetContainerLogsAsync(
             ContainerName,
             new ContainerLogsParameters
@@ -56,6 +57,7 @@ public class RavenDbDockerContainerFixture : DockerContainerFixture
                 ShowStdout = true,
                 ShowStderr = true
             });
+#pragma warning restore CS0618 // Type or member is obsolete
 
         using (var reader = new StreamReader(logStream))
         {

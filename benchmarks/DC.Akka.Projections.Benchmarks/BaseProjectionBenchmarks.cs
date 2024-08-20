@@ -50,10 +50,8 @@ public abstract class BaseProjectionBenchmarks
     public async Task ProjectEvents()
     {
         var coordinator = await _coordinator.Start();
-        
-        var projection = await coordinator.Get(_projection.Name);
-        
-        await projection!.WaitForCompletion();
+
+        await coordinator.Get(_projection.Name)!.WaitForCompletion();
     }
 
     protected abstract IHaveConfiguration<ProjectionInstanceConfiguration> Configure(

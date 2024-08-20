@@ -8,14 +8,14 @@ namespace DC.Akka.Projections.Cluster.Sharding;
 public class ClusterSingletonProjectionCoordinator(
     IImmutableDictionary<string, IProjectionProxy> projections) : IProjectionsCoordinator
 {
-    public Task<IImmutableList<IProjectionProxy>> GetAll()
+    public IImmutableList<IProjectionProxy> GetAll()
     {
-        return Task.FromResult<IImmutableList<IProjectionProxy>>(projections.Values.ToImmutableList());
+        return projections.Values.ToImmutableList();
     }
 
-    public Task<IProjectionProxy?> Get(string projectionName)
+    public IProjectionProxy? Get(string projectionName)
     {
-        return Task.FromResult(projections.GetValueOrDefault(projectionName));
+        return projections.GetValueOrDefault(projectionName);
     }
     
     public class Setup(

@@ -151,7 +151,7 @@ async Task RunProjection()
                 .WithRavenDbPositionStorage(documentStore))
         .Start();
 
-    var proxy = await projectionsCoordinator
+    var proxy = projectionsCoordinator
         .Get(projection.Name);
     
     await proxy!

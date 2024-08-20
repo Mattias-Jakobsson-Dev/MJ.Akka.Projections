@@ -4,6 +4,6 @@ namespace DC.Akka.Projections.Configuration;
 
 public interface IProjectionsCoordinator
 {
-    Task<IImmutableList<IProjectionProxy>> GetAll();
-    Task<IProjectionProxy?> Get(string projectionName);
+    IImmutableList<IProjectionProxy> GetAll();
+    IProjectionProxy? Get(string projectionName);
 }
