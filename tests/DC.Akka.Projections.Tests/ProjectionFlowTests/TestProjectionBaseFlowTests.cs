@@ -5,8 +5,8 @@ using FluentAssertions;
 
 namespace DC.Akka.Projections.Tests.ProjectionFlowTests;
 
-public abstract class TestProjectionBaseFlowTests<TId> : BaseProjectionFlowTests<TId, TestDocument<TId>>
-    where TId : notnull
+public abstract class TestProjectionBaseFlowTests<TId>(IHaveActorSystem actorSystemHandler) 
+    : BaseProjectionFlowTests<TId, TestDocument<TId>>(actorSystemHandler) where TId : notnull
 {
     protected override IProjection<TId, TestDocument<TId>> GetProjection(IImmutableList<object> events)
     {
