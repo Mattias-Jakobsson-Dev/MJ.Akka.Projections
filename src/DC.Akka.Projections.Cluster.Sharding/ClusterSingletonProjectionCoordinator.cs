@@ -24,11 +24,9 @@ public class ClusterSingletonProjectionCoordinator(
     {
         private readonly Dictionary<string, IProjection> _projections = new();
         
-        public Task WithProjection(IProjection projection)
+        public void WithProjection(IProjection projection)
         {
             _projections[projection.Name] = projection;
-
-            return Task.CompletedTask;
         }
 
         public Task<IProjectionsCoordinator> Start()

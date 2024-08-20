@@ -3,10 +3,12 @@ using Akka.Actor;
 using Akka.Event;
 using DC.Akka.Projections.Configuration;
 using DC.Akka.Projections.Storage;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections;
 
-public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
+[PublicAPI]
+public class DocumentProjection<TId, TDocument> : ReceiveActor
     where TId : notnull where TDocument : notnull
 {
     public static class Commands
@@ -21,15 +23,11 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
 
     private readonly ProjectionConfiguration _configuration;
     private readonly TId _id;
-    private readonly TimeSpan? _passivateAfter;
     private readonly ILoggingAdapter _logger;
 
-    public ITimerScheduler? Timers { get; set; }
-
-    public DocumentProjection(string projectionName, TId id, TimeSpan? passivateAfter)
+    public DocumentProjection(string projectionName, TId id)
     {
         _id = id;
-        _passivateAfter = passivateAfter;
         _logger = Context.GetLogger();
 
         _configuration = Context
@@ -39,8 +37,6 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
                          throw new NoDocumentProjectionException<TDocument>(projectionName);
 
         Become(NotLoaded);
-
-        HandlePassivation();
     }
 
     private void NotLoaded()
@@ -52,8 +48,6 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
             document = await ProjectEvents(document, cmd.Events);
 
             Become(() => Loaded(document));
-
-            HandlePassivation();
         });
     }
 
@@ -64,8 +58,6 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
             document = await ProjectEvents(document, cmd.Events);
 
             Become(() => Loaded(document));
-
-            HandlePassivation();
         });
     }
 
@@ -144,20 +136,9 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithTimers
             return (document, events.Select(x => x.Position).Max());
         }
     }
-
-    private void HandlePassivation()
+    
+    public static Props Init(string projectionName, TId id)
     {
-        if (_passivateAfter == null || Timers == null)
-            return;
-
-        Timers.StartSingleTimer(
-            "passivation",
-            PoisonPill.Instance,
-            _passivateAfter.Value);
-    }
-
-    public static Props Init(string projectionName, TId id, TimeSpan? passivateAfter)
-    {
-        return Props.Create(() => new DocumentProjection<TId, TDocument>(projectionName, id, passivateAfter));
+        return Props.Create(() => new DocumentProjection<TId, TDocument>(projectionName, id));
     }
 }

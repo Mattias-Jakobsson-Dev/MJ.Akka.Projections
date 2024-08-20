@@ -18,10 +18,9 @@ public class ShardedProjectors(ActorSystem actorSystem, ClusterShardingSettings 
                 configuration.Name,
                 name => ClusterSharding.Get(actorSystem).StartAsync(
                     typeName: $"projection-{name}",
-                    entityPropsFactory: documentId => Props.Create(() => new DocumentProjection<TId, TDocument>(
-                        name,
-                        (TId)configuration.IdFromString(documentId),
-                        null)),
+                    entityPropsFactory: documentId => configuration
+                        .GetProjection()
+                        .CreateProjectionProps(configuration.IdFromString(documentId)),
                     settings: settings,
                     messageExtractor: new MessageExtractor<TId, TDocument>(maxNumberOfShards, configuration)));
 

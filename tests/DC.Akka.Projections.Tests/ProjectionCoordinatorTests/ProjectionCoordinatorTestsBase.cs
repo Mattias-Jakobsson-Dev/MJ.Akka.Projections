@@ -6,7 +6,7 @@ using DC.Akka.Projections.Tests.TestData;
 using JetBrains.Annotations;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionCoordinator;
+namespace DC.Akka.Projections.Tests.ProjectionCoordinatorTests;
 
 public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
 {
@@ -33,10 +33,11 @@ public abstract class ProjectionCoordinatorTestsBase : TestKit, IAsyncLifetime
                 ImmutableList<DocumentToDelete>.Empty);
 
         var projectionsCoordinator = await Sys
-            .StartProjections(
+            .Projections(
                 conf => Configure(conf)
                     .WithProjectionStorage(Storage)
-                    .WithPositionStorage(_positionStorage));
+                    .WithPositionStorage(_positionStorage))
+            .Start();
 
         var projections = await projectionsCoordinator.GetAll();
 

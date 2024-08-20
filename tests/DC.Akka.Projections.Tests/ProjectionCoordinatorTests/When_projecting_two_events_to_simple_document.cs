@@ -6,7 +6,7 @@ using FluentAssertions;
 using JetBrains.Annotations;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionCoordinator;
+namespace DC.Akka.Projections.Tests.ProjectionCoordinatorTests;
 
 public class When_projecting_two_events_to_simple_document
 {

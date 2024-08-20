@@ -3,11 +3,11 @@ using FluentAssertions;
 using JetBrains.Annotations;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionSequencers;
+namespace DC.Akka.Projections.Tests.ProjectionSequencerTests;
 
-public class When_projecting_slower_events_before_faster_events_for_same_id(
-    When_projecting_slower_events_before_faster_events_for_same_id.Fixture fixture)
-    : IClassFixture<When_projecting_slower_events_before_faster_events_for_same_id.Fixture>
+public class When_projecting_slower_events_after_faster_events_for_same_id(
+    When_projecting_slower_events_after_faster_events_for_same_id.Fixture fixture)
+    : IClassFixture<When_projecting_slower_events_after_faster_events_for_same_id.Fixture>
 {
     [Fact]
     public void Then_first_task_should_finish()
@@ -26,7 +26,7 @@ public class When_projecting_slower_events_before_faster_events_for_same_id(
     {
         fixture.FirstTaskResponse!.CompletedAt.Should().BeBefore(fixture.SecondTaskResponse!.CompletedAt);
     }
-    
+
     [Fact]
     public void Then_second_task_should_start_after_first_task_finished()
     {
@@ -50,8 +50,8 @@ public class When_projecting_slower_events_before_faster_events_for_same_id(
 
             return new Dictionary<string, (string, int, ImmutableList<TimeSpan>)>
             {
-                ["first"] = (id, 1, ImmutableList.Create(TimeSpan.FromMilliseconds(200))),
-                ["second"] = (id, 2, ImmutableList.Create(TimeSpan.Zero))
+                ["first"] = (id, 1, ImmutableList.Create(TimeSpan.Zero)),
+                ["second"] = (id, 2, ImmutableList.Create(TimeSpan.FromMilliseconds(200)))
             }.ToImmutableDictionary();
         }
 

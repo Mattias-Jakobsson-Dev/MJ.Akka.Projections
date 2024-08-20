@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.Streams;
+using DC.Akka.Projections.InProc;
 using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections.Configuration;
@@ -23,7 +24,7 @@ public record ProjectionSystemConfiguration(
             new InMemoryProjectionStorage(),
             new InMemoryPositionStorage(),
             new InProcessSingletonProjectionCoordinator.Setup(actorSystem),
-            new KeepTrackOfProjectorsInProc(actorSystem),
+            new KeepTrackOfProjectorsInProc(actorSystem, MaxNumberOfProjectorsPassivation.Default),
             ImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>>.Empty);
     }
 }

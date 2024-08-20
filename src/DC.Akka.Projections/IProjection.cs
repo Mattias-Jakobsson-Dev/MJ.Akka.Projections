@@ -9,7 +9,7 @@ public interface IProjection
     string Name { get; }
     Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
     Props CreateCoordinatorProps();
-    Props CreateProjectorProps(object id, TimeSpan? passivateAfter);
+    Props CreateProjectionProps(object id);
 }
 
 public interface IProjection<TId, TDocument> : IProjection where TId : notnull where TDocument : notnull

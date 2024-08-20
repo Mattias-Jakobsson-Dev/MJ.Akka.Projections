@@ -6,7 +6,7 @@ using FluentAssertions;
 using JetBrains.Annotations;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionCoordinator;
+namespace DC.Akka.Projections.Tests.ProjectionCoordinatorTests;
 
 public class When_projecting_event_that_fails_without_restart_behaviour(
     When_projecting_event_that_fails_without_restart_behaviour.TestFixture fixture)

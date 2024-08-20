@@ -85,7 +85,7 @@ public static class ConfigurationExtensions
         return new ConfigurePart<ProjectionSystemConfiguration, TCoordinator>(config, coordinator);
     }
 
-    internal static async Task<IProjectionsCoordinator> Build(
+    internal static IConfigureProjectionCoordinator Build(
         this IHaveConfiguration<ProjectionSystemConfiguration> conf)
     {
         var result = new Dictionary<string, ProjectionConfiguration>();
@@ -94,13 +94,13 @@ public static class ConfigurationExtensions
         {
             var configuration = projection.Value(conf.Config);
 
-            await conf.Config.Coordinator.WithProjection(configuration.GetProjection());
+            conf.Config.Coordinator.WithProjection(configuration.GetProjection());
 
             result[projection.Key] = configuration;
         }
 
         ProjectionConfigurationsSupplier.Register(conf.ActorSystem, result.ToImmutableDictionary());
 
-        return await conf.Config.Coordinator.Start();
+        return conf.Config.Coordinator;
     }
 }

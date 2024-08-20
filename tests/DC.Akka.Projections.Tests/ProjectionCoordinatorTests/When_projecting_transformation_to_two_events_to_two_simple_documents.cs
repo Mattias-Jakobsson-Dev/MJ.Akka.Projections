@@ -3,9 +3,9 @@ using DC.Akka.Projections.Configuration;
 using DC.Akka.Projections.Tests.TestData;
 using JetBrains.Annotations;
 
-namespace DC.Akka.Projections.Tests.ProjectionCoordinator;
+namespace DC.Akka.Projections.Tests.ProjectionCoordinatorTests;
 
-public class When_projecting_transformation_to_two_events_to_simple_document
+public class When_projecting_transformation_to_two_events_to_two_simple_documents
 {
     public class With_normal_storage
     {
@@ -30,14 +30,14 @@ public class When_projecting_transformation_to_two_events_to_simple_document
     }
 
     public abstract class BaseTests<TId, TFixture>(TFixture fixture)
-        : When_projecting_two_events_to_simple_document.BaseTests<TId, TFixture>(fixture)
-        where TFixture : When_projecting_two_events_to_simple_document.BaseFixture<TId> where TId : notnull
+        : When_projecting_two_events_to_two_simple_documents.BaseTests<TId, TFixture>(fixture)
+        where TFixture : When_projecting_two_events_to_two_simple_documents.BaseFixture<TId> where TId : notnull
     {
         protected override int ExpectedPosition => 1;
     }
 
     [PublicAPI]
-    public class NormalStorageFixture<TId> : When_projecting_two_events_to_simple_document.NormalStorageFixture<TId>
+    public class NormalStorageFixture<TId> : When_projecting_two_events_to_two_simple_documents.NormalStorageFixture<TId>
         where TId : notnull
     {
         protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
@@ -47,14 +47,14 @@ public class When_projecting_transformation_to_two_events_to_simple_document
                 .WithTestProjection<TId>(
                     ImmutableList.Create<object>(new Events<TId>.TransformToMultipleEvents(
                         ImmutableList.Create<Events<TId>.IEvent>(
-                            new Events<TId>.FirstEvent(DocumentId, FirstEventId),
-                            new Events<TId>.SecondEvent(DocumentId, SecondEventId)))),
+                            new Events<TId>.FirstEvent(FirstDocumentId, FirstEventId),
+                            new Events<TId>.SecondEvent(SecondDocumentId, SecondEventId)))),
                     ConfigureProjection);
         }
     }
 
     [PublicAPI]
-    public class BatchedStorageFixture<TId> : When_projecting_two_events_to_simple_document.BatchedStorageFixture<TId>
+    public class BatchedStorageFixture<TId> : When_projecting_two_events_to_two_simple_documents.BatchedStorageFixture<TId>
         where TId : notnull
     {
         protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
@@ -64,8 +64,8 @@ public class When_projecting_transformation_to_two_events_to_simple_document
                 .WithTestProjection<TId>(
                     ImmutableList.Create<object>(new Events<TId>.TransformToMultipleEvents(
                         ImmutableList.Create<Events<TId>.IEvent>(
-                            new Events<TId>.FirstEvent(DocumentId, FirstEventId),
-                            new Events<TId>.SecondEvent(DocumentId, SecondEventId)))),
+                            new Events<TId>.FirstEvent(FirstDocumentId, FirstEventId),
+                            new Events<TId>.SecondEvent(SecondDocumentId, SecondEventId)))),
                     ConfigureProjection);
         }
     }

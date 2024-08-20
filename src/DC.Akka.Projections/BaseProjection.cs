@@ -18,9 +18,9 @@ public abstract class BaseProjection<TId, TDocument> : IProjection<TId, TDocumen
         return ProjectionsCoordinator<TId, TDocument>.Init(Name);
     }
 
-    public virtual Props CreateProjectorProps(object id, TimeSpan? passivateAfter)
+    public Props CreateProjectionProps(object id)
     {
-        return DocumentProjection<TId, TDocument>.Init(Name, (TId)id, passivateAfter);
+        return DocumentProjection<TId, TDocument>.Init(Name, (TId)id);
     }
 
     public virtual string Name => GetType().Name;

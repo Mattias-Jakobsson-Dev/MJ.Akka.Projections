@@ -26,6 +26,7 @@ public abstract class BaseProjectionBenchmarks
 
     private ActorSystem ActorSystem { get; set; } = null!;
     private TestProjection _projection = null!;
+    private IConfigureProjectionCoordinator _coordinator = null!;
     
     [IterationSetup]
     public virtual void Setup()
@@ -35,6 +36,10 @@ public abstract class BaseProjectionBenchmarks
             "akka.loglevel = ERROR");
 
         _projection = new TestProjection(Configuration.NumberOfEvents, Configuration.NumberOfDocuments);
+
+        _coordinator = ActorSystem
+            .Projections(conf => conf
+                .WithProjection(_projection, Configure));
     }
 
     [PublicAPI]
@@ -44,10 +49,8 @@ public abstract class BaseProjectionBenchmarks
     [Benchmark, EventsPerSecond(nameof(Configuration))]
     public async Task ProjectEvents()
     {
-        var coordinator = await ActorSystem
-            .StartProjections(conf => conf
-                .WithProjection(_projection, Configure));
-
+        var coordinator = await _coordinator.Start();
+        
         var projection = await coordinator.Get(_projection.Name);
         
         await projection!.WaitForCompletion();

@@ -6,7 +6,7 @@ using DC.Akka.Projections.Storage;
 using DC.Akka.Projections.Tests.TestData;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionSequencers;
+namespace DC.Akka.Projections.Tests.ProjectionSequencerTests;
 
 public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
 {

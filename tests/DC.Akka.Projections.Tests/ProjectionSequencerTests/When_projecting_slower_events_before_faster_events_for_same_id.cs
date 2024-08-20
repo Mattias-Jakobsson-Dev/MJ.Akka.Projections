@@ -3,10 +3,11 @@ using FluentAssertions;
 using JetBrains.Annotations;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionSequencers;
+namespace DC.Akka.Projections.Tests.ProjectionSequencerTests;
 
-public class When_projecting_events_to_two_different_ids(When_projecting_events_to_two_different_ids.Fixture fixture)
-    : IClassFixture<When_projecting_events_to_two_different_ids.Fixture>
+public class When_projecting_slower_events_before_faster_events_for_same_id(
+    When_projecting_slower_events_before_faster_events_for_same_id.Fixture fixture)
+    : IClassFixture<When_projecting_slower_events_before_faster_events_for_same_id.Fixture>
 {
     [Fact]
     public void Then_first_task_should_finish()
@@ -21,29 +22,36 @@ public class When_projecting_events_to_two_different_ids(When_projecting_events_
     }
 
     [Fact]
-    public void Then_tasks_should_run_in_parallel()
+    public void Then_first_task_should_finish_before_second_task()
     {
-        fixture
-            .FirstTaskResponse!
-            .CompletedAt
-            .Should()
-            .BeCloseTo(fixture.SecondTaskResponse!.CompletedAt, TimeSpan.FromMilliseconds(200));
+        fixture.FirstTaskResponse!.CompletedAt.Should().BeBefore(fixture.SecondTaskResponse!.CompletedAt);
     }
     
+    [Fact]
+    public void Then_second_task_should_start_after_first_task_finished()
+    {
+        fixture
+            .SecondTaskResponse!.StartedAt
+            .Should()
+            .BeAfter(fixture.FirstTaskResponse!.CompletedAt);
+    }
+
     [PublicAPI]
     public class Fixture : ProjectionSequencerBaseFixture
     {
         public AckWithTime? FirstTaskResponse { get; private set; }
         public AckWithTime? SecondTaskResponse { get; private set; }
-        
+
         protected override IImmutableDictionary<
-            string, 
+            string,
             (string documentId, int sortOrder, ImmutableList<TimeSpan> delays)> SetupBatches()
         {
+            var id = Guid.NewGuid().ToString();
+
             return new Dictionary<string, (string, int, ImmutableList<TimeSpan>)>
             {
-                ["first"] = (Guid.NewGuid().ToString(), 1, ImmutableList.Create(TimeSpan.FromMilliseconds(200))),
-                ["second"] = (Guid.NewGuid().ToString(), 2, ImmutableList.Create(TimeSpan.FromMilliseconds(200)))
+                ["first"] = (id, 1, ImmutableList.Create(TimeSpan.FromMilliseconds(200))),
+                ["second"] = (id, 2, ImmutableList.Create(TimeSpan.Zero))
             }.ToImmutableDictionary();
         }
 
