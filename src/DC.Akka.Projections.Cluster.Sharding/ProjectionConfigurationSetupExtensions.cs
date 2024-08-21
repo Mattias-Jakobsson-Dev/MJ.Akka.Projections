@@ -31,7 +31,7 @@ public static class ConfigurationExtensions
                 (configureCoordinator ?? (x => x))(
                     ClusterSingletonManagerSettings.Create(source.ActorSystem))));
     }
-    
+
     public static IConfigurePart<ProjectionSystemConfiguration, ShardedDaemonProjectionCoordinator.Setup>
         AsShardedDaemon(
             this IHaveConfiguration<ProjectionSystemConfiguration> source,
@@ -45,5 +45,31 @@ public static class ConfigurationExtensions
                 (configureDaemon ?? (x => x))(
                     ShardedDaemonProcessSettings.Create(source.ActorSystem)
                         .WithShardingSettings(ClusterShardingSettings.Create(source.ActorSystem)))));
+    }
+
+    public static IConfigurePart<T, ClusterSingletonProjectionStorage>
+        WithClusterSingletonInMemoryStorage<T>(
+            this IHaveConfiguration<T> setup,
+            string name = "projection-storage",
+            Func<ClusterSingletonManagerSettings, ClusterSingletonManagerSettings>? configureCoordinator = null) 
+        where T : ProjectionConfig
+    {
+        return setup
+            .WithProjectionStorage(ClusterSingletonProjectionStorage
+                .Create(setup.ActorSystem, name, (configureCoordinator ?? (x => x))(
+                    ClusterSingletonManagerSettings.Create(setup.ActorSystem))));
+    }
+    
+    public static IConfigurePart<T, ClusterSingletonPositionStorage>
+        WithClusterSingletonInMemoryPositionStorage<T>(
+            this IHaveConfiguration<T> setup,
+            string name = "projection-position-storage",
+            Func<ClusterSingletonManagerSettings, ClusterSingletonManagerSettings>? configureCoordinator = null)
+        where T : ProjectionConfig
+    {
+        return setup
+            .WithPositionStorage(ClusterSingletonPositionStorage
+                .Create(setup.ActorSystem, name, (configureCoordinator ?? (x => x))(
+                    ClusterSingletonManagerSettings.Create(setup.ActorSystem))));
     }
 }
