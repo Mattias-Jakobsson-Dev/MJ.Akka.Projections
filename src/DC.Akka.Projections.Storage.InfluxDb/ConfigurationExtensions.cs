@@ -9,7 +9,7 @@ public static class ConfigurationExtensions
 {
     public static IConfigurePart<TConfig, InfluxDbProjectionStorage> WithInfluxDbDocumentStorage<TConfig>(
         this IHaveConfiguration<TConfig> source,
-        IInfluxDBClient client) where TConfig : ProjectionConfig
+        IInfluxDBClient client) where TConfig : ContinuousProjectionConfig
     {
         return source.WithProjectionStorage(new InfluxDbProjectionStorage(client));
     }

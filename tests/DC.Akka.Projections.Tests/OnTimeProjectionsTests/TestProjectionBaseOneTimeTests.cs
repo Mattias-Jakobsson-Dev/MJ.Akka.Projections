@@ -1,12 +1,13 @@
 using System.Collections.Immutable;
 using AutoFixture;
+using DC.Akka.Projections.Tests.ContinuousProjectionsTests;
 using DC.Akka.Projections.Tests.TestData;
 using FluentAssertions;
 
-namespace DC.Akka.Projections.Tests.ProjectionFlowTests;
+namespace DC.Akka.Projections.Tests.OnTimeProjectionsTests;
 
-public abstract class TestProjectionBaseFlowTests<TId>(IHaveActorSystem actorSystemHandler) 
-    : BaseProjectionFlowTests<TId, TestDocument<TId>>(actorSystemHandler) where TId : notnull
+public abstract class TestProjectionBaseOneTimeTests<TId>(IHaveActorSystem actorSystemHandler) 
+    : BaseOneTimeProjectionsTest<TId, TestDocument<TId>>(actorSystemHandler) where TId : notnull
 {
     protected override IProjection<TId, TestDocument<TId>> GetProjection(IImmutableList<object> events)
     {

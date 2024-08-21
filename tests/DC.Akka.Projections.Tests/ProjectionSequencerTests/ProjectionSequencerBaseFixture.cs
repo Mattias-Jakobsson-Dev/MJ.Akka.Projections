@@ -21,6 +21,7 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
                 new TestProjectionFactory(),
                 null,
                 ProjectionStreamConfiguration.Default,
+                true,
                 new FakeEventHandler()));
 
         var batches = SetupBatches();

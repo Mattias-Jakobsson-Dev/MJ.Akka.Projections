@@ -52,7 +52,7 @@ public static class ConfigurationExtensions
             this IHaveConfiguration<T> setup,
             string name = "projection-storage",
             Func<ClusterSingletonManagerSettings, ClusterSingletonManagerSettings>? configureCoordinator = null) 
-        where T : ProjectionConfig
+        where T : ContinuousProjectionConfig
     {
         return setup
             .WithProjectionStorage(ClusterSingletonProjectionStorage
@@ -65,7 +65,7 @@ public static class ConfigurationExtensions
             this IHaveConfiguration<T> setup,
             string name = "projection-position-storage",
             Func<ClusterSingletonManagerSettings, ClusterSingletonManagerSettings>? configureCoordinator = null)
-        where T : ProjectionConfig
+        where T : ContinuousProjectionConfig
     {
         return setup
             .WithPositionStorage(ClusterSingletonPositionStorage

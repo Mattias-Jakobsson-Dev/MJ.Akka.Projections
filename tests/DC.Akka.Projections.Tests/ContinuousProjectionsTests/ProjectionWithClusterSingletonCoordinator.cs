@@ -1,11 +1,11 @@
-using DC.Akka.Projections.Configuration;
 using DC.Akka.Projections.Cluster.Sharding;
+using DC.Akka.Projections.Configuration;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionFlowTests;
+namespace DC.Akka.Projections.Tests.ContinuousProjectionsTests;
 
 public class ProjectionWithClusterSingletonCoordinator(ClusteredActorSystemSupplier actorSystemHandler)
-    : TestProjectionBaseFlowTests<string>(actorSystemHandler), IClassFixture<ClusteredActorSystemSupplier>
+    : TestProjectionBaseContinuousTests<string>(actorSystemHandler), IClassFixture<ClusteredActorSystemSupplier>
 {
     protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
         IHaveConfiguration<ProjectionSystemConfiguration> config)

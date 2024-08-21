@@ -89,7 +89,7 @@ public class BatchedProjectionStorage : IProjectionStorage
                     }
                     else
                     {
-                        promise.TrySetException(new Exception("Failed to write documents"));
+                        promise.TrySetException(result.Exception ?? new Exception("Failed to write documents"));
                     }
                 },
                 cancellationToken: cancellationToken,

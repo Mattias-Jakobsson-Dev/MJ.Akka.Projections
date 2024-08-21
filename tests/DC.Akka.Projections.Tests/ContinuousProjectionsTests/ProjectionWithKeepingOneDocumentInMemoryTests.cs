@@ -1,10 +1,10 @@
 using DC.Akka.Projections.Configuration;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionFlowTests;
+namespace DC.Akka.Projections.Tests.ContinuousProjectionsTests;
 
 public class ProjectionWithKeepingOneDocumentInMemoryTests(NormalTestKitActorSystem actorSystemSetup) 
-    : TestProjectionBaseFlowTests<string>(actorSystemSetup), IClassFixture<NormalTestKitActorSystem>
+    : TestProjectionBaseContinuousTests<string>(actorSystemSetup), IClassFixture<NormalTestKitActorSystem>
 {
     protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
         IHaveConfiguration<ProjectionSystemConfiguration> config)

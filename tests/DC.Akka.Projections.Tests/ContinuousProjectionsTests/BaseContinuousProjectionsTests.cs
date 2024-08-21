@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using Akka.Actor;
 using Akka.Streams;
 using Akka.TestKit.Extensions;
 using AutoFixture;
@@ -8,9 +7,9 @@ using DC.Akka.Projections.Storage;
 using FluentAssertions;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionFlowTests;
+namespace DC.Akka.Projections.Tests.ContinuousProjectionsTests;
 
-public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem actorSystemHandler)
+public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorSystem actorSystemHandler)
     where TId : notnull
     where TDocument : notnull
 {
@@ -19,7 +18,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_event_that_fails_once_with_restart_behaviour()
     {
-        using var system = CreateActorSystem();
+        using var system = actorSystemHandler.StartNewActorSystem();
         
         var id = Fixture.Create<TId>();
 
@@ -64,7 +63,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_event_that_fails_once_without_restart_behaviour()
     {
-        using var system = CreateActorSystem();
+        using var system = actorSystemHandler.StartNewActorSystem();
         
         var id = Fixture.Create<TId>();
 
@@ -106,7 +105,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_transformation_to_two_events_for_one_document()
     {
-        using var system = CreateActorSystem();
+        using var system = actorSystemHandler.StartNewActorSystem();
         
         var id = Fixture.Create<TId>();
 
@@ -147,7 +146,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_transformation_to_two_events_for_two_documents()
     {
-        using var system = CreateActorSystem();
+        using var system = actorSystemHandler.StartNewActorSystem();
         
         var firstId = Fixture.Create<TId>();
         var secondId = Fixture.Create<TId>();
@@ -197,7 +196,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_two_events_that_doesnt_match_projection()
     {
-        using var system = CreateActorSystem();
+        using var system = actorSystemHandler.StartNewActorSystem();
         
         var id = Fixture.Create<TId>();
 
@@ -234,7 +233,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_two_events_for_one_document()
     {
-        using var system = CreateActorSystem();
+        using var system = actorSystemHandler.StartNewActorSystem();
         
         var id = Fixture.Create<TId>();
 
@@ -274,7 +273,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_two_events_for_two_documents()
     {
-        using var system = CreateActorSystem();
+        using var system = actorSystemHandler.StartNewActorSystem();
         
         var firstId = Fixture.Create<TId>();
         var secondId = Fixture.Create<TId>();
@@ -317,6 +316,49 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
         
         await VerifyDocument(secondId, secondDocument!, events);
     }
+
+    [Fact]
+    public async Task Projecting_from_second_event_position()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+        
+        var id = Fixture.Create<TId>();
+
+        var firstEvent = GetTestEvent(id);
+        var secondEvent = GetTestEvent(id);
+        
+        var events = ImmutableList.Create(firstEvent, secondEvent);
+        var projection = GetProjection(events);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
+
+        var projectionsSetup = system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }));
+
+        await positionStorage.StoreLatestPosition(projection.Name, 1);
+
+        var coordinator = await projectionsSetup.Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+
+        var position = await positionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(2);
+
+        var document = await projectionStorage.LoadDocument<TDocument>(id);
+
+        document.Should().NotBeNull();
+        
+        await VerifyDocument(id, document!, ImmutableList.Create(secondEvent));
+    }
     
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration> Configure(
         IHaveConfiguration<ProjectionSystemConfiguration> config)
@@ -335,9 +377,4 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     protected abstract object GetUnMatchedEvent(TId documentId);
 
     protected abstract Task VerifyDocument(TId documentId, TDocument document, IImmutableList<object> events);
-
-    private ActorSystem CreateActorSystem()
-    {
-        return actorSystemHandler.StartNewActorSystem();
-    }
 }

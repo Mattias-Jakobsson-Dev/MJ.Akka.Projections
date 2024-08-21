@@ -7,11 +7,6 @@ namespace DC.Akka.Projections.Configuration;
 public class InProcessSingletonProjectionCoordinator(IImmutableDictionary<string, IProjectionProxy> coordinators) 
     : IProjectionsCoordinator
 {
-    public IImmutableList<IProjectionProxy> GetAll()
-    {
-        return coordinators.Values.ToImmutableList();
-    }
-
     public IProjectionProxy? Get(string projectionName)
     {
         return coordinators.GetValueOrDefault(projectionName);

@@ -5,9 +5,10 @@ using Akka.Cluster.Sharding;
 using Akka.Cluster.Tools.Singleton;
 using Akka.Configuration;
 using Akka.TestKit.Xunit2;
+using DC.Akka.Projections.Tests.ContinuousProjectionsTests;
 using JetBrains.Annotations;
 
-namespace DC.Akka.Projections.Tests.ProjectionFlowTests;
+namespace DC.Akka.Projections.Tests;
 
 [PublicAPI]
 public class ClusteredActorSystemSupplier : TestKit, IHaveActorSystem

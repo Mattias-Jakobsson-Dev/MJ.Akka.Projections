@@ -1,7 +1,7 @@
 using Akka.Cluster.Tools.Singleton;
 using DC.Akka.Projections.Cluster.Sharding;
 using DC.Akka.Projections.Storage;
-using DC.Akka.Projections.Tests.ProjectionFlowTests;
+using DC.Akka.Projections.Tests.ContinuousProjectionsTests;
 using Hyperion.Internal;
 using Xunit;
 

@@ -13,8 +13,9 @@ public record ProjectionSystemConfiguration(
     IProjectionPositionStorage PositionStorage,
     IConfigureProjectionCoordinator Coordinator,
     IKeepTrackOfProjectors ProjectorFactory,
-    IImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>> Projections)
-    : ProjectionConfig(RestartSettings, StreamConfiguration, ProjectionStorage, PositionStorage)
+    IImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>> Projections,
+    bool StorePosition)
+    : ContinuousProjectionConfig(RestartSettings, StreamConfiguration, ProjectionStorage, PositionStorage)
 {
     public static ProjectionSystemConfiguration CreateDefaultConfiguration(ActorSystem actorSystem)
     {
@@ -25,6 +26,7 @@ public record ProjectionSystemConfiguration(
             new InMemoryPositionStorage(),
             new InProcessSingletonProjectionCoordinator.Setup(actorSystem),
             new KeepTrackOfProjectorsInProc(actorSystem, MaxNumberOfProjectorsPassivation.Default),
-            ImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>>.Empty);
+            ImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>>.Empty,
+            true);
     }
 }

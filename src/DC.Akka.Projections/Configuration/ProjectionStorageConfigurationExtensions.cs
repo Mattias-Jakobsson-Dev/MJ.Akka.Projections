@@ -7,8 +7,8 @@ public static class ProjectionStorageConfigurationExtensions
     public static IConfigurePart<TConfig, BatchedProjectionStorage> Batched<TConfig, TStorage>(
         this IConfigurePart<TConfig, TStorage> source,
         int batchSize = 100,
-        int parallelism = 5)
-        where TConfig : ProjectionConfig
+        int parallelism = 1)
+        where TConfig : ContinuousProjectionConfig
         where TStorage : IProjectionStorage
     {
         return source

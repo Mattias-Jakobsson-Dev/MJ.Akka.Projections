@@ -8,11 +8,6 @@ namespace DC.Akka.Projections.Cluster.Sharding;
 public class ShardedDaemonProjectionCoordinator(
     IImmutableDictionary<string, IProjectionProxy> projections) : IProjectionsCoordinator
 {
-    public IImmutableList<IProjectionProxy> GetAll()
-    {
-        return projections.Values.ToImmutableList();
-    }
-
     public IProjectionProxy? Get(string projectionName)
     {
         return projections.GetValueOrDefault(projectionName);

@@ -4,10 +4,10 @@ using DC.Akka.Projections.Tests.Storage;
 using Raven.Client.Documents;
 using Xunit;
 
-namespace DC.Akka.Projections.Tests.ProjectionFlowTests;
+namespace DC.Akka.Projections.Tests.ContinuousProjectionsTests;
 
 public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTestKitActorSystem actorSystemSetup)
-    : TestProjectionBaseFlowTests<string>(actorSystemSetup), IClassFixture<RavenDbFixture>,
+    : TestProjectionBaseContinuousTests<string>(actorSystemSetup), IClassFixture<RavenDbFixture>,
         IClassFixture<NormalTestKitActorSystem>
 {
     private readonly IDocumentStore _documentStore = fixture.OpenDocumentStore();

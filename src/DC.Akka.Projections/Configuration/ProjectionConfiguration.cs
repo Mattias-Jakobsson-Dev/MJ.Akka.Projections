@@ -13,6 +13,7 @@ public class ProjectionConfiguration<TId, TDocument>(
     IKeepTrackOfProjectors projectorFactory,
     RestartSettings? restartSettings,
     ProjectionStreamConfiguration projectionStreamConfiguration,
+    bool storePosition,
     IHandleEventInProjection<TDocument> eventsHandler) 
     : ProjectionConfiguration(
         projection,
@@ -20,7 +21,8 @@ public class ProjectionConfiguration<TId, TDocument>(
         positionStorage,
         projectorFactory,
         restartSettings,
-        projectionStreamConfiguration) where TId : notnull where TDocument : notnull
+        projectionStreamConfiguration,
+        storePosition) where TId : notnull where TDocument : notnull
 {
     public override string IdToString(object id)
     {
@@ -59,7 +61,8 @@ public abstract class ProjectionConfiguration(
     IProjectionPositionStorage positionStorage,
     IKeepTrackOfProjectors projectorFactory,
     RestartSettings? restartSettings,
-    ProjectionStreamConfiguration projectionStreamConfiguration)
+    ProjectionStreamConfiguration projectionStreamConfiguration,
+    bool storePosition)
 {
     public string Name { get; } = projection.Name;
     public IProjectionStorage DocumentStorage { get; } = documentStorage;
@@ -67,6 +70,7 @@ public abstract class ProjectionConfiguration(
     public IKeepTrackOfProjectors ProjectorFactory { get; } = projectorFactory;
     public RestartSettings? RestartSettings { get; } = restartSettings;
     public ProjectionStreamConfiguration ProjectionStreamConfiguration { get; } = projectionStreamConfiguration;
+    public bool StorePosition { get; } = storePosition;
 
     public IProjection GetProjection()
     {

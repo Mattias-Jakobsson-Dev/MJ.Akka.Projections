@@ -87,7 +87,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
                     _sequencer = sequencer;
 
-                    return _configuration
+                    var flow = _configuration
                         .StartSource(latestPosition)
                         .Batch(
                             _configuration.ProjectionStreamConfiguration.EventBatchSize,
@@ -137,8 +137,12 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                     Messages.Reject nack => throw new Exception("Rejected projection", nack.Cause),
                                     _ => throw new Exception("Unknown projection response")
                                 };
-                            })
-                        .GroupedWithin(
+                            });
+
+                    if (!_configuration.StorePosition)
+                        return flow.Select(_ => NotUsed.Instance);
+
+                    return flow.GroupedWithin(
                             _configuration.ProjectionStreamConfiguration.PositionBatching.Number,
                             _configuration.ProjectionStreamConfiguration.PositionBatching.Timeout)
                         .SelectAsync(1, async positions =>
@@ -168,7 +172,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         {
             Sender.Tell(new ProjectionsCoordinator.Responses.StopResponse());
         });
-        
+
         Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ => { _waitingForCompletion.Add(Sender); });
     }
 
@@ -186,7 +190,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             HandleCompletionWaiters();
 
             Become(Stopped);
-            
+
             Sender.Tell(new ProjectionsCoordinator.Responses.StopResponse());
         });
 
@@ -234,15 +238,15 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         });
 
         Receive<ProjectionsCoordinator.Commands.Kill>(_ => { Context.Stop(Self); });
-        
+
         Receive<ProjectionsCoordinator.Commands.Stop>(_ =>
         {
             Become(Stopped);
-            
+
             Sender.Tell(new ProjectionsCoordinator.Responses.StopResponse());
         });
     }
-    
+
     private void HandleCompletionWaiters(Exception? error = null)
     {
         foreach (var item in _waitingForCompletion)

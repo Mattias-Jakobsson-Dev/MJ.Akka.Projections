@@ -64,6 +64,7 @@ public class When_projecting_two_batches_to_two_ids_with_settings_to_keep_one_pr
                 {
                     ProjectDocumentTimeout = TimeSpan.FromSeconds(5)
                 },
+                true,
                 new FakeEventsHandler());
 
             var firstProjector = await factory.GetProjector<string, object>(firstId, projectionConfiguration);

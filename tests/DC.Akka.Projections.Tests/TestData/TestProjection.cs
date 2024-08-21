@@ -97,7 +97,7 @@ public class TestProjection<TId>(IImmutableList<object> events)
     {
         return Source.From(events
             .Select((x, i) => new EventWithPosition(x, i + 1))
-            .Where(x => fromPosition == null || x.Position >= fromPosition)
+            .Where(x => fromPosition == null || x.Position > fromPosition)
             .ToImmutableList());
     }
 }

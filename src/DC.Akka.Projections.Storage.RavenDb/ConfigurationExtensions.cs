@@ -12,7 +12,7 @@ public static class ConfigurationExtensions
         this IHaveConfiguration<TConfig> source,
         IDocumentStore documentStore,
         BulkInsertOptions? insertOptions = null)
-        where TConfig : ProjectionConfig
+        where TConfig : ContinuousProjectionConfig
     {
         return source
             .WithRavenDbPositionStorage(documentStore)
@@ -22,7 +22,7 @@ public static class ConfigurationExtensions
     public static IConfigurePart<TConfig, RavenDbProjectionStorage> WithRavenDbDocumentStorage<TConfig>(
         this IHaveConfiguration<TConfig> source,
         IDocumentStore documentStore,
-        BulkInsertOptions? insertOptions = null) where TConfig : ProjectionConfig
+        BulkInsertOptions? insertOptions = null) where TConfig : ContinuousProjectionConfig
     {
         return source.WithProjectionStorage(new RavenDbProjectionStorage(
             documentStore,
@@ -34,7 +34,7 @@ public static class ConfigurationExtensions
     
     public static IConfigurePart<TConfig, RavenDbProjectionPositionStorage> WithRavenDbPositionStorage<TConfig>(
         this IHaveConfiguration<TConfig> source,
-        IDocumentStore documentStore) where TConfig : ProjectionConfig
+        IDocumentStore documentStore) where TConfig : ContinuousProjectionConfig
     {
         return source.WithPositionStorage(new RavenDbProjectionPositionStorage(documentStore));
     }

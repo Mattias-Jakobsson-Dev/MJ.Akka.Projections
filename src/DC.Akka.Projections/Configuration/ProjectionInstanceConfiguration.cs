@@ -7,7 +7,7 @@ public record ProjectionInstanceConfiguration(
     RestartSettings? RestartSettings,
     ProjectionStreamConfiguration? StreamConfiguration,
     IProjectionStorage? ProjectionStorage,
-    IProjectionPositionStorage? PositionStorage) : ProjectionConfig(
+    IProjectionPositionStorage? PositionStorage) : ContinuousProjectionConfig(
     RestartSettings, StreamConfiguration, ProjectionStorage, PositionStorage)
 {
     public static ProjectionInstanceConfiguration Empty { get; } = new(

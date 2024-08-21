@@ -9,7 +9,7 @@ public static class ConfigurationExtensions
     public static IConfigurePart<T, TStorage> WithProjectionStorage<T, TStorage>(
         this IHaveConfiguration<T> source,
         TStorage storage) where TStorage : IProjectionStorage
-        where T : ProjectionConfig
+        where T : ContinuousProjectionConfig
     {
         var config = source.WithModifiedConfig(conf => conf with
         {
@@ -23,7 +23,7 @@ public static class ConfigurationExtensions
         this IHaveConfiguration<T> source,
         TStorage storage)
         where TStorage : IProjectionPositionStorage
-        where T : ProjectionConfig
+        where T : ContinuousProjectionConfig
     {
         var config = source.WithModifiedConfig(conf => conf with
         {
