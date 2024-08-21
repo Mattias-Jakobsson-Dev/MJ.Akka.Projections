@@ -25,6 +25,8 @@ public static class ProjectionsCoordinator
     public static class Responses
     {
         public record WaitForCompletionResponse(Exception? Error = null);
+
+        public record StopResponse;
     }
 }
 
@@ -43,6 +45,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     private UniqueKillSwitch? _killSwitch;
 
     private readonly ProjectionConfiguration _configuration;
+
+    private readonly HashSet<IActorRef> _waitingForCompletion = [];
 
     private IActorRef? _sequencer;
 
@@ -108,8 +112,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                 {
                                     x.Events,
                                     x.Id,
-                                    LowestEventNumber = !x.Events.IsEmpty 
-                                        ? x.Events.Select(y => y.Position).Min() 
+                                    LowestEventNumber = !x.Events.IsEmpty
+                                        ? x.Events.Select(y => y.Position).Min()
                                         : null
                                 })
                                 .OrderBy(x => x.LowestEventNumber)
@@ -159,12 +163,17 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         });
 
         Receive<ProjectionsCoordinator.Commands.Kill>(_ => { Context.Stop(Self); });
+
+        Receive<ProjectionsCoordinator.Commands.Stop>(_ =>
+        {
+            Sender.Tell(new ProjectionsCoordinator.Responses.StopResponse());
+        });
+        
+        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ => { _waitingForCompletion.Add(Sender); });
     }
 
     private void Started()
     {
-        var waitingForCompletion = new HashSet<IActorRef>();
-
         Receive<ProjectionsCoordinator.Commands.Stop>(_ =>
         {
             _logger.Info("Stopping projection {0}", _configuration.Name);
@@ -174,12 +183,11 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             if (_sequencer != null)
                 Context.Stop(_sequencer);
 
-            foreach (var item in waitingForCompletion)
-                item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
-
-            waitingForCompletion.Clear();
+            HandleCompletionWaiters();
 
             Become(Stopped);
+            
+            Sender.Tell(new ProjectionsCoordinator.Responses.StopResponse());
         });
 
         Receive<InternalCommands.Fail>(cmd =>
@@ -191,25 +199,19 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             if (_sequencer != null)
                 Context.Stop(_sequencer);
 
-            foreach (var item in waitingForCompletion)
-                item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse(cmd.Cause));
-
-            waitingForCompletion.Clear();
+            HandleCompletionWaiters(cmd.Cause);
 
             Become(Stopped);
         });
 
-        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ => { waitingForCompletion.Add(Sender); });
+        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ => { _waitingForCompletion.Add(Sender); });
 
         Receive<InternalCommands.Complete>(_ =>
         {
             if (_sequencer != null)
                 Context.Stop(_sequencer);
 
-            foreach (var item in waitingForCompletion)
-                item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
-
-            waitingForCompletion.Clear();
+            HandleCompletionWaiters();
 
             Become(Completed);
         });
@@ -232,6 +234,21 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         });
 
         Receive<ProjectionsCoordinator.Commands.Kill>(_ => { Context.Stop(Self); });
+        
+        Receive<ProjectionsCoordinator.Commands.Stop>(_ =>
+        {
+            Become(Stopped);
+            
+            Sender.Tell(new ProjectionsCoordinator.Responses.StopResponse());
+        });
+    }
+    
+    private void HandleCompletionWaiters(Exception? error = null)
+    {
+        foreach (var item in _waitingForCompletion)
+            item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse(error));
+
+        _waitingForCompletion.Clear();
     }
 
     protected override void PreStart()

@@ -23,7 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Akka.Cluster.Sharding" Version="1.5.15" />
+      <PackageReference Include="Akka.Cluster.Sharding" Version="1.5.27.1" />
     </ItemGroup>
 
 </Project>

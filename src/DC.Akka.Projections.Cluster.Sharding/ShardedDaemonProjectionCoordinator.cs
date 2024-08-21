@@ -12,19 +12,19 @@ public class ShardedDaemonProjectionCoordinator(
     {
         return projections.Values.ToImmutableList();
     }
-    
+
     public IProjectionProxy? Get(string projectionName)
     {
         return projections.GetValueOrDefault(projectionName);
     }
-    
+
     public class Setup(
         ActorSystem actorSystem,
         string name,
         ShardedDaemonProcessSettings settings) : IConfigureProjectionCoordinator
     {
         private readonly Dictionary<string, IProjection> _projections = new();
-        
+
         public void WithProjection(IProjection projection)
         {
             _projections[projection.Name] = projection;
@@ -36,7 +36,7 @@ public class ShardedDaemonProjectionCoordinator(
                 .Select(x => x.Value)
                 .OrderBy(x => x.Name)
                 .ToImmutableList();
-        
+
             ShardedDaemonProcess
                 .Get(actorSystem)
                 .Init(
@@ -46,39 +46,64 @@ public class ShardedDaemonProjectionCoordinator(
                     settings,
                     new ProjectionsCoordinator.Commands.Kill());
 
-            var projectionProxies = new Dictionary<string, IProjectionProxy>();
+            var shardingRef = await ClusterSharding
+                .Get(actorSystem)
+                .StartProxyAsync(
+                    $"sharded-daemon-process-{name}",
+                    settings.Role ?? "",
+                    new MessageExtractor(sortedProjections.Count));
 
-            var shardingBaseSettings = settings.ShardingSettings;
-        
-            if (shardingBaseSettings == null)
-            {
-                var shardingConfig = actorSystem.Settings.Config.GetConfig("akka.cluster.sharded-daemon-process.sharding");
-                var coordinatorSingletonConfig = actorSystem.Settings.Config.GetConfig(shardingConfig.GetString("coordinator-singleton"));
-                shardingBaseSettings = ClusterShardingSettings.Create(shardingConfig, coordinatorSingletonConfig);
-            }
-        
-            foreach (var sortedProjection in sortedProjections)
-            {
-                var proxy = await ClusterSharding
-                    .Get(actorSystem)
-                    .StartProxyAsync(
-                        $"sharded-daemon-process-{name}",
-                        settings.Role ?? shardingBaseSettings.Role,
-                        new MessageExtractor(sortedProjections.Count));
+            var projectionProxies = sortedProjections
+                .Select((projection, index) => new
+                {
+                    Id = index,
+                    Projection = projection
+                })
+                .ToImmutableDictionary(
+                    x => x.Projection.Name, 
+                    x => (IProjectionProxy)new ShardedDaemonProjectionProxy(
+                        x.Projection,
+                        x.Id,
+                        shardingRef));
 
-                projectionProxies[sortedProjection.Name] = new ActorRefProjectionProxy(proxy, sortedProjection);
-            }
-
-            return new ShardedDaemonProjectionCoordinator(projectionProxies.ToImmutableDictionary());
+            return new ShardedDaemonProjectionCoordinator(projectionProxies);
         }
     }
     
+    private class ShardedDaemonProjectionProxy(IProjection projection, int daemonId, IActorRef coordinator) 
+        : IProjectionProxy
+    {
+        public IProjection Projection { get; } = projection;
+        
+        public Task Stop()
+        {
+            coordinator.Tell(WrapMessage(new ProjectionsCoordinator.Commands.Stop()));
+        
+            return Task.CompletedTask;
+        }
+
+        public async Task WaitForCompletion(TimeSpan? timeout = null)
+        {
+            var response = await coordinator.Ask<ProjectionsCoordinator.Responses.WaitForCompletionResponse>(
+                WrapMessage(new ProjectionsCoordinator.Commands.WaitForCompletion()),
+                timeout ?? Timeout.InfiniteTimeSpan);
+
+            if (response.Error != null)
+                throw response.Error;
+        }
+
+        private ShardingEnvelope WrapMessage(object message)
+        {
+            return new ShardingEnvelope(daemonId.ToString(), message);
+        }
+    }
+
     private sealed class MessageExtractor(int maxNumberOfShards) : HashCodeMessageExtractor(maxNumberOfShards)
     {
         public override string EntityId(object message) => (message as ShardingEnvelope)?.EntityId ?? "";
-        
+
         public override object? EntityMessage(object message) => (message as ShardingEnvelope)?.Message;
-        
+
         public override string ShardId(string entityId, object? messageHint = null)
         {
             return entityId;

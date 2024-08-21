@@ -9,6 +9,6 @@ public class NormalTestKitActorSystem : TestKit, IHaveActorSystem
 {
     public ActorSystem StartNewActorSystem()
     {
-        return ActorSystem.Create("test", DefaultConfig);
+        return ActorSystem.Create(Sys.Name, DefaultConfig);
     }
 }

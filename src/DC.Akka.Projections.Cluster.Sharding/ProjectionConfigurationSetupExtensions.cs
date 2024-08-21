@@ -11,8 +11,7 @@ public static class ConfigurationExtensions
     public static IConfigurePart<ProjectionSystemConfiguration, ShardedProjectors> WithSharding(
         this IHaveConfiguration<ProjectionSystemConfiguration> setup,
         int maxNumberOfShards = 100,
-        Func<ClusterShardingSettings, ClusterShardingSettings>? configureShard = null,
-        Func<ClusterSingletonManagerSettings, ClusterSingletonManagerSettings>? configureCoordinator = null)
+        Func<ClusterShardingSettings, ClusterShardingSettings>? configureShard = null)
     {
         return setup
             .WithProjectionFactory(new ShardedProjectors(
@@ -44,6 +43,7 @@ public static class ConfigurationExtensions
                 source.ActorSystem,
                 name,
                 (configureDaemon ?? (x => x))(
-                    ShardedDaemonProcessSettings.Create(source.ActorSystem))));
+                    ShardedDaemonProcessSettings.Create(source.ActorSystem)
+                        .WithShardingSettings(ClusterShardingSettings.Create(source.ActorSystem)))));
     }
 }

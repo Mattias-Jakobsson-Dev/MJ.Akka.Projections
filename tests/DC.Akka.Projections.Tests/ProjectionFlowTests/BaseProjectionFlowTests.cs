@@ -78,7 +78,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
                 .WithProjectionStorage(projectionStorage)
                 .WithPositionStorage(positionStorage)))
             .Start();
-
+        
         await coordinator
             .Get(projection.Name)!
             .WaitForCompletion(TimeSpan.FromSeconds(5))

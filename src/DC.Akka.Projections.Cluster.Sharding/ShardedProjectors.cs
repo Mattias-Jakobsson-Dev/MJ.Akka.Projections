@@ -17,12 +17,12 @@ public class ShardedProjectors(ActorSystem actorSystem, ClusterShardingSettings 
             .GetOrAdd(
                 configuration.Name,
                 name => ClusterSharding.Get(actorSystem).StartAsync(
-                    typeName: $"projection-{name}",
-                    entityPropsFactory: documentId => configuration
+                    $"projection-{name}",
+                    documentId => configuration
                         .GetProjection()
                         .CreateProjectionProps(configuration.IdFromString(documentId)),
-                    settings: settings,
-                    messageExtractor: new MessageExtractor<TId, TDocument>(maxNumberOfShards, configuration)));
+                    settings,
+                    new MessageExtractor<TId, TDocument>(maxNumberOfShards, configuration)));
 
         return new ActorRefProjectorProxy<TId, TDocument>(
             id,
