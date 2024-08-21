@@ -8,9 +8,8 @@ public class ActorRefProjectionProxy(IActorRef coordinator, IProjection projecti
 
     public Task Stop()
     {
-        coordinator.Tell(new ProjectionsCoordinator.Commands.Stop());
-        
-        return Task.CompletedTask;
+        return coordinator.Ask<ProjectionsCoordinator.Responses.StopResponse>(
+            new ProjectionsCoordinator.Commands.Stop());
     }
 
     public async Task WaitForCompletion(TimeSpan? timeout = null)

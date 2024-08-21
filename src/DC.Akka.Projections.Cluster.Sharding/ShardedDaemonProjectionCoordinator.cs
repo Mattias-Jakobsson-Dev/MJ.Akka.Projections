@@ -77,9 +77,8 @@ public class ShardedDaemonProjectionCoordinator(
         
         public Task Stop()
         {
-            coordinator.Tell(WrapMessage(new ProjectionsCoordinator.Commands.Stop()));
-        
-            return Task.CompletedTask;
+            return coordinator.Ask<ProjectionsCoordinator.Responses.StopResponse>(
+                WrapMessage(new ProjectionsCoordinator.Commands.Stop()));
         }
 
         public async Task WaitForCompletion(TimeSpan? timeout = null)
