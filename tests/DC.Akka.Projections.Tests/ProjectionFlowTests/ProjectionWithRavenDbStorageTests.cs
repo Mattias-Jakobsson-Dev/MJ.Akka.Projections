@@ -1,9 +1,7 @@
-using Akka.Actor;
-using DC.Akka.Projections.Storage;
+using DC.Akka.Projections.Configuration;
 using DC.Akka.Projections.Storage.RavenDb;
 using DC.Akka.Projections.Tests.Storage;
 using Raven.Client.Documents;
-using Raven.Client.Documents.BulkInsert;
 using Xunit;
 
 namespace DC.Akka.Projections.Tests.ProjectionFlowTests;
@@ -14,13 +12,11 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 {
     private readonly IDocumentStore _documentStore = fixture.OpenDocumentStore();
 
-    protected override IProjectionStorage GetProjectionStorage(ActorSystem system)
+    protected override IHaveConfiguration<ProjectionSystemConfiguration> Configure(
+        IHaveConfiguration<ProjectionSystemConfiguration> config)
     {
-        return new RavenDbProjectionStorage(_documentStore, new BulkInsertOptions());
-    }
-
-    protected override IProjectionPositionStorage GetPositionStorage(ActorSystem system)
-    {
-        return new RavenDbProjectionPositionStorage(_documentStore);
+        return config
+            .WithRavenDbDocumentStorage(_documentStore)
+            .WithRavenDbPositionStorage(_documentStore);
     }
 }

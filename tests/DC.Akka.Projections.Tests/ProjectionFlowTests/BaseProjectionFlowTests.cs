@@ -19,14 +19,14 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_event_that_fails_once_with_restart_behaviour()
     {
-        var system = CreateActorSystem();
+        using var system = CreateActorSystem();
         
         var id = Fixture.Create<TId>();
 
         var events = ImmutableList.Create(GetEventThatFails(id, 1));
         var projection = GetProjection(events);
-        var projectionStorage = GetProjectionStorage(system);
-        var positionStorage = GetPositionStorage(system);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
 
         var coordinator = await system
             .Projections(config => Configure(config
@@ -40,9 +40,14 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
                 {
                     MaxProjectionRetries = 0
                 })
-                .WithProjection(projection, ConfigureProjection)
-                .WithProjectionStorage(projectionStorage)
-                .WithPositionStorage(positionStorage)))
+                .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }))
             .Start();
 
         await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
@@ -59,14 +64,14 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_event_that_fails_once_without_restart_behaviour()
     {
-        var system = CreateActorSystem();
+        using var system = CreateActorSystem();
         
         var id = Fixture.Create<TId>();
 
         var events = ImmutableList.Create(GetEventThatFails(id, 1));
         var projection = GetProjection(events);
-        var projectionStorage = GetProjectionStorage(system);
-        var positionStorage = GetPositionStorage(system);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
 
         var coordinator = await system
             .Projections(config => Configure(config
@@ -74,9 +79,14 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
                 {
                     MaxProjectionRetries = 0
                 })
-                .WithProjection(projection, ConfigureProjection)
-                .WithProjectionStorage(projectionStorage)
-                .WithPositionStorage(positionStorage)))
+                .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }))
             .Start();
         
         await coordinator
@@ -96,7 +106,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_transformation_to_two_events_for_one_document()
     {
-        var system = CreateActorSystem();
+        using var system = CreateActorSystem();
         
         var id = Fixture.Create<TId>();
 
@@ -106,14 +116,19 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
 
         var events = ImmutableList.Create(transformEvent);
         var projection = GetProjection(events);
-        var projectionStorage = GetProjectionStorage(system);
-        var positionStorage = GetPositionStorage(system);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
 
         var coordinator = await system
             .Projections(config => Configure(config
-                .WithProjection(projection, ConfigureProjection)
-                .WithProjectionStorage(projectionStorage)
-                .WithPositionStorage(positionStorage)))
+                .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }))
             .Start();
 
         await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
@@ -132,7 +147,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_transformation_to_two_events_for_two_documents()
     {
-        var system = CreateActorSystem();
+        using var system = CreateActorSystem();
         
         var firstId = Fixture.Create<TId>();
         var secondId = Fixture.Create<TId>();
@@ -145,14 +160,19 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
 
         var events = ImmutableList.Create(transformEvent);
         var projection = GetProjection(events);
-        var projectionStorage = GetProjectionStorage(system);
-        var positionStorage = GetPositionStorage(system);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
 
         var coordinator = await system
             .Projections(config => Configure(config
-                .WithProjection(projection, ConfigureProjection)
-                .WithProjectionStorage(projectionStorage)
-                .WithPositionStorage(positionStorage)))
+                .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }))
             .Start();
 
         await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
@@ -177,7 +197,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_two_events_that_doesnt_match_projection()
     {
-        var system = CreateActorSystem();
+        using var system = CreateActorSystem();
         
         var id = Fixture.Create<TId>();
 
@@ -185,14 +205,19 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
             GetUnMatchedEvent(id),
             GetUnMatchedEvent(id));
         var projection = GetProjection(events);
-        var projectionStorage = GetProjectionStorage(system);
-        var positionStorage = GetPositionStorage(system);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
 
         var coordinator = await system
             .Projections(config => Configure(config
-                .WithProjection(projection, ConfigureProjection)
-                .WithProjectionStorage(projectionStorage)
-                .WithPositionStorage(positionStorage)))
+                .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }))
             .Start();
 
         await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
@@ -209,7 +234,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_two_events_for_one_document()
     {
-        var system = CreateActorSystem();
+        using var system = CreateActorSystem();
         
         var id = Fixture.Create<TId>();
 
@@ -218,14 +243,19 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
         
         var events = ImmutableList.Create(firstEvent, secondEvent);
         var projection = GetProjection(events);
-        var projectionStorage = GetProjectionStorage(system);
-        var positionStorage = GetPositionStorage(system);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
 
         var coordinator = await system
             .Projections(config => Configure(config
-                .WithProjection(projection, ConfigureProjection)
-                .WithProjectionStorage(projectionStorage)
-                .WithPositionStorage(positionStorage)))
+                .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }))
             .Start();
 
         await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
@@ -244,7 +274,7 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
     [Fact]
     public async Task Projecting_two_events_for_two_documents()
     {
-        var system = CreateActorSystem();
+        using var system = CreateActorSystem();
         
         var firstId = Fixture.Create<TId>();
         var secondId = Fixture.Create<TId>();
@@ -254,14 +284,19 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
         
         var events = ImmutableList.Create(firstEvent, secondEvent);
         var projection = GetProjection(events);
-        var projectionStorage = GetProjectionStorage(system);
-        var positionStorage = GetPositionStorage(system);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
 
         var coordinator = await system
             .Projections(config => Configure(config
-                .WithProjection(projection, ConfigureProjection)
-                .WithProjectionStorage(projectionStorage)
-                .WithPositionStorage(positionStorage)))
+                .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }))
             .Start();
 
         await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
@@ -281,22 +316,6 @@ public abstract class BaseProjectionFlowTests<TId, TDocument>(IHaveActorSystem a
         secondDocument.Should().NotBeNull();
         
         await VerifyDocument(secondId, secondDocument!, events);
-    }
-    
-    protected virtual IProjectionStorage GetProjectionStorage(ActorSystem actorSystem)
-    {
-        return new InMemoryProjectionStorage();
-    }
-
-    protected virtual IProjectionPositionStorage GetPositionStorage(ActorSystem actorSystem)
-    {
-        return new InMemoryPositionStorage();
-    }
-
-    protected virtual IHaveConfiguration<ProjectionInstanceConfiguration> ConfigureProjection(
-        IHaveConfiguration<ProjectionInstanceConfiguration> config)
-    {
-        return config;
     }
     
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration> Configure(
