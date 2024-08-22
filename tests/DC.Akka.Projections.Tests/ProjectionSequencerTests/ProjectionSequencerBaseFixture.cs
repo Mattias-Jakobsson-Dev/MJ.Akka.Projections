@@ -20,8 +20,8 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
                 new InMemoryPositionStorage(),
                 new TestProjectionFactory(),
                 null,
-                ProjectionStreamConfiguration.Default,
-                true,
+                BatchEventBatchingStrategy.Default,
+                BatchWithinEventPositionBatchingStrategy.Default,
                 new FakeEventHandler()));
 
         var batches = SetupBatches();
@@ -91,7 +91,8 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
         private class TestProjectionProxy : IProjectorProxy
         {
             public async Task<Messages.IProjectEventsResponse> ProjectEvents(
-                IImmutableList<EventWithPosition> events)
+                IImmutableList<EventWithPosition> events,
+                TimeSpan timeout)
             {
                 var startedAt = DateTimeOffset.Now;
                 

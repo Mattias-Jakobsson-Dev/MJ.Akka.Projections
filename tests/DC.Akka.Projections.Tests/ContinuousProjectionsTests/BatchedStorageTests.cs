@@ -34,10 +34,6 @@ public class BatchedStorageTests : TestKit
                             TimeSpan.Zero,
                             1)
                         .WithMaxRestarts(5, TimeSpan.FromSeconds(10)))
-                .WithProjectionStreamConfiguration(ProjectionStreamConfiguration.Default with
-                {
-                    MaxProjectionRetries = 0
-                })
                 .WithProjectionStorage(projectionStorage)
                 .Batched()
                 .WithPositionStorage(positionStorage)

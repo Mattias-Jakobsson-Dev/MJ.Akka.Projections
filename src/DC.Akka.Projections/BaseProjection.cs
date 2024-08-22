@@ -7,6 +7,8 @@ namespace DC.Akka.Projections;
 public abstract class BaseProjection<TId, TDocument> : IProjection<TId, TDocument>
     where TId : notnull where TDocument : notnull
 {
+    public virtual TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(30);
+    
     public abstract TId IdFromString(string id);
     public abstract string IdToString(TId id);
 

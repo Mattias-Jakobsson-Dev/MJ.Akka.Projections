@@ -8,25 +8,30 @@ namespace DC.Akka.Projections.Configuration;
 
 public record ProjectionSystemConfiguration(
     RestartSettings? RestartSettings,
-    ProjectionStreamConfiguration StreamConfiguration,
+    IEventBatchingStrategy EventBatchingStrategy,
     IProjectionStorage ProjectionStorage,
     IProjectionPositionStorage PositionStorage,
+    IEventPositionBatchingStrategy PositionBatchingStrategy,
     IConfigureProjectionCoordinator Coordinator,
     IKeepTrackOfProjectors ProjectorFactory,
-    IImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>> Projections,
-    bool StorePosition)
-    : ContinuousProjectionConfig(RestartSettings, StreamConfiguration, ProjectionStorage, PositionStorage)
+    IImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>> Projections)
+    : ContinuousProjectionConfig(
+        RestartSettings,
+        EventBatchingStrategy,
+        ProjectionStorage,
+        PositionStorage,
+        PositionBatchingStrategy)
 {
     public static ProjectionSystemConfiguration CreateDefaultConfiguration(ActorSystem actorSystem)
     {
         return new ProjectionSystemConfiguration(
             null,
-            ProjectionStreamConfiguration.Default,
+            BatchEventBatchingStrategy.Default,
             new InMemoryProjectionStorage(),
             new InMemoryPositionStorage(),
+            BatchWithinEventPositionBatchingStrategy.Default,
             new InProcessSingletonProjectionCoordinator.Setup(actorSystem),
             new KeepTrackOfProjectorsInProc(actorSystem, MaxNumberOfProjectorsPassivation.Default),
-            ImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>>.Empty,
-            true);
+            ImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>>.Empty);
     }
 }

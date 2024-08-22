@@ -35,10 +35,6 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
                             TimeSpan.Zero,
                             1)
                         .WithMaxRestarts(5, TimeSpan.FromSeconds(10)))
-                .WithProjectionStreamConfiguration(ProjectionStreamConfiguration.Default with
-                {
-                    MaxProjectionRetries = 0
-                })
                 .WithProjection(projection))
                 .WithModifiedConfig(conf =>
                 {
@@ -74,10 +70,6 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
         var coordinator = await system
             .Projections(config => Configure(config
-                .WithProjectionStreamConfiguration(ProjectionStreamConfiguration.Default with
-                {
-                    MaxProjectionRetries = 0
-                })
                 .WithProjection(projection))
                 .WithModifiedConfig(conf =>
                 {

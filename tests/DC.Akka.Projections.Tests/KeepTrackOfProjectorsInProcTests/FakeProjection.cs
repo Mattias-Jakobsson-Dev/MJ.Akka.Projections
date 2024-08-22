@@ -8,6 +8,8 @@ namespace DC.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
 public class FakeProjection(TimeSpan delay) : IProjection<string, object>
 {
     public string Name => GetType().Name;
+    
+    public TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(5);
 
     public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
     {

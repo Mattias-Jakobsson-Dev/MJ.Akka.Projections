@@ -30,6 +30,63 @@ public static class ProjectionsCoordinator
     }
 }
 
+public interface IEventBatchingStrategy
+{
+    int GetParallelism();
+    
+    Source<IEnumerable<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source);
+}
+
+public class BatchEventBatchingStrategy(int batchSize, int parallelism) : IEventBatchingStrategy
+{
+    public static BatchEventBatchingStrategy Default { get; } = new(1_000, 100);
+    
+    public int GetParallelism()
+    {
+        return parallelism;
+    }
+
+    public Source<IEnumerable<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)
+    {
+        return source
+            .Batch(
+                batchSize,
+                ImmutableList.Create,
+                (current, item) => current.Add(item))
+            .Select(x => (IEnumerable<EventWithPosition>)x);
+    }
+}
+
+public interface IEventPositionBatchingStrategy
+{
+    Source<PositionData, NotUsed> Get(Source<PositionData, NotUsed> source);
+}
+
+public class NoBatchingPositionStrategy : IEventPositionBatchingStrategy
+{
+    public Source<PositionData, NotUsed> Get(Source<PositionData, NotUsed> source)
+    {
+        return source;
+    }
+}
+
+public class BatchWithinEventPositionBatchingStrategy(int maxItems, TimeSpan timeout) : IEventPositionBatchingStrategy
+{
+    public static BatchWithinEventPositionBatchingStrategy Default { get; } = new(10_000, TimeSpan.FromSeconds(10.0));
+    
+    public Source<PositionData, NotUsed> Get(Source<PositionData, NotUsed> source)
+    {
+        return source
+            .GroupedWithin(maxItems, timeout)
+            .Select(positions =>
+            {
+                var highestPosition = positions.Select(x => x.Position).MaxBy(y => y);
+
+                return new PositionData(highestPosition);
+            });
+    }
+}
+
 [PublicAPI]
 public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : notnull where TDocument : notnull
 {
@@ -87,12 +144,12 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
                     _sequencer = sequencer;
 
+                    var source = _configuration
+                        .StartSource(latestPosition);
+
                     var flow = _configuration
-                        .StartSource(latestPosition)
-                        .Batch(
-                            _configuration.ProjectionStreamConfiguration.EventBatchSize,
-                            ImmutableList.Create,
-                            (current, item) => current.Add(item))
+                        .ProjectionEventBatchingStrategy
+                        .Get(source)
                         .SelectMany(data =>
                         {
                             return data
@@ -126,7 +183,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                             TimeSpan.FromMinutes(1),
                             1)
                         .SelectAsync(
-                            _configuration.ProjectionStreamConfiguration.ProjectionParallelism,
+                            _configuration.ProjectionEventBatchingStrategy.GetParallelism(),
                             async data =>
                             {
                                 var response = await data.Task;
@@ -139,19 +196,14 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                 };
                             });
 
-                    if (!_configuration.StorePosition)
-                        return flow.Select(_ => NotUsed.Instance);
-
-                    return flow.GroupedWithin(
-                            _configuration.ProjectionStreamConfiguration.PositionBatching.Number,
-                            _configuration.ProjectionStreamConfiguration.PositionBatching.Timeout)
-                        .SelectAsync(1, async positions =>
+                    return _configuration
+                        .PositionBatchingStrategy
+                        .Get(flow)
+                        .SelectAsync(1, async highestPosition =>
                         {
-                            var highestPosition = positions.Select(x => x.Position).MaxBy(y => y);
-
                             latestPosition = await _configuration.PositionStorage.StoreLatestPosition(
                                 _configuration.Name,
-                                highestPosition);
+                                highestPosition.Position);
 
                             return NotUsed.Instance;
                         });
@@ -286,6 +338,4 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             ? RestartSource.OnFailuresWithBackoff(createSource, restartSettings)
             : createSource();
     }
-
-    private record PositionData(long? Position);
 }

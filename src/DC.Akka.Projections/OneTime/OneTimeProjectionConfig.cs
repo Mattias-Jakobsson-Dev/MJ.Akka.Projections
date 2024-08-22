@@ -5,11 +5,11 @@ namespace DC.Akka.Projections.OneTime;
 
 public record OneTimeProjectionConfig(
     RestartSettings? RestartSettings,
-    ProjectionStreamConfiguration StreamConfiguration,
-    long? StartPosition) : ProjectionConfig(RestartSettings, StreamConfiguration)
+    IEventBatchingStrategy EventBatchingStrategy,
+    long? StartPosition) : ProjectionConfig(RestartSettings, EventBatchingStrategy)
 {
     public static OneTimeProjectionConfig Default { get; } = new(
         null,
-        ProjectionStreamConfiguration.Default,
+        BatchEventBatchingStrategy.Default,
         null);
 }

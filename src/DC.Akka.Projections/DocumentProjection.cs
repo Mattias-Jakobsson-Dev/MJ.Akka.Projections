@@ -67,17 +67,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
         
         try
         {
-            var result = await Retries
-                .Run<(TDocument? document, long? position), Exception>(
-                    RunProjections,
-                    _configuration.ProjectionStreamConfiguration.MaxProjectionRetries,
-                    (retries, exception) => _logger
-                        .Warning(
-                            exception,
-                            "Failed handling {0} events for {1}, retrying (tries: {2})",
-                            events.Count,
-                            _id,
-                            retries));
+            var result = await RunProjections();
             
             Sender.Tell(new Messages.Acknowledge(result.position));
 

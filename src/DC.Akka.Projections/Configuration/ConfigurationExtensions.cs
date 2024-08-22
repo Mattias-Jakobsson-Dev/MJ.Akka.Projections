@@ -46,19 +46,6 @@ public static class ConfigurationExtensions
         return new ConfigurePart<T, RestartSettings?>(config, restartSettings);
     }
     
-    public static IConfigurePart<T, ProjectionStreamConfiguration> WithProjectionStreamConfiguration<T>(
-        this IHaveConfiguration<T> source,
-        ProjectionStreamConfiguration streamConfiguration)
-        where T : ProjectionConfig
-    {
-        var config = source.WithModifiedConfig(conf => conf with
-        {
-            StreamConfiguration = streamConfiguration
-        });
-
-        return new ConfigurePart<T, ProjectionStreamConfiguration>(config, streamConfiguration);
-    }
-    
     public static IConfigurePart<ProjectionSystemConfiguration, TFactory> WithProjectionFactory<TFactory>(
         this IHaveConfiguration<ProjectionSystemConfiguration> source,
         TFactory factory) 
@@ -70,6 +57,34 @@ public static class ConfigurationExtensions
         });
 
         return new ConfigurePart<ProjectionSystemConfiguration, TFactory>(config, factory);
+    }
+    
+    public static IConfigurePart<T, TStrategy> WithEventBatchingStrategy<T, TStrategy>(
+        this IHaveConfiguration<T> source,
+        TStrategy strategy)
+        where TStrategy : IEventBatchingStrategy
+        where T : ContinuousProjectionConfig
+    {
+        var config = source.WithModifiedConfig(conf => conf with
+        {
+            EventBatchingStrategy = strategy
+        });
+
+        return new ConfigurePart<T, TStrategy>(config, strategy);
+    }
+    
+    public static IConfigurePart<T, TStrategy> WithPositionStorageBatchingStrategy<T, TStrategy>(
+        this IHaveConfiguration<T> source,
+        TStrategy strategy)
+        where TStrategy : IEventPositionBatchingStrategy
+        where T : ContinuousProjectionConfig
+    {
+        var config = source.WithModifiedConfig(conf => conf with
+        {
+            PositionBatchingStrategy = strategy
+        });
+
+        return new ConfigurePart<T, TStrategy>(config, strategy);
     }
     
     public static IConfigurePart<ProjectionSystemConfiguration, TCoordinator> WithCoordinator<TCoordinator>(

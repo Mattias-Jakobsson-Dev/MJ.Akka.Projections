@@ -19,6 +19,8 @@ public class TestProjection<TId>(IImmutableList<object> events)
     : BaseProjection<TId, TestDocument<TId>> 
     where TId : notnull
 {
+    public override TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(5);
+
     private static string GetName()
     {
         return $"TestProjectionOf{typeof(TId).Name}";

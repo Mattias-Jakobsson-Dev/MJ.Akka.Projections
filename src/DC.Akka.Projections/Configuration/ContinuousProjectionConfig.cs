@@ -5,7 +5,8 @@ namespace DC.Akka.Projections.Configuration;
 
 public abstract record ContinuousProjectionConfig(
     RestartSettings? RestartSettings,
-    ProjectionStreamConfiguration? StreamConfiguration,
+    IEventBatchingStrategy? EventBatchingStrategy,
     IProjectionStorage? ProjectionStorage,
-    IProjectionPositionStorage? PositionStorage) 
-    : ProjectionConfig(RestartSettings, StreamConfiguration);
+    IProjectionPositionStorage? PositionStorage,
+    IEventPositionBatchingStrategy? PositionBatchingStrategy) 
+    : ProjectionConfig(RestartSettings, EventBatchingStrategy);

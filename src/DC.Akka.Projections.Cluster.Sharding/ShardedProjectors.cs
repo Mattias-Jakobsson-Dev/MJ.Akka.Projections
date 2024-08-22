@@ -24,10 +24,7 @@ public class ShardedProjectors(ActorSystem actorSystem, ClusterShardingSettings 
                     settings,
                     new MessageExtractor<TId, TDocument>(maxNumberOfShards, configuration)));
 
-        return new ActorRefProjectorProxy<TId, TDocument>(
-            id,
-            projector,
-            configuration.ProjectionStreamConfiguration.ProjectDocumentTimeout);
+        return new ActorRefProjectorProxy<TId, TDocument>(id, projector);
     }
 
     private class MessageExtractor<TId, TDocument>(

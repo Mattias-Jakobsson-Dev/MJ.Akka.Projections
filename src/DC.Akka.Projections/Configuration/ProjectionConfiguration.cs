@@ -12,8 +12,8 @@ public class ProjectionConfiguration<TId, TDocument>(
     IProjectionPositionStorage positionStorage,
     IKeepTrackOfProjectors projectorFactory,
     RestartSettings? restartSettings,
-    ProjectionStreamConfiguration projectionStreamConfiguration,
-    bool storePosition,
+    IEventBatchingStrategy projectionEventBatchingStrategy,
+    IEventPositionBatchingStrategy positionBatchingStrategy,
     IHandleEventInProjection<TDocument> eventsHandler) 
     : ProjectionConfiguration(
         projection,
@@ -21,8 +21,8 @@ public class ProjectionConfiguration<TId, TDocument>(
         positionStorage,
         projectorFactory,
         restartSettings,
-        projectionStreamConfiguration,
-        storePosition) where TId : notnull where TDocument : notnull
+        projectionEventBatchingStrategy,
+        positionBatchingStrategy) where TId : notnull where TDocument : notnull
 {
     public override string IdToString(object id)
     {
@@ -61,16 +61,16 @@ public abstract class ProjectionConfiguration(
     IProjectionPositionStorage positionStorage,
     IKeepTrackOfProjectors projectorFactory,
     RestartSettings? restartSettings,
-    ProjectionStreamConfiguration projectionStreamConfiguration,
-    bool storePosition)
+    IEventBatchingStrategy projectionEventBatchingStrategy,
+    IEventPositionBatchingStrategy positionBatchingStrategy)
 {
     public string Name { get; } = projection.Name;
     public IProjectionStorage DocumentStorage { get; } = documentStorage;
     public IProjectionPositionStorage PositionStorage { get; } = positionStorage;
     public IKeepTrackOfProjectors ProjectorFactory { get; } = projectorFactory;
     public RestartSettings? RestartSettings { get; } = restartSettings;
-    public ProjectionStreamConfiguration ProjectionStreamConfiguration { get; } = projectionStreamConfiguration;
-    public bool StorePosition { get; } = storePosition;
+    public IEventBatchingStrategy ProjectionEventBatchingStrategy { get; } = projectionEventBatchingStrategy;
+    public IEventPositionBatchingStrategy PositionBatchingStrategy { get; } = positionBatchingStrategy;
 
     public IProjection GetProjection()
     {

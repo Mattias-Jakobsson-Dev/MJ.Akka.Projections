@@ -30,8 +30,8 @@ public static class ProjectionSetupConfigurationExtensions
                             configuredProjection.PositionStorage!,
                             conf.ProjectorFactory,
                             configuredProjection.RestartSettings,
-                            configuredProjection.StreamConfiguration!,
-                            conf.StorePosition,
+                            configuredProjection.EventBatchingStrategy!,
+                            configuredProjection.PositionBatchingStrategy!,
                             projection.Configure(new SetupProjection<TId, TDocument>()).Build());
                     })
             });

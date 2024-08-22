@@ -65,9 +65,8 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             }
             else
             {
-                var promise =
-                    new TaskCompletionSource<Messages.IProjectEventsResponse>(TaskCreationOptions
-                        .RunContinuationsAsynchronously);
+                var promise = new TaskCompletionSource<Messages.IProjectEventsResponse>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
 
                 if (!_queues.TryGetValue(id, out var value))
                 {
@@ -117,11 +116,13 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
         });
     }
 
-    private async Task<Messages.IProjectEventsResponse> Run(TId id, IImmutableList<EventWithPosition> events)
+    private async Task<Messages.IProjectEventsResponse> Run(
+        TId id,
+        IImmutableList<EventWithPosition> events)
     {
         var projector = await _configuration.ProjectorFactory.GetProjector<TId, TDocument>(id, _configuration);
 
-        return await projector.ProjectEvents(events);
+        return await projector.ProjectEvents(events, _configuration.GetProjection().ProjectionTimeout);
     }
 
     public static IActorRef Create(IActorRefFactory refFactory, ProjectionConfiguration configuration)

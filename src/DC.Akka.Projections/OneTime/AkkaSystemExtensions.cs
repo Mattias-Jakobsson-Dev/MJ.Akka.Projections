@@ -23,11 +23,8 @@ public static class AkkaSystemExtensions
                 .WithProjectionStorage(storage)
                 .WithPositionStorage(new StaticPositionStorage(configuration.Config.StartPosition))
                 .WithRestartSettings(configuration.Config.RestartSettings)
-                .WithProjectionStreamConfiguration(configuration.Config.StreamConfiguration!)
-                .WithModifiedConfig(x => x with
-                {
-                    StorePosition = false
-                })
+                .WithEventBatchingStrategy(configuration.Config.EventBatchingStrategy!)
+                .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
                 .WithProjection(projection));
         
         return new OneTimeProjection<TId, TDocument>(

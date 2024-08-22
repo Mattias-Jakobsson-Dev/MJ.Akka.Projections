@@ -67,21 +67,22 @@ public class When_projecting_three_batches_to_two_ids_with_settings_to_keep_one_
                 new InMemoryPositionStorage(),
                 factory,
                 null,
-                ProjectionStreamConfiguration.Default with
-                {
-                    ProjectDocumentTimeout = TimeSpan.FromSeconds(5)
-                },
-                true,
+                BatchEventBatchingStrategy.Default, 
+                BatchWithinEventPositionBatchingStrategy.Default,
                 new FakeEventsHandler());
 
             var firstProjector = await factory.GetProjector<string, object>(firstId, projectionConfiguration);
             var secondProjector = await factory.GetProjector<string, object>(secondId, projectionConfiguration);
             var thirdProjector = await factory.GetProjector<string, object>(firstId, projectionConfiguration);
 
-            FirstResponse = await firstProjector.ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 1)));
-            SecondResponse =
-                await secondProjector.ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 2)));
-            ThirdResponse = await thirdProjector.ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 3)));
+            FirstResponse = await firstProjector
+                .ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 1)), TimeSpan.FromSeconds(5));
+            
+            SecondResponse = await secondProjector
+                .ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 2)), TimeSpan.FromSeconds(5));
+            
+            ThirdResponse = await thirdProjector
+                .ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 3)), TimeSpan.FromSeconds(5));
 
             var firstProjectorId = MurmurHash.StringHash(firstId).ToString();
             var secondProjectorId = MurmurHash.StringHash(secondId).ToString();

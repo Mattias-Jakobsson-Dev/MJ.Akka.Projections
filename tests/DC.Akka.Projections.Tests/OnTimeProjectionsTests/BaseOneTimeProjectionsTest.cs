@@ -34,11 +34,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
                                 TimeSpan.Zero,
                                 TimeSpan.Zero,
                                 1)
-                            .WithMaxRestarts(5, TimeSpan.FromSeconds(10)))
-                    .WithProjectionStreamConfiguration(ProjectionStreamConfiguration.Default with
-                    {
-                        MaxProjectionRetries = 0
-                    }))
+                            .WithMaxRestarts(5, TimeSpan.FromSeconds(10))))
             .Run(TimeSpan.FromSeconds(5));
 
         var document = await result.Load(id);
@@ -59,11 +55,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
         await system
             .CreateOneTimeProjection(
                 projection,
-                x => Configure(x)
-                    .WithProjectionStreamConfiguration(ProjectionStreamConfiguration.Default with
-                    {
-                        MaxProjectionRetries = 0
-                    }))
+                Configure)
             .Run(TimeSpan.FromSeconds(5))
             .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
     }
