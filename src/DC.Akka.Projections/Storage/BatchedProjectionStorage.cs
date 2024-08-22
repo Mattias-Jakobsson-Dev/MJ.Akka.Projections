@@ -32,10 +32,17 @@ public class BatchedProjectionStorage : IProjectionStorage
                 parallelism,
                 async write =>
                 {
-                    await _innerStorage.Store(write.ToUpsert, write.ToDelete);
-                    
-                    write.Completed();
+                    try
+                    {
+                        await _innerStorage.Store(write.ToUpsert, write.ToDelete);
 
+                        write.Completed();
+                    }
+                    catch (Exception e)
+                    {
+                        write.Fail(e);
+                    }
+                    
                     return NotUsed.Instance;
                 })
             .ToMaterialized(Sink.Ignore<NotUsed>(), Keep.Left)
@@ -137,7 +144,13 @@ public class BatchedProjectionStorage : IProjectionStorage
         public void Completed()
         {
             foreach (var completion in _completions)
-                completion.SetResult(NotUsed.Instance);
+                completion.TrySetResult(NotUsed.Instance);
+        }
+
+        public void Fail(Exception exception)
+        {
+            foreach (var completion in _completions)
+                completion.TrySetException(exception);
         }
 
         private static ImmutableList<T> Merge<T>(

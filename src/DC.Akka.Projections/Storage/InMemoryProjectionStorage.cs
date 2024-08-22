@@ -10,7 +10,7 @@ public class InMemoryProjectionStorage : IProjectionStorage
 {
     protected readonly ConcurrentDictionary<object, (Type Type, ReadOnlyMemory<byte> Data)> Documents = new();
     
-    public async Task<TDocument?> LoadDocument<TDocument>(
+    public virtual async Task<TDocument?> LoadDocument<TDocument>(
         object id,
         CancellationToken cancellationToken = default)
     {
@@ -19,7 +19,7 @@ public class InMemoryProjectionStorage : IProjectionStorage
             default;
     }
 
-    public async Task Store(
+    public virtual async Task Store(
         IImmutableList<DocumentToStore> toUpsert,
         IImmutableList<DocumentToDelete> toDelete,
         CancellationToken cancellationToken = default)

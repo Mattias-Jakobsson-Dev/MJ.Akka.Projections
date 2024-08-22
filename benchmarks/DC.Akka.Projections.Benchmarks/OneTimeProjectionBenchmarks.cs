@@ -6,7 +6,7 @@ using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Loggers;
 using DC.Akka.Projections.Benchmarks.Columns;
 using DC.Akka.Projections.OneTime;
-using Hyperion.Internal;
+using JetBrains.Annotations;
 
 namespace DC.Akka.Projections.Benchmarks;
 

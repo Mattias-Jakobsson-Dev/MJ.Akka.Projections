@@ -63,6 +63,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
 
     private async Task<TDocument?> ProjectEvents(TDocument? document, IImmutableList<EventWithPosition> events)
     {
+        var documentToProject = document is IResetDocument<TDocument> reset ? reset.Reset() : document;
+        
         try
         {
             var result = await Retries
@@ -92,37 +94,34 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
 
         async Task<(TDocument? document, long? position)> RunProjections()
         {
-            var exists = document != null;
+            var exists = documentToProject != null;
 
             if (!events.Any())
-                return (document, null);
+                return (documentToProject, null);
 
             var wasHandled = false;
 
             foreach (var evnt in events)
             {
                 var (projectionResult, hasHandler) =
-                    await _configuration.HandleEvent(document, evnt.Event, evnt.Position ?? 0);
+                    await _configuration.HandleEvent(documentToProject, evnt.Event, evnt.Position ?? 0);
 
-                document = (TDocument?)projectionResult;
+                documentToProject = (TDocument?)projectionResult;
 
                 wasHandled = wasHandled || hasHandler;
             }
 
             if (!wasHandled) 
-                return (document, events.Select(x => x.Position).Max());
+                return (documentToProject, events.Select(x => x.Position).Max());
             
-            if (document != null)
+            if (documentToProject != null)
             {
                 await _configuration
                     .DocumentStorage
                     .Store(
                         ImmutableList.Create(
-                            new DocumentToStore(_id, document)),
+                            new DocumentToStore(_id, documentToProject)),
                         ImmutableList<DocumentToDelete>.Empty);
-
-                if (document is IResetDocument<TDocument> reset)
-                    document = reset.Reset();
             }
             else if (exists)
             {
@@ -133,7 +132,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
                         ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
             }
 
-            return (document, events.Select(x => x.Position).Max());
+            return (documentToProject, events.Select(x => x.Position).Max());
         }
     }
     

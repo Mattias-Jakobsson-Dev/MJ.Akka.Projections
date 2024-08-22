@@ -19,7 +19,7 @@ public class TestProjection<TId>(IImmutableList<object> events)
     : BaseProjection<TId, TestDocument<TId>> 
     where TId : notnull
 {
-    public static string GetName()
+    private static string GetName()
     {
         return $"TestProjectionOf{typeof(TId).Name}";
     }
