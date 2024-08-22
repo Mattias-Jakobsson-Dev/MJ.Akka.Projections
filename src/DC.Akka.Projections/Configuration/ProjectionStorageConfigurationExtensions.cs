@@ -6,15 +6,17 @@ public static class ProjectionStorageConfigurationExtensions
 {
     public static IConfigurePart<TConfig, BatchedProjectionStorage> Batched<TConfig, TStorage>(
         this IConfigurePart<TConfig, TStorage> source,
-        int batchSize = 100,
-        int parallelism = 1)
+        int parallelism = 1,
+        IStorageBatchingStrategy? batchingStrategy = null)
         where TConfig : ContinuousProjectionConfig
         where TStorage : IProjectionStorage
     {
+        batchingStrategy ??= new BatchSizeStorageBatchingStrategy(100);
+        
         return source
             .WithProjectionStorage(source.ItemUnderConfiguration.Batched(
                 source.ActorSystem,
-                batchSize,
-                parallelism));
+                parallelism,
+                batchingStrategy));
     }
 }

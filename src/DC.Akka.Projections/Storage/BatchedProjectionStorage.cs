@@ -9,25 +9,25 @@ namespace DC.Akka.Projections.Storage;
 public class BatchedProjectionStorage : IProjectionStorage
 {
     private readonly IProjectionStorage _innerStorage;
-    private readonly ISourceQueueWithComplete<PendingWrite> _writeQueue;
+    private readonly ISourceQueueWithComplete<IPendingWrite> _writeQueue;
     private readonly int _bufferSize;
 
     public BatchedProjectionStorage(
         ActorSystem actorSystem,
         IProjectionStorage innerStorage,
-        int batchSize,
-        int parallelism)
+        int parallelism,
+        IStorageBatchingStrategy batchingStrategy)
     {
         _innerStorage = innerStorage;
 
-        _bufferSize = batchSize * parallelism * 2;
+        _bufferSize = batchingStrategy.GetBufferSize(parallelism);
 
-        _writeQueue = Source
-            .Queue<PendingWrite>(_bufferSize, OverflowStrategy.Backpressure)
-            .Batch(
-                batchSize,
-                x => x,
-                (current, pending) => current.MergeWith(pending))
+        var queue = Source
+            .Queue<IPendingWrite>(_bufferSize, OverflowStrategy.Backpressure);
+
+        queue = batchingStrategy.GetStrategy(queue);
+
+        _writeQueue = queue
             .SelectAsync(
                 parallelism,
                 async write =>
@@ -42,7 +42,7 @@ public class BatchedProjectionStorage : IProjectionStorage
                     {
                         write.Fail(e);
                     }
-                    
+
                     return NotUsed.Instance;
                 })
             .ToMaterialized(Sink.Ignore<NotUsed>(), Keep.Left)
@@ -62,11 +62,11 @@ public class BatchedProjectionStorage : IProjectionStorage
         CancellationToken cancellationToken = default)
     {
         var promise = new TaskCompletionSource<NotUsed>(TaskCreationOptions.RunContinuationsAsynchronously);
-        
+
         _writeQueue.OfferAsync(new PendingWrite(
-            toUpsert,
-            toDelete,
-            promise))
+                toUpsert,
+                toDelete,
+                promise))
             .ContinueWith(
                 result =>
                 {
@@ -84,13 +84,13 @@ public class BatchedProjectionStorage : IProjectionStorage
                             case QueueOfferResult.Dropped:
                                 promise.TrySetException(new Exception(
                                     $"Failed to enqueue documents batch write, the queue buffer was full ({_bufferSize} elements)"));
-                                
+
                                 break;
 
                             case QueueOfferResult.QueueClosed:
                                 promise.TrySetException(new Exception(
                                     "Failed to enqueue documents batch write, the queue was closed."));
-                                
+
                                 break;
                         }
                     }
@@ -104,72 +104,5 @@ public class BatchedProjectionStorage : IProjectionStorage
                 scheduler: TaskScheduler.Default);
 
         return promise.Task;
-    }
-
-    private class PendingWrite
-    {
-        private readonly IImmutableList<TaskCompletionSource<NotUsed>> _completions;
-        
-        public PendingWrite(
-            IImmutableList<DocumentToStore> toUpsert,
-            IImmutableList<DocumentToDelete> toDelete,
-            TaskCompletionSource<NotUsed> completion) : this(
-            toUpsert,
-            toDelete,
-            ImmutableList.Create(completion))
-        {
-        }
-
-        private PendingWrite(
-            IImmutableList<DocumentToStore> toUpsert,
-            IImmutableList<DocumentToDelete> toDelete,
-            IImmutableList<TaskCompletionSource<NotUsed>> completions)
-        {
-            ToUpsert = toUpsert;
-            ToDelete = toDelete;
-            _completions = completions;
-        }
-        
-        public IImmutableList<DocumentToStore> ToUpsert { get; }
-        public IImmutableList<DocumentToDelete> ToDelete { get; }
-
-        public PendingWrite MergeWith(PendingWrite other)
-        {
-            return new PendingWrite(
-                Merge(ToUpsert, other.ToUpsert),
-                Merge(ToDelete, other.ToDelete),
-                _completions.AddRange(other._completions));
-        }
-
-        public void Completed()
-        {
-            foreach (var completion in _completions)
-                completion.TrySetResult(NotUsed.Instance);
-        }
-
-        public void Fail(Exception exception)
-        {
-            foreach (var completion in _completions)
-                completion.TrySetException(exception);
-        }
-
-        private static ImmutableList<T> Merge<T>(
-            IImmutableList<T> existing,
-            IImmutableList<T> newItems) where T : StorageDocument<T>
-        {
-            return existing
-                .AddRange(newItems)
-                .Aggregate(
-                    ImmutableList<T>.Empty,
-                    (current, item) =>
-                    {
-                        var existingItem = current
-                            .FirstOrDefault(x => x.Equals(item));
-
-                        return existingItem != null
-                            ? current.Remove(existingItem).Add(item)
-                            : current.Add(item);
-                    });
-        }
     }
 }
