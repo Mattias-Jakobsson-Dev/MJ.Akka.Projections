@@ -30,63 +30,6 @@ public static class ProjectionsCoordinator
     }
 }
 
-public interface IEventBatchingStrategy
-{
-    int GetParallelism();
-    
-    Source<IEnumerable<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source);
-}
-
-public class BatchEventBatchingStrategy(int batchSize, int parallelism) : IEventBatchingStrategy
-{
-    public static BatchEventBatchingStrategy Default { get; } = new(1_000, 100);
-    
-    public int GetParallelism()
-    {
-        return parallelism;
-    }
-
-    public Source<IEnumerable<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)
-    {
-        return source
-            .Batch(
-                batchSize,
-                ImmutableList.Create,
-                (current, item) => current.Add(item))
-            .Select(x => (IEnumerable<EventWithPosition>)x);
-    }
-}
-
-public interface IEventPositionBatchingStrategy
-{
-    Source<PositionData, NotUsed> Get(Source<PositionData, NotUsed> source);
-}
-
-public class NoBatchingPositionStrategy : IEventPositionBatchingStrategy
-{
-    public Source<PositionData, NotUsed> Get(Source<PositionData, NotUsed> source)
-    {
-        return source;
-    }
-}
-
-public class BatchWithinEventPositionBatchingStrategy(int maxItems, TimeSpan timeout) : IEventPositionBatchingStrategy
-{
-    public static BatchWithinEventPositionBatchingStrategy Default { get; } = new(10_000, TimeSpan.FromSeconds(10.0));
-    
-    public Source<PositionData, NotUsed> Get(Source<PositionData, NotUsed> source)
-    {
-        return source
-            .GroupedWithin(maxItems, timeout)
-            .Select(positions =>
-            {
-                var highestPosition = positions.Select(x => x.Position).MaxBy(y => y);
-
-                return new PositionData(highestPosition);
-            });
-    }
-}
-
 [PublicAPI]
 public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : notnull where TDocument : notnull
 {
