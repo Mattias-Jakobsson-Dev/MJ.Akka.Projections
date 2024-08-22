@@ -80,6 +80,11 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
 
     private class TestProjectionFactory : IKeepTrackOfProjectors
     {
+        public void Reset()
+        {
+            
+        }
+
         public Task<IProjectorProxy> GetProjector<TId, TDocument>(
             TId id,
             ProjectionConfiguration configuration)

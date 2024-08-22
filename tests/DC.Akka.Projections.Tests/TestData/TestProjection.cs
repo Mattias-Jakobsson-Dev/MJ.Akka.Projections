@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
@@ -15,8 +16,8 @@ public static class TestProjection
             .ToImmutableDictionary();
 }
 
-public class TestProjection<TId>(IImmutableList<object> events) 
-    : BaseProjection<TId, TestDocument<TId>> 
+public class TestProjection<TId>(IImmutableList<object> events)
+    : BaseProjection<TId, TestDocument<TId>>
     where TId : notnull
 {
     public override TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(5);
@@ -40,8 +41,8 @@ public class TestProjection<TId>(IImmutableList<object> events)
 
     public override ISetupProjection<TId, TestDocument<TId>> Configure(ISetupProjection<TId, TestDocument<TId>> config)
     {
-        var failures = new Dictionary<string, int>();
-        
+        var failures = new ConcurrentDictionary<TId, Dictionary<string, int>>();
+
         return config
             .TransformUsing<Events<TId>.TransformToMultipleEvents>(
                 evnt => evnt.Events.OfType<object>().ToImmutableList())
@@ -54,20 +55,8 @@ public class TestProjection<TId>(IImmutableList<object> events)
                         Id = evnt.DocId
                     };
 
-                    doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
-
-                    return doc;
-                })
-            .On<Events<TId>.SecondEvent>(
-                x => x.DocId,
-                (evnt, doc) =>
-                {
-                    doc ??= new TestDocument<TId>
-                    {
-                        Id = evnt.DocId
-                    };
-
-                    doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
+                    if (!evnt.AddUnique || !doc.HandledEvents.Contains(evnt.EventId))
+                        doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
 
                     return doc;
                 })
@@ -79,17 +68,22 @@ public class TestProjection<TId>(IImmutableList<object> events)
                     {
                         Id = evnt.DocId
                     };
-                    
-                    failures.TryAdd(evnt.FailureKey, 0);
 
-                    if (failures[evnt.FailureKey] < evnt.ConsecutiveFailures)
+                    var documentFailures = failures.GetOrAdd(
+                        evnt.DocId,
+                        _ => new Dictionary<string, int>());
+
+                    documentFailures.TryAdd(evnt.FailureKey, 0);
+
+                    if (documentFailures[evnt.FailureKey] < evnt.ConsecutiveFailures)
                     {
-                        failures[evnt.FailureKey]++;
+                        documentFailures[evnt.FailureKey]++;
 
                         throw evnt.FailWith;
                     }
-                    
-                    doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
+
+                    if (!evnt.AddUnique || !doc.HandledEvents.Contains(evnt.EventId))
+                        doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
 
                     return doc;
                 });

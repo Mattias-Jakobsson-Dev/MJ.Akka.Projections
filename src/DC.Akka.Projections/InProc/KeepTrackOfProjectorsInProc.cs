@@ -11,6 +11,16 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
 {
     private readonly ConcurrentDictionary<string, IActorRef> _coordinators = new();
 
+    public void Reset()
+    {
+        var coordinators = _coordinators.Values.ToImmutableList();
+
+        _coordinators.Clear();
+
+        foreach (var coordinator in coordinators)
+            actorSystem.Stop(coordinator);
+    }
+
     public Task<IProjectorProxy> GetProjector<TId, TDocument>(TId id, ProjectionConfiguration configuration)
         where TId : notnull where TDocument : notnull
     {
@@ -18,12 +28,12 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
             .GetOrAdd(
                 configuration.Name,
                 _ => actorSystem.ActorOf(Props.Create(() =>
-                    new InProcDocumentProjectionCoordinator<TId, TDocument>(passivationHandler, configuration)),
+                        new InProcDocumentProjectionCoordinator<TId, TDocument>(passivationHandler, configuration)),
                     $"in-proc-projector-{configuration.Name}"));
 
         return Task.FromResult<IProjectorProxy>(new InProcDocumentProjectorProxy<TId, TDocument>(id, coordinator));
     }
-    
+
     private class InProcDocumentProjectorProxy<TId, TDocument>(TId id, IActorRef coordinator) : IProjectorProxy
         where TId : notnull where TDocument : notnull
     {
@@ -46,9 +56,9 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
     {
         public static class Commands
         {
-            public record Project(TId Id, IImmutableList<EventWithPosition> Events, TimeSpan Timeout);   
+            public record Project(TId Id, IImmutableList<EventWithPosition> Events, TimeSpan Timeout);
         }
-        
+
         private static class InternalCommands
         {
             public record RemoveChild(string ChildId);
@@ -75,18 +85,15 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
 
                 _inProcessHandler[projectionId] = id;
 
-                var projectionRef = Context.Child(id);
-
-                if (projectionRef.IsNobody())
-                {
-                    projectionRef = Context.ActorOf(
+                var projectionRef = Context
+                    .Child(id)
+                    .GetOrElse(() => Context.ActorOf(
                         projectionConfiguration.GetProjection().CreateProjectionProps(cmd.Id),
-                        id);
-                }
+                        id));
 
                 var self = Self;
                 var sender = Sender;
-                
+
                 projectionRef
                     .Ask<Messages.IProjectEventsResponse>(
                         new DocumentProjection<TId, TDocument>.Commands.ProjectEvents(
@@ -97,7 +104,10 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
                     {
                         self.Tell(new InternalCommands.FinishedProjectingToChild(projectionId));
 
-                        sender.Tell(response.Result);
+                        sender.Tell(response.IsCompletedSuccessfully
+                            ? response.Result
+                            : new Messages.Reject(
+                                response.Exception ?? new Exception("Failure while projecting events")));
                     });
 
                 handlePassivation.SetAndMaybeRemove(

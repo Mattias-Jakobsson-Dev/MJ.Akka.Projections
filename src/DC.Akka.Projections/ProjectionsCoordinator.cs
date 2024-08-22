@@ -80,6 +80,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                 {
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Name, latestPosition);
 
+                    _configuration.ProjectorFactory.Reset();
+                    
                     if (_sequencer != null)
                         Context.Stop(_sequencer);
 
@@ -123,7 +125,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         })
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.StartProjectingResponse>(
                             sequencer,
-                            TimeSpan.FromMinutes(1),
+                            _configuration.GetProjection().ProjectionTimeout,
                             1)
                         .SelectAsync(
                             _configuration.ProjectionEventBatchingStrategy.GetParallelism(),
