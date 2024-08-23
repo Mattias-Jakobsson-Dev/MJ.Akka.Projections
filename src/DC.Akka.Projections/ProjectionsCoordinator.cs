@@ -81,7 +81,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Name, latestPosition);
 
                     _configuration.ProjectorFactory.Reset();
-                    
+
                     if (_sequencer != null)
                         Context.Stop(_sequencer);
 
@@ -95,51 +95,34 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                     var flow = _configuration
                         .ProjectionEventBatchingStrategy
                         .Get(source)
-                        .SelectMany(data =>
-                        {
-                            return data
-                                .SelectMany(x => _configuration
-                                    .TransformEvent(x.Event)
-                                    .Select(y => x with { Event = y }))
-                                .Select(x => new
-                                {
-                                    Event = x,
-                                    Id = _configuration.GetDocumentIdFrom(x.Event)
-                                })
-                                .GroupBy(x => x.Id)
-                                .Select(x => (
-                                    Events: x.Select(y => y.Event).ToImmutableList(),
-                                    Id: x.Key))
-                                .Select(x => new
-                                {
-                                    x.Events,
-                                    x.Id,
-                                    LowestEventNumber = !x.Events.IsEmpty
-                                        ? x.Events.Select(y => y.Position).Min()
-                                        : null
-                                })
-                                .OrderBy(x => x.LowestEventNumber)
-                                .Select(x => new ProjectionSequencer<TId, TDocument>.Commands.StartProjecting(
-                                    x.Id,
-                                    x.Events));
-                        })
+                        .Select(x =>
+                            new ProjectionSequencer<TId, TDocument>.Commands.StartProjecting(x.ToImmutableList()))
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.StartProjectingResponse>(
                             sequencer,
                             _configuration.GetProjection().ProjectionTimeout,
                             1)
+                        .SelectMany(x => x.Tasks)
                         .SelectAsync(
                             _configuration.ProjectionEventBatchingStrategy.GetParallelism(),
-                            async data =>
+                            async task =>
                             {
-                                var response = await data.Task;
+                                var response = await task.task;
 
                                 return response switch
                                 {
-                                    Messages.Acknowledge ack => new PositionData(ack.Position),
+                                    Messages.Acknowledge ack => (task.groupId, PositionData: new PositionData(ack.Position)),
                                     Messages.Reject nack => throw new Exception("Rejected projection", nack.Cause),
                                     _ => throw new Exception("Unknown projection response")
                                 };
-                            });
+                            })
+                        .Select(x => new ProjectionSequencer<TId, TDocument>.Commands.WaitForGroupToFinish(
+                            x.groupId,
+                            x.PositionData))
+                        .Ask<ProjectionSequencer<TId, TDocument>.Responses.WaitForGroupToFinishResponse>(
+                            sequencer,
+                            _configuration.GetProjection().ProjectionTimeout,
+                            1)
+                        .Select(x => x.PositionData);
 
                     return _configuration
                         .PositionBatchingStrategy

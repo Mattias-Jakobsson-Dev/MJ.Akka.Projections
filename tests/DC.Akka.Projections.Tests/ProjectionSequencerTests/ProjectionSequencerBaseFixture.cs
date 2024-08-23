@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using DC.Akka.Projections.Configuration;
@@ -29,6 +30,8 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
         var position = 1;
 
         var responses = new Dictionary<string, Task<Messages.IProjectEventsResponse>>();
+
+        var startedAt = Stopwatch.StartNew();
         
         foreach (var batch in batches.OrderBy(x => x.Value.sortOrder))
         {
@@ -36,17 +39,15 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
             
             var events = batch.Value.delays.Select((delay, index) =>
                     new EventWithPosition(
-                        new Events.DelayProcessingEvent(delay),
+                        new Events.DelayProcessingEvent(batch.Value.documentId, delay, startedAt),
                         currentPosition + index))
                 .ToImmutableList();
             
             var response = await sequencer
                 .Ask<ProjectionSequencer<string, TestDocument<string>>.Responses.StartProjectingResponse>(
-                    new ProjectionSequencer<string, TestDocument<string>>.Commands.StartProjecting(
-                        new DocumentId(batch.Value.documentId, true),
-                        events));
+                    new ProjectionSequencer<string, TestDocument<string>>.Commands.StartProjecting(events));
 
-            responses[batch.Key] = response.Task;
+            responses[batch.Key] = response.Tasks[0].task;
 
             position += batch.Value.delays.Count;
         }
@@ -99,26 +100,29 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
                 IImmutableList<EventWithPosition> events,
                 TimeSpan timeout)
             {
-                var startedAt = DateTimeOffset.Now;
-                
-                var delayTime = events
+                var delayEvent = events
                     .Select(x => x.Event)
                     .OfType<Events.DelayProcessingEvent>()
-                    .Select(x => x.Delay.Ticks)
-                    .Sum(x => x);
+                    .First();
 
-                await Task.Delay(TimeSpan.FromTicks(delayTime));
+                var timeSinceStarted = delayEvent.SinceCreated.Elapsed;
 
-                return new AckWithTime(startedAt, DateTimeOffset.Now);
+                await Task.Delay(delayEvent.Delay);
+
+                return new AckWithTime(
+                    timeSinceStarted,
+                    delayEvent.SinceCreated.Elapsed,
+                    events.GetHighestEventNumber());
             }
         }
     }
 
-    public record AckWithTime(DateTimeOffset StartedAt, DateTimeOffset CompletedAt) : Messages.IProjectEventsResponse;
+    public record AckWithTime(TimeSpan TimeSinceStarted, TimeSpan TimeSinceCompleted, long? Position) 
+        : Messages.Acknowledge(Position);
 
     private static class Events
     {
-        public record DelayProcessingEvent(TimeSpan Delay);
+        public record DelayProcessingEvent(string DocumentId, TimeSpan Delay, Stopwatch SinceCreated);
     }
     
     private class FakeEventHandler : IHandleEventInProjection<TestDocument<string>>
@@ -130,6 +134,9 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
 
         public DocumentId GetDocumentIdFrom(object evnt)
         {
+            if (evnt is Events.DelayProcessingEvent delayEvent)
+                return new DocumentId(delayEvent.DocumentId, true);
+
             return new DocumentId(null, false);
         }
 

@@ -22,18 +22,15 @@ public class When_projecting_slower_events_after_faster_events_for_same_id(
     }
 
     [Fact]
-    public void Then_first_task_should_finish_before_second_task()
-    {
-        fixture.FirstTaskResponse!.CompletedAt.Should().BeBefore(fixture.SecondTaskResponse!.CompletedAt);
-    }
-
-    [Fact]
-    public void Then_second_task_should_start_after_first_task_finished()
+    public void Then_first_task_should_finish_before_second_task_starts()
     {
         fixture
-            .SecondTaskResponse!.StartedAt
+            .FirstTaskResponse!
+            .TimeSinceCompleted
             .Should()
-            .BeAfter(fixture.FirstTaskResponse!.CompletedAt);
+            .BeLessThan(fixture
+                .SecondTaskResponse!
+                .TimeSinceStarted);
     }
 
     [PublicAPI]

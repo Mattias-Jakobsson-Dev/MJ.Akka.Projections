@@ -351,6 +351,50 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
         
         await VerifyDocument(id, document!, ImmutableList.Create(secondEvent));
     }
+
+    [Fact]
+    public async Task Projecting_three_events_in_same_group_with_parallelism_1()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+        
+        var documentId = Fixture.Create<TId>();
+
+        var events = ImmutableList.Create(
+            GetTestEvent(documentId),
+            GetTestEvent(documentId), 
+            GetTestEvent(documentId));
+        
+        var projection = GetProjection(events);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithEventBatchingStrategy(
+                    new BatchWithinEventBatchingStrategy(3, TimeSpan.FromSeconds(1), 1))
+                .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }))
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+
+        var position = await positionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(3);
+
+        var document = await projectionStorage.LoadDocument<TDocument>(documentId);
+
+        document.Should().NotBeNull();
+        
+        await VerifyDocument(documentId, document!, events);
+    }
     
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration> Configure(
         IHaveConfiguration<ProjectionSystemConfiguration> config)

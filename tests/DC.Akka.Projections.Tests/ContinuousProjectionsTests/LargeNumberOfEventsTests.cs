@@ -106,7 +106,8 @@ public class LargeNumberOfEventsTests : TestKit
                     .WithRestartSettings(RestartSettings.Create(TimeSpan.Zero, TimeSpan.Zero, 1))
                     .WithProjection(projection)
                     .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
-                    .WithProjectionStorage(projectionStorage))
+                    .WithProjectionStorage(projectionStorage)
+                    .WithEventBatchingStrategy(new NoEventBatchingStrategy(100)))
                 .WithModifiedConfig(conf =>
                 {
                     positionStorage = conf.PositionStorage!;
