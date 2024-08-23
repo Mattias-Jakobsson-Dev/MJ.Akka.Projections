@@ -101,7 +101,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                             sequencer,
                             _configuration.GetProjection().ProjectionTimeout,
                             1)
-                        .SelectMany(x => x.Tasks)
+                        .SelectMany(x => x.Tasks.OrderBy(y => y.sortOrder))
                         .SelectAsync(
                             _configuration.ProjectionEventBatchingStrategy.GetParallelism(),
                             async task =>

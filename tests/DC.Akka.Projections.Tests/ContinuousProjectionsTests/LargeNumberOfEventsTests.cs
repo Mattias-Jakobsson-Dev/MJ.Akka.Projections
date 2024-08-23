@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Akka.Streams;
 using Akka.TestKit.Xunit2;
@@ -67,8 +68,9 @@ public class LargeNumberOfEventsTests : TestKit
         int numberOfDocuments,
         int numberOfEvents,
         int failurePercentage,
-        Func<IHaveConfiguration<ProjectionSystemConfiguration>, IHaveConfiguration<ProjectionSystemConfiguration>>
-            configure,
+        Func<
+            IHaveConfiguration<ProjectionSystemConfiguration>,
+            IHaveConfiguration<ProjectionSystemConfiguration>> configure,
         IProjectionStorage projectionStorage)
     {
         var documentIds = Enumerable
@@ -99,6 +101,7 @@ public class LargeNumberOfEventsTests : TestKit
         var projection = new TestProjection<string>(events.OfType<object>().ToImmutableList());
 
         IProjectionPositionStorage positionStorage = null!;
+        ProjectionStorageWithEventStoredTracker usedProjectionStorageWithEventStoredTracker = null!;
 
         var coordinator = await Sys
             .Projections(config => configure(config
@@ -109,9 +112,15 @@ public class LargeNumberOfEventsTests : TestKit
                     .WithEventBatchingStrategy(new NoEventBatchingStrategy(100)))
                 .WithModifiedConfig(conf =>
                 {
+                    usedProjectionStorageWithEventStoredTracker =
+                        new ProjectionStorageWithEventStoredTracker(conf.ProjectionStorage!);
+
                     positionStorage = conf.PositionStorage!;
 
-                    return conf;
+                    return conf with
+                    {
+                        ProjectionStorage = usedProjectionStorageWithEventStoredTracker
+                    };
                 }))
             .Start();
 
@@ -120,8 +129,6 @@ public class LargeNumberOfEventsTests : TestKit
         var position = await positionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(numberOfEvents);
-
-        projection.HandledEvents.Should().HaveCount(numberOfEvents);
 
         foreach (var documentId in documentIds)
         {
@@ -137,6 +144,10 @@ public class LargeNumberOfEventsTests : TestKit
 
             document.HandledEvents.Should().BeEquivalentTo(documentEvents.Select(x => x.EventId));
         }
+
+        projection.HandledEvents.Should().HaveCount(numberOfEvents);
+
+        usedProjectionStorageWithEventStoredTracker.StoredEvents.Distinct().Should().HaveCount(numberOfEvents);
     }
 
     private class RandomFailureProjectionStorage(int failurePercentage) : InMemoryProjectionStorage
@@ -152,6 +163,35 @@ public class LargeNumberOfEventsTests : TestKit
                 throw new Exception("Random failure");
 
             return base.Store(toUpsert, toDelete, cancellationToken);
+        }
+    }
+
+    private class ProjectionStorageWithEventStoredTracker(IProjectionStorage innerStorage) : IProjectionStorage
+    {
+        public readonly ConcurrentBag<string> StoredEvents = [];
+
+        public Task<TDocument?> LoadDocument<TDocument>(object id, CancellationToken cancellationToken = default)
+        {
+            return innerStorage.LoadDocument<TDocument>(id, cancellationToken);
+        }
+
+        public Task Store(
+            IImmutableList<DocumentToStore> toUpsert,
+            IImmutableList<DocumentToDelete> toDelete,
+            CancellationToken cancellationToken = default)
+        {
+            var events = toUpsert
+                .Select(x => x.Document as TestDocument<string>)
+                .Where(x => x != null)
+                .SelectMany(x => x!.HandledEvents)
+                .ToImmutableList();
+
+            foreach (var evnt in events)
+            {
+                StoredEvents.Add(evnt);
+            }
+
+            return innerStorage.Store(toUpsert, toDelete, cancellationToken);
         }
     }
 }

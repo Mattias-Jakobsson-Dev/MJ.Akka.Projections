@@ -23,7 +23,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     public static class Responses
     {
         public record StartProjectingResponse(
-            IImmutableList<(Guid groupId, Guid taskId, Task<Messages.IProjectEventsResponse> task)> Tasks);
+            IImmutableList<(int sortOrder, Guid groupId, Guid taskId, Task<Messages.IProjectEventsResponse> task)> Tasks);
 
         public record WaitForGroupToFinishResponse(PositionData PositionData);
     }
@@ -45,10 +45,11 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
 
         Receive<Commands.StartProjecting>(cmd =>
         {
-            var tasks = new List<(Guid groupId, Guid taskId, Task<Messages.IProjectEventsResponse> task)>();
+            var tasks = new List<(int sortOrder, Guid groupId, Guid taskId, Task<Messages.IProjectEventsResponse> task)>();
 
             var groupedEvents = cmd
                 .Events
+                .OrderBy(x => x.Position ?? 0)
                 .SelectMany((x, index) => _configuration
                     .TransformEvent(x.Event)
                     .Select(y => new
@@ -72,6 +73,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                 {
                     x.Events,
                     x.Id,
+                    x.Index,
                     TaskId = Guid.NewGuid()
                 });
 
@@ -86,7 +88,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                 {
                     if (!groupedEvent.Id.IsUsable)
                     {
-                        tasks.Add((groupId, groupedEvent.TaskId, Task.FromResult<Messages.IProjectEventsResponse>(
+                        tasks.Add((groupedEvent.Index, groupId, groupedEvent.TaskId, Task.FromResult<Messages.IProjectEventsResponse>(
                             new Messages.Acknowledge(groupedEvent.Events.GetHighestEventNumber()))));
 
                         continue;
@@ -107,7 +109,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
 
                         _inprogressIds.Add(id);
 
-                        tasks.Add((groupId, groupedEvent.TaskId, task));
+                        tasks.Add((groupedEvent.Index, groupId, groupedEvent.TaskId, task));
                     }
                     else
                     {
@@ -125,7 +127,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
 
                         value.Enqueue((groupedEvent.Events, promise));
 
-                        tasks.Add((groupId, groupedEvent.TaskId, promise.Task));
+                        tasks.Add((groupedEvent.Index, groupId, groupedEvent.TaskId, promise.Task));
                     }
                 }
 
