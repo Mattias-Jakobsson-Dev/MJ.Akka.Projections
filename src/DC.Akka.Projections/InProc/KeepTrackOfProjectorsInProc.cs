@@ -63,10 +63,10 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
         {
             public record RemoveChild(string ChildId);
 
-            public record FinishedProjectingToChild(string ProjectionId);
+            public record FinishedProjectingToChild(Guid ProjectionId);
         }
 
-        private readonly Dictionary<string, string> _inProcessHandler = new();
+        private readonly Dictionary<Guid, string> _inProcessHandler = new();
         private readonly List<string> _waitingToBeRemoved = [];
 
         public InProcDocumentProjectionCoordinator(
@@ -81,7 +81,7 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
                         .IdToString(cmd.Id))
                     .ToString();
 
-                var projectionId = Guid.NewGuid().ToString();
+                var projectionId = Guid.NewGuid();
 
                 _inProcessHandler[projectionId] = id;
 

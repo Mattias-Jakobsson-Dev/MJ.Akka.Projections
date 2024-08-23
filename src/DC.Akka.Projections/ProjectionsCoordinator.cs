@@ -110,7 +110,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
                                 return response switch
                                 {
-                                    Messages.Acknowledge ack => (task.groupId, PositionData: new PositionData(ack.Position)),
+                                    Messages.Acknowledge ack => (task.groupId,
+                                        PositionData: new PositionData(ack.Position)),
                                     Messages.Reject nack => throw new Exception("Rejected projection", nack.Cause),
                                     _ => throw new Exception("Unknown projection response")
                                 };

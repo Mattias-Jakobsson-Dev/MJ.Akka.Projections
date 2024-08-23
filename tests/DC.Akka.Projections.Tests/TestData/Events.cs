@@ -4,7 +4,7 @@ namespace DC.Akka.Projections.Tests.TestData;
 
 public static class Events<TId>
 {
-    public record FirstEvent(TId DocId, string EventId, bool AddUnique = false) : IEvent;
+    public record FirstEvent(TId DocId, string EventId) : IEvent;
     
     public record UnHandledEvent(TId DocId);
 
@@ -15,8 +15,7 @@ public static class Events<TId>
         string EventId,
         string FailureKey,
         int ConsecutiveFailures,
-        Exception FailWith,
-        bool AddUnique = false) : IEvent;
+        Exception FailWith) : IEvent;
 
     public interface IEvent
     {

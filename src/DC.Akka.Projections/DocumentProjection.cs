@@ -91,7 +91,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
 
             var wasHandled = false;
 
-            foreach (var evnt in events)
+            foreach (var evnt in events.OrderBy(x => x.Position ?? 0))
             {
                 var (projectionResult, hasHandler) =
                     await _configuration.HandleEvent(documentToProject, evnt.Event, evnt.Position ?? 0);
@@ -102,7 +102,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
             }
 
             if (!wasHandled) 
-                return (documentToProject, events.Select(x => x.Position).Max());
+                return (documentToProject, events.GetHighestEventNumber());
             
             if (documentToProject != null)
             {
@@ -122,7 +122,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
                         ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
             }
 
-            return (documentToProject, events.Select(x => x.Position).Max());
+            return (documentToProject, events.GetHighestEventNumber());
         }
     }
     

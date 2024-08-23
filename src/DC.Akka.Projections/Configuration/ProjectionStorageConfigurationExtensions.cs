@@ -11,7 +11,7 @@ public static class ProjectionStorageConfigurationExtensions
         where TConfig : ContinuousProjectionConfig
         where TStorage : IProjectionStorage
     {
-        batchingStrategy ??= new BatchSizeStorageBatchingStrategy(100);
+        batchingStrategy ??= BatchedProjectionStorage.DefaultStrategy;
         
         return source
             .WithProjectionStorage(source.ItemUnderConfiguration.Batched(

@@ -13,4 +13,6 @@ public class ProjectionWithKeepingOneDocumentInMemoryTests(NormalTestKitActorSys
             .WithInProcProjectionFactory()
             .KeepLimitedInMemory(1);
     }
+
+    protected override TimeSpan ProjectionWaitTime { get; } = TimeSpan.FromSeconds(20);
 }

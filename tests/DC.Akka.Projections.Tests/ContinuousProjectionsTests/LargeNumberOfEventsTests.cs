@@ -89,11 +89,10 @@ public class LargeNumberOfEventsTests : TestKit
                         _fixture.Create<string>(),
                         _fixture.Create<string>(),
                         1,
-                        new Exception("Failed projection"),
-                        true);
+                        new Exception("Failed projection"));
                 }
 
-                return new Events<string>.FirstEvent(documentId, _fixture.Create<string>(), true);
+                return new Events<string>.FirstEvent(documentId, _fixture.Create<string>());
             })
             .ToImmutableList();
 
@@ -121,6 +120,8 @@ public class LargeNumberOfEventsTests : TestKit
         var position = await positionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(numberOfEvents);
+
+        projection.HandledEvents.Should().HaveCount(numberOfEvents);
 
         foreach (var documentId in documentIds)
         {

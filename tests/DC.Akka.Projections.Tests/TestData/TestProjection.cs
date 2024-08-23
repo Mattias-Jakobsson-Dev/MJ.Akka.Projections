@@ -22,6 +22,8 @@ public class TestProjection<TId>(IImmutableList<object> events)
 {
     public override TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(5);
 
+    public ConcurrentDictionary<string, Events<TId>.IEvent> HandledEvents { get; } = new();
+
     private static string GetName()
     {
         return $"TestProjectionOf{typeof(TId).Name}";
@@ -50,13 +52,14 @@ public class TestProjection<TId>(IImmutableList<object> events)
                 x => x.DocId,
                 (evnt, doc) =>
                 {
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                    
                     doc ??= new TestDocument<TId>
                     {
                         Id = evnt.DocId
                     };
 
-                    if (!evnt.AddUnique || !doc.HandledEvents.Contains(evnt.EventId))
-                        doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
+                    doc.AddHandledEvent(evnt.EventId);
 
                     return doc;
                 })
@@ -81,9 +84,14 @@ public class TestProjection<TId>(IImmutableList<object> events)
 
                         throw evnt.FailWith;
                     }
+                    
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
 
-                    if (!evnt.AddUnique || !doc.HandledEvents.Contains(evnt.EventId))
-                        doc.HandledEvents = doc.HandledEvents.Add(evnt.EventId);
+                    doc.AddHandledEvent(evnt.EventId);
+
+                    doc.PreviousEventFailures = doc.PreviousEventFailures.SetItem(
+                        evnt.EventId,
+                        documentFailures[evnt.FailureKey]);
 
                     return doc;
                 });

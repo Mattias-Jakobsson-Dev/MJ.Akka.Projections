@@ -93,7 +93,157 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
         document.Should().BeNull();
     }
+    
+    [Fact]
+    public async Task Projecting_event_where_storage_fails_once_with_restart_behaviour()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+        
+        var id = Fixture.Create<TId>();
 
+        var events = ImmutableList.Create(GetTestEvent(id));
+        var projection = GetProjection(events);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithRestartSettings(
+                        RestartSettings.Create(
+                                TimeSpan.Zero,
+                                TimeSpan.Zero,
+                                1)
+                            .WithMaxRestarts(5, TimeSpan.FromSeconds(10)))
+                    .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = new FailStorage(
+                        conf.ProjectionStorage!,
+                        ImmutableList.Create(new StorageFailures(
+                            _ => true,
+                            _ => false,
+                            _ => false,
+                            new Exception("Failure"))));
+                    
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf with
+                    {
+                        ProjectionStorage = projectionStorage
+                    };
+                }))
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+
+        var position = await positionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(1);
+
+        var document = await projectionStorage.LoadDocument<TDocument>(id);
+
+        document.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Projecting_where_storage_fails_once_without_restart_behaviour()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+        
+        var id = Fixture.Create<TId>();
+
+        var events = ImmutableList.Create(GetTestEvent(id));
+        var projection = GetProjection(events);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = new FailStorage(
+                        conf.ProjectionStorage!,
+                        ImmutableList.Create(new StorageFailures(
+                            _ => true,
+                            _ => false,
+                            _ => false,
+                            new Exception("Failure"))));
+                    
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf with
+                    {
+                        ProjectionStorage = projectionStorage
+                    };
+                }))
+            .Start();
+        
+        await coordinator
+            .Get(projection.Name)!
+            .WaitForCompletion(TimeSpan.FromSeconds(5))
+            .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
+
+        var position = await positionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().BeNull();
+
+        var document = await projectionStorage.LoadDocument<TDocument>(id);
+
+        document.Should().BeNull();
+    }
+    
+    [Fact]
+    public async Task Projecting_event_that_fails_once_and_storage_fails_once_with_restart_behaviour()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+        
+        var id = Fixture.Create<TId>();
+
+        var events = ImmutableList.Create(GetEventThatFails(id, 1));
+        var projection = GetProjection(events);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithRestartSettings(
+                        RestartSettings.Create(
+                                TimeSpan.Zero,
+                                TimeSpan.Zero,
+                                1)
+                            .WithMaxRestarts(5, TimeSpan.FromSeconds(10)))
+                    .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = new FailStorage(
+                        conf.ProjectionStorage!,
+                        ImmutableList.Create(new StorageFailures(
+                            _ => true,
+                            _ => false,
+                            _ => false,
+                            new Exception("Failure"))));
+                    
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf with
+                    {
+                        ProjectionStorage = projectionStorage
+                    };
+                }))
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+
+        var position = await positionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(1);
+
+        var document = await projectionStorage.LoadDocument<TDocument>(id);
+
+        document.Should().NotBeNull();
+    }
+    
     [Fact]
     public async Task Projecting_transformation_to_two_events_for_one_document()
     {
@@ -132,7 +282,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
         document.Should().NotBeNull();
         
-        await VerifyDocument(id, document!, events);
+        await VerifyDocument(id, document!, events, projection);
     }
 
     [Fact]
@@ -176,13 +326,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
         firstDocument.Should().NotBeNull();
         
-        await VerifyDocument(firstId, firstDocument!, events);
+        await VerifyDocument(firstId, firstDocument!, events, projection);
         
         var secondDocument = await projectionStorage.LoadDocument<TDocument>(secondId);
 
         secondDocument.Should().NotBeNull();
         
-        await VerifyDocument(secondId, secondDocument!, events);
+        await VerifyDocument(secondId, secondDocument!, events, projection);
     }
 
     [Fact]
@@ -259,7 +409,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
         document.Should().NotBeNull();
         
-        await VerifyDocument(id, document!, events);
+        await VerifyDocument(id, document!, events, projection);
     }
     
     [Fact]
@@ -300,13 +450,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
         firstDocument.Should().NotBeNull();
         
-        await VerifyDocument(firstId, firstDocument!, events);
+        await VerifyDocument(firstId, firstDocument!, events, projection);
         
         var secondDocument = await projectionStorage.LoadDocument<TDocument>(secondId);
 
         secondDocument.Should().NotBeNull();
         
-        await VerifyDocument(secondId, secondDocument!, events);
+        await VerifyDocument(secondId, secondDocument!, events, projection);
     }
 
     [Fact]
@@ -349,7 +499,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
         document.Should().NotBeNull();
         
-        await VerifyDocument(id, document!, ImmutableList.Create(secondEvent));
+        await VerifyDocument(id, document!, ImmutableList.Create(secondEvent), projection);
     }
 
     [Fact]
@@ -393,7 +543,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
         document.Should().NotBeNull();
         
-        await VerifyDocument(documentId, document!, events);
+        await VerifyDocument(documentId, document!, events, projection);
     }
     
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration> Configure(
@@ -412,5 +562,77 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
     protected abstract object GetUnMatchedEvent(TId documentId);
 
-    protected abstract Task VerifyDocument(TId documentId, TDocument document, IImmutableList<object> events);
+    protected abstract Task VerifyDocument(
+        TId documentId,
+        TDocument document,
+        IImmutableList<object> events,
+        IProjection projection);
+    
+    protected class FailStorage(
+        IProjectionStorage innerStorage,
+        IImmutableList<StorageFailures> failures) : IProjectionStorage
+    {
+        public Task<T?> LoadDocument<T>(object id, CancellationToken cancellationToken = default)
+        {
+            foreach (var failure in failures)
+                failure.MaybeFail(id);
+            
+            return innerStorage.LoadDocument<T>(id, cancellationToken);
+        }
+
+        public Task Store(
+            IImmutableList<DocumentToStore> toUpsert,
+            IImmutableList<DocumentToDelete> toDelete,
+            CancellationToken cancellationToken = default)
+        {
+            foreach (var failure in failures)
+                failure.MaybeFail(toUpsert, toDelete);
+
+            return innerStorage.Store(toUpsert, toDelete, cancellationToken);
+        }
+    }
+    
+    protected class StorageFailures(
+        Func<DocumentToStore, bool> checkUpsertFailure,
+        Func<DocumentToDelete, bool> checkDeleteFailure,
+        Func<object, bool> checkLoadFailure,
+        Exception failWith)
+    {
+        private readonly object _lock = new { };
+        private bool _hasFailed;
+
+        public void MaybeFail(
+            IImmutableList<DocumentToStore> toUpsert,
+            IImmutableList<DocumentToDelete> toDelete)
+        {
+            if (_hasFailed)
+                return;
+
+            lock (_lock)
+            {
+                if (!toUpsert.Any(checkUpsertFailure) && !toDelete.Any(checkDeleteFailure)) 
+                    return;
+                
+                _hasFailed = true;
+
+                throw failWith;
+            }
+        }
+
+        public void MaybeFail(object idToLoad)
+        {
+            if (_hasFailed)
+                return;
+
+            lock (_lock)
+            {
+                if (!checkLoadFailure(idToLoad))
+                    return;
+
+                _hasFailed = true;
+
+                throw failWith;
+            }
+        }
+    }
 }

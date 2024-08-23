@@ -8,9 +8,10 @@ namespace DC.Akka.Projections.Storage;
 
 public class BatchedProjectionStorage : IProjectionStorage
 {
+    public static IStorageBatchingStrategy DefaultStrategy { get; } = new BatchSizeStorageBatchingStrategy(100);
+    
     private readonly IProjectionStorage _innerStorage;
     private readonly ISourceQueueWithComplete<IPendingWrite> _writeQueue;
-    private readonly int _bufferSize;
 
     public BatchedProjectionStorage(
         ActorSystem actorSystem,
@@ -20,10 +21,8 @@ public class BatchedProjectionStorage : IProjectionStorage
     {
         _innerStorage = innerStorage;
 
-        _bufferSize = batchingStrategy.GetBufferSize(parallelism);
-
         var queue = Source
-            .Queue<IPendingWrite>(_bufferSize, OverflowStrategy.Backpressure);
+            .Queue<IPendingWrite>(int.MaxValue, OverflowStrategy.Backpressure);
 
         queue = batchingStrategy.GetStrategy(queue);
 
@@ -63,10 +62,7 @@ public class BatchedProjectionStorage : IProjectionStorage
     {
         var promise = new TaskCompletionSource<NotUsed>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        _writeQueue.OfferAsync(new PendingWrite(
-                toUpsert,
-                toDelete,
-                promise))
+        _writeQueue.OfferAsync(new PendingWrite(toUpsert, toDelete, promise))
             .ContinueWith(
                 result =>
                 {
@@ -83,7 +79,7 @@ public class BatchedProjectionStorage : IProjectionStorage
                                 break;
                             case QueueOfferResult.Dropped:
                                 promise.TrySetException(new Exception(
-                                    $"Failed to enqueue documents batch write, the queue buffer was full ({_bufferSize} elements)"));
+                                    $"Failed to enqueue documents batch write, the queue buffer was full"));
 
                                 break;
 
