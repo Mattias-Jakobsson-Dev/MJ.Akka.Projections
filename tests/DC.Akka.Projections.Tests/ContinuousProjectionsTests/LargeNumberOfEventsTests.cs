@@ -30,6 +30,22 @@ public class LargeNumberOfEventsTests : TestKit
             x => x.WithRestartSettings(null),
             new InMemoryProjectionStorage());
     }
+    
+    [Theory]
+    [InlineData(50, 1_000)]
+    [InlineData(100, 1_000)]
+    public Task Handling_events_without_failures_with_batched_storage(
+        int numberOfDocuments,
+        int numberOfEvents)
+    {
+        return RunTest(
+            numberOfDocuments,
+            numberOfEvents,
+            0,
+            x => x.WithRestartSettings(null),
+            new InMemoryProjectionStorage()
+                .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
+    }
 
     [Theory]
     [InlineData(50, 1_000, 1)]

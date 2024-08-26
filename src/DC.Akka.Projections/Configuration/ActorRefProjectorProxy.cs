@@ -8,10 +8,17 @@ public class ActorRefProjectorProxy<TId, TDocument>(TId id, IActorRef projector)
 {
     public Task<Messages.IProjectEventsResponse> ProjectEvents(
         IImmutableList<EventWithPosition> events,
-        TimeSpan timeout)
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         return projector.Ask<Messages.IProjectEventsResponse>(
             new DocumentProjection<TId, TDocument>.Commands.ProjectEvents(id, events),
-            timeout);
+            timeout,
+            cancellationToken);
+    }
+
+    public void StopAllInProgress()
+    {
+        projector.Tell(new DocumentProjection<TId, TDocument>.Commands.StopInProcessEvents(id));
     }
 }

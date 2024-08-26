@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
 using DC.Akka.Projections.Storage;
@@ -15,7 +16,7 @@ public class BatchedProjectionStorageTests : TestKit
     [Fact]
     public async Task Ensure_multiple_concurrent_writes_with_batch_size_strategy()
     {
-        var innerStorage = new StorageWithDelay();
+        var innerStorage = new StorageWithDelay(TimeSpan.FromMilliseconds(100));
 
         var batchedStorage = innerStorage
             .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(5));
@@ -39,7 +40,7 @@ public class BatchedProjectionStorageTests : TestKit
     [Fact]
     public async Task Ensure_multiple_concurrent_writes_with_batch_within_strategy()
     {
-        var innerStorage = new StorageWithDelay();
+        var innerStorage = new StorageWithDelay(TimeSpan.FromMilliseconds(100));
 
         var batchedStorage = innerStorage
             .Batched(Sys, 1, new BufferWithinStorageBatchingStrategy(10, TimeSpan.FromMilliseconds(200)));
@@ -59,8 +60,75 @@ public class BatchedProjectionStorageTests : TestKit
 
         innerStorage.NumberOfWrites.Should().Be(1);
     }
+
+    [Fact]
+    public async Task Ensure_cancellation_token_cancels_write()
+    {
+        var innerStorage = new StorageWithDelay(TimeSpan.FromSeconds(10));
+        
+        var batchedStorage = innerStorage
+            .Batched(Sys, 1, new NoStorageBatchingStrategy());
+        
+        var cancellationTokenSource = new CancellationTokenSource();
+        
+        var id = _fixture.Create<string>();
+
+        var task = batchedStorage
+            .Store(
+                ImmutableList.Create(new DocumentToStore(id, new TestDocument<string>
+                {
+                    Id = id
+                })),
+                ImmutableList<DocumentToDelete>.Empty,
+                cancellationTokenSource.Token);
+        
+        await cancellationTokenSource.CancelAsync();
+        
+        await task
+            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+    }
     
-    private class StorageWithDelay : IProjectionStorage
+    [Fact]
+    public async Task Ensure_cancellation_token_cancels_two_writes()
+    {
+        var innerStorage = new StorageWithDelay(TimeSpan.FromSeconds(10));
+        
+        var batchedStorage = innerStorage
+            .Batched(Sys, 1, new NoStorageBatchingStrategy());
+        
+        var cancellationTokenSource = new CancellationTokenSource();
+        
+        var firstId = _fixture.Create<string>();
+        var secondId = _fixture.Create<string>();
+
+        var firstTask = batchedStorage
+            .Store(
+                ImmutableList.Create(new DocumentToStore(firstId, new TestDocument<string>
+                {
+                    Id = firstId
+                })),
+                ImmutableList<DocumentToDelete>.Empty,
+                cancellationTokenSource.Token);
+        
+        var secondTask = batchedStorage
+            .Store(
+                ImmutableList.Create(new DocumentToStore(secondId, new TestDocument<string>
+                {
+                    Id = secondId
+                })),
+                ImmutableList<DocumentToDelete>.Empty,
+                cancellationTokenSource.Token);
+        
+        await cancellationTokenSource.CancelAsync();
+        
+        await firstTask
+            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+        
+        await secondTask
+            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+    }
+    
+    private class StorageWithDelay(TimeSpan delay) : IProjectionStorage
     {
         private readonly object _lock = new { };
         
@@ -77,7 +145,7 @@ public class BatchedProjectionStorageTests : TestKit
             IImmutableList<DocumentToDelete> toDelete,
             CancellationToken cancellationToken = default)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+            await Task.Delay(delay, cancellationToken);
 
             await _storage.Store(toUpsert, toDelete, cancellationToken);
 

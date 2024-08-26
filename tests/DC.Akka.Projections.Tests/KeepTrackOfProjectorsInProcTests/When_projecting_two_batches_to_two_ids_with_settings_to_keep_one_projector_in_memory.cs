@@ -68,10 +68,16 @@ public class When_projecting_two_batches_to_two_ids_with_settings_to_keep_one_pr
             var secondProjector = await factory.GetProjector<string, object>(secondId, projectionConfiguration);
 
             FirstResponse = await firstProjector
-                .ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 1)), TimeSpan.FromSeconds(5));
+                .ProjectEvents(
+                    ImmutableList.Create(new EventWithPosition(new { }, 1)), 
+                    TimeSpan.FromSeconds(5),
+                    CancellationToken.None);
             
             SecondResponse = await secondProjector
-                .ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 2)), TimeSpan.FromSeconds(5));
+                .ProjectEvents(
+                    ImmutableList.Create(new EventWithPosition(new { }, 2)), 
+                    TimeSpan.FromSeconds(5),
+                    CancellationToken.None);
 
             var firstProjectorId = MurmurHash.StringHash(firstId).ToString();
             var secondProjectorId = MurmurHash.StringHash(secondId).ToString();

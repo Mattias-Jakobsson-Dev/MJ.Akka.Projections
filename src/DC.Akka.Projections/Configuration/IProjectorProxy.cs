@@ -6,5 +6,8 @@ public interface IProjectorProxy
 {
     Task<Messages.IProjectEventsResponse> ProjectEvents(
         IImmutableList<EventWithPosition> events,
-        TimeSpan timeout);
+        TimeSpan timeout,
+        CancellationToken cancellationToken);
+
+    void StopAllInProgress();
 }

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
 using DC.Akka.Projections.Storage;
@@ -123,6 +124,29 @@ public abstract class ProjectionStorageTests<TId, TDocument> : TestKit where TId
                 ImmutableList.Create(new DocumentToDelete(id, typeof(TDocument))));
         
         var document = await storage.LoadDocument<TDocument>(id);
+
+        document.Should().BeNull();
+    }
+
+    [Fact]
+    public virtual async Task WriteWithCancelledTask()
+    {
+        var storage = GetStorage();
+
+        var id = CreateRandomId();
+        
+        var cancellationTokenSource = new CancellationTokenSource();
+
+        await cancellationTokenSource.CancelAsync();
+
+        await storage
+            .Store(
+                ImmutableList<DocumentToStore>.Empty,
+                ImmutableList.Create(new DocumentToDelete(id, typeof(TDocument))), 
+                cancellationTokenSource.Token)
+            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+        
+        var document = await storage.LoadDocument<TDocument>(id, CancellationToken.None);
 
         document.Should().BeNull();
     }

@@ -24,21 +24,44 @@ public class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument>
         _transformers = transformers;
     }
 
-    public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
-        Func<TProjectedEvent, TId> getId,
-        Func<TProjectedEvent, TDocument?, long, Task<TDocument?>> handler,
-        Func<IProjectionFilterSetup<TDocument, TProjectedEvent>,
-            IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
+    public ISetupProjection<TId, TDocument> On<TEvent>(
+        Func<TEvent, TId> getId,
+        Func<TEvent, TDocument?, long, Task<TDocument?>> handler,
+        Func<IProjectionFilterSetup<TDocument, TEvent>,
+            IProjectionFilterSetup<TDocument, TEvent>>? filter)
     {
-        IProjectionFilterSetup<TDocument, TProjectedEvent> projectionFilterSetup
-            = ProjectionFilterSetup<TDocument, TProjectedEvent>.Create();
+        return On(
+            getId, 
+            (evnt, doc, position, _) => handler(evnt, doc, position),
+            filter);
+    }
+
+    public ISetupProjection<TId, TDocument> On<TEvent>(
+        Func<TEvent, TId> getId,
+        Func<TEvent, TDocument?, CancellationToken, Task<TDocument?>> handler,
+        Func<IProjectionFilterSetup<TDocument, TEvent>, IProjectionFilterSetup<TDocument, TEvent>>? filter = null)
+    {
+        return On(
+            getId, 
+            (evnt, doc, _, cancellationToken) => handler(evnt, doc, cancellationToken),
+            filter);
+    }
+
+    public ISetupProjection<TId, TDocument> On<TEvent>(
+        Func<TEvent, TId> getId, 
+        Func<TEvent, TDocument?, long, CancellationToken, Task<TDocument?>> handler,
+        Func<IProjectionFilterSetup<TDocument, TEvent>, IProjectionFilterSetup<TDocument, TEvent>>? filter = null)
+    {
+        IProjectionFilterSetup<TDocument, TEvent> projectionFilterSetup
+            = ProjectionFilterSetup<TDocument, TEvent>.Create();
 
         projectionFilterSetup = filter?.Invoke(projectionFilterSetup) ?? projectionFilterSetup;
 
         return new SetupProjection<TId, TDocument>(
-            _handlers.SetItem(typeof(TProjectedEvent), new Handler(
-                evnt => getId((TProjectedEvent)evnt),
-                (evnt, doc, position) => handler((TProjectedEvent)evnt, doc, position),
+            _handlers.SetItem(typeof(TEvent), new Handler(
+                evnt => getId((TEvent)evnt),
+                (evnt, doc, position, cancellationToken) =>
+                    handler((TEvent)evnt, doc, position, cancellationToken),
                 projectionFilterSetup.Build())),
             _transformers);
     }
@@ -51,7 +74,7 @@ public class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument>
     {
         return On(
             getId,
-            (evnt, doc, _) => handler(evnt, doc),
+            (evnt, doc, _, _) => handler(evnt, doc),
             filter);
     }
 
@@ -94,7 +117,7 @@ public class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument>
 
     private record Handler(
         Func<object, TId> GetId,
-        Func<object, TDocument?, long, Task<TDocument?>> Handle,
+        Func<object, TDocument?, long, CancellationToken, Task<TDocument?>> Handle,
         IProjectionFilter<TDocument> Filter);
 
     private class EventHandler(
@@ -140,7 +163,8 @@ public class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument>
         public async Task<(TDocument? document, bool hasHandler)> Handle(
             TDocument? document,
             object evnt,
-            long position)
+            long position,
+            CancellationToken cancellationToken)
         {
             var typesToCheck = evnt.GetType().GetInheritedTypes();
 
@@ -154,7 +178,7 @@ public class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument>
                 if (!handler.Filter.FilterDocument(document))
                     return (document, handled);
 
-                document = await handler.Handle(evnt, document, position);
+                document = await handler.Handle(evnt, document, position, cancellationToken);
 
                 handled = true;
             }

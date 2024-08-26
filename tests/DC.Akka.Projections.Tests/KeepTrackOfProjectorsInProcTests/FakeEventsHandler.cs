@@ -14,7 +14,11 @@ public class FakeEventsHandler : IHandleEventInProjection<object>
         return new DocumentId(null, false);
     }
 
-    public Task<(object? document, bool hasHandler)> Handle(object? document, object evnt, long position)
+    public Task<(object? document, bool hasHandler)> Handle(
+        object? document,
+        object evnt,
+        long position,
+        CancellationToken cancellationToken)
     {
         return Task.FromResult<(object? document, bool hasHandler)>((document, false));
     }

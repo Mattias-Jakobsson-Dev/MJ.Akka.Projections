@@ -47,9 +47,14 @@ public class ProjectionConfiguration<TId, TDocument>(
     public override async Task<(object? document, bool hasHandler)> HandleEvent(
         object? document,
         object evnt,
-        long position)
+        long position,
+        CancellationToken cancellationToken)
     {
-        var response = await eventsHandler.Handle((TDocument?)document, evnt, position);
+        var response = await eventsHandler.Handle(
+            (TDocument?)document,
+            evnt, 
+            position,
+            cancellationToken);
 
         return response;
     }
@@ -93,5 +98,6 @@ public abstract class ProjectionConfiguration(
     public abstract Task<(object? document, bool hasHandler)> HandleEvent(
         object? document,
         object evnt,
-        long position);
+        long position,
+        CancellationToken cancellationToken);
 }

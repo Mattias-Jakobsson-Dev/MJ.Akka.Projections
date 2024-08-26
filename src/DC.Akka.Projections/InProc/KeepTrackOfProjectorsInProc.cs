@@ -39,15 +39,22 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
     {
         public Task<Messages.IProjectEventsResponse> ProjectEvents(
             IImmutableList<EventWithPosition> events,
-            TimeSpan timeout)
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
         {
             return coordinator
-                .Ask<Messages.IProjectEventsResponse>(
-                    new InProcDocumentProjectionCoordinator<TId, TDocument>.Commands.Project(
+                .Ask<Messages.IProjectEventsResponse>(new InProcDocumentProjectionCoordinator<TId, TDocument>.Commands.Project(
                         id,
                         events,
-                        timeout),
-                    timeout);
+                        timeout), 
+                    timeout, 
+                    cancellationToken);
+        }
+
+        public void StopAllInProgress()
+        {
+            coordinator
+                .Tell(new InProcDocumentProjectionCoordinator<TId, TDocument>.Commands.StopInProcessEvents(id));
         }
     }
 
@@ -56,7 +63,12 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
     {
         public static class Commands
         {
-            public record Project(TId Id, IImmutableList<EventWithPosition> Events, TimeSpan Timeout);
+            public record Project(
+                TId Id,
+                IImmutableList<EventWithPosition> Events,
+                TimeSpan Timeout);
+            
+            public record StopInProcessEvents(TId Id);
         }
 
         private static class InternalCommands
@@ -151,6 +163,18 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
 
                     _waitingToBeRemoved.Remove(childId);
                 }
+            });
+
+            Receive<Commands.StopInProcessEvents>(cmd =>
+            {
+                var id = MurmurHash.StringHash(projectionConfiguration
+                        .IdToString(cmd.Id))
+                    .ToString();
+                
+                var projectionRef = Context.Child(id);
+
+                if (!projectionRef.IsNobody())
+                    projectionRef.Tell(new DocumentProjection<TId, TDocument>.Commands.StopInProcessEvents(cmd.Id));
             });
         }
     }

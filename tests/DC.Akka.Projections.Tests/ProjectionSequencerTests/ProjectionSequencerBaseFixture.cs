@@ -23,7 +23,8 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
                 null,
                 BatchEventBatchingStrategy.Default,
                 BatchWithinEventPositionBatchingStrategy.Default,
-                new FakeEventHandler()));
+                new FakeEventHandler()),
+            CancellationToken.None);
 
         var batches = SetupBatches();
 
@@ -45,7 +46,8 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
             
             var response = await sequencer
                 .Ask<ProjectionSequencer<string, TestDocument<string>>.Responses.StartProjectingResponse>(
-                    new ProjectionSequencer<string, TestDocument<string>>.Commands.StartProjecting(events));
+                    new ProjectionSequencer<string, TestDocument<string>>.Commands.StartProjecting(
+                        events));
 
             responses[batch.Key] = response.Tasks[0].task;
 
@@ -98,7 +100,8 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
         {
             public async Task<Messages.IProjectEventsResponse> ProjectEvents(
                 IImmutableList<EventWithPosition> events,
-                TimeSpan timeout)
+                TimeSpan timeout,
+                CancellationToken cancellationToken)
             {
                 var delayEvent = events
                     .Select(x => x.Event)
@@ -107,12 +110,17 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
 
                 var timeSinceStarted = delayEvent.SinceCreated.Elapsed;
 
-                await Task.Delay(delayEvent.Delay);
+                await Task.Delay(delayEvent.Delay, cancellationToken);
 
                 return new AckWithTime(
                     timeSinceStarted,
                     delayEvent.SinceCreated.Elapsed,
                     events.GetHighestEventNumber());
+            }
+
+            public void StopAllInProgress()
+            {
+                
             }
         }
     }
@@ -143,7 +151,8 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
         public Task<(TestDocument<string>? document, bool hasHandler)> Handle(
             TestDocument<string>? document,
             object evnt,
-            long position)
+            long position,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult((document, false));
         }

@@ -10,37 +10,50 @@ internal class PendingWrite : IPendingWrite
     public static PendingWrite Empty { get; } = new(
         ImmutableList<DocumentToStore>.Empty,
         ImmutableList<DocumentToDelete>.Empty,
-        ImmutableList<TaskCompletionSource<NotUsed>>.Empty);
+        ImmutableList<TaskCompletionSource<NotUsed>>.Empty,
+        CancellationToken.None);
 
     public PendingWrite(
         IImmutableList<DocumentToStore> toUpsert,
         IImmutableList<DocumentToDelete> toDelete,
-        TaskCompletionSource<NotUsed> completion) : this(
+        TaskCompletionSource<NotUsed> completion,
+        CancellationToken cancellationToken) : this(
         toUpsert,
         toDelete,
-        ImmutableList.Create(completion))
+        ImmutableList.Create(completion),
+        cancellationToken)
     {
     }
 
     private PendingWrite(
         IImmutableList<DocumentToStore> toUpsert,
         IImmutableList<DocumentToDelete> toDelete,
-        IImmutableList<TaskCompletionSource<NotUsed>> completions)
+        IImmutableList<TaskCompletionSource<NotUsed>> completions,
+        CancellationToken cancellationToken)
     {
         ToUpsert = toUpsert;
         ToDelete = toDelete;
         _completions = completions;
+        CancellationToken = cancellationToken;
     }
-
+    
     public IImmutableList<DocumentToStore> ToUpsert { get; }
     public IImmutableList<DocumentToDelete> ToDelete { get; }
+    public CancellationToken CancellationToken { get; }
 
     public IPendingWrite MergeWith(IPendingWrite other)
     {
+        var cancellationToken = CancellationToken == other.CancellationToken
+            ? CancellationToken
+            : CancellationTokenSource
+                .CreateLinkedTokenSource(CancellationToken, other.CancellationToken)
+                .Token;
+        
         return new PendingWrite(
             Merge(ToUpsert, other.ToUpsert),
             Merge(ToDelete, other.ToDelete),
-            _completions.AddRange(other.GetCompletions()));
+            _completions.AddRange(other.GetCompletions()),
+            cancellationToken);
     }
 
     public void Completed()

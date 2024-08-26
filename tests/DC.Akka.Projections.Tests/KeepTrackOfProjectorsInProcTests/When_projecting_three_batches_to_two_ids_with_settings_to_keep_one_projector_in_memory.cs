@@ -76,13 +76,22 @@ public class When_projecting_three_batches_to_two_ids_with_settings_to_keep_one_
             var thirdProjector = await factory.GetProjector<string, object>(firstId, projectionConfiguration);
 
             FirstResponse = await firstProjector
-                .ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 1)), TimeSpan.FromSeconds(5));
+                .ProjectEvents(
+                    ImmutableList.Create(new EventWithPosition(new { }, 1)),
+                    TimeSpan.FromSeconds(5),
+                    CancellationToken.None);
             
             SecondResponse = await secondProjector
-                .ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 2)), TimeSpan.FromSeconds(5));
+                .ProjectEvents(
+                    ImmutableList.Create(new EventWithPosition(new { }, 2)), 
+                    TimeSpan.FromSeconds(5),
+                    CancellationToken.None);
             
             ThirdResponse = await thirdProjector
-                .ProjectEvents(ImmutableList.Create(new EventWithPosition(new { }, 3)), TimeSpan.FromSeconds(5));
+                .ProjectEvents(
+                    ImmutableList.Create(new EventWithPosition(new { }, 3)), 
+                    TimeSpan.FromSeconds(5),
+                    CancellationToken.None);
 
             var firstProjectorId = MurmurHash.StringHash(firstId).ToString();
             var secondProjectorId = MurmurHash.StringHash(secondId).ToString();

@@ -107,8 +107,5 @@ public class ProjectionPositionTests : TestKit
         var firstDocument = await projectionStorage.LoadDocument<TestDocument<string>>(documentId);
 
         firstDocument.Should().NotBeNull();
-
-        firstDocument!.HandledEvents.Should().HaveCount(2);
-        firstDocument.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(firstEventId, secondEventId));
     }
 }

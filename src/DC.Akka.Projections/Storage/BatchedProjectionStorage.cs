@@ -33,7 +33,9 @@ public class BatchedProjectionStorage : IProjectionStorage
                 {
                     try
                     {
-                        await _innerStorage.Store(write.ToUpsert, write.ToDelete);
+                        write.CancellationToken.ThrowIfCancellationRequested();
+                        
+                        await _innerStorage.Store(write.ToUpsert, write.ToDelete, write.CancellationToken);
 
                         write.Completed();
                     }
@@ -62,7 +64,7 @@ public class BatchedProjectionStorage : IProjectionStorage
     {
         var promise = new TaskCompletionSource<NotUsed>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        _writeQueue.OfferAsync(new PendingWrite(toUpsert, toDelete, promise))
+        _writeQueue.OfferAsync(new PendingWrite(toUpsert, toDelete, promise, cancellationToken))
             .ContinueWith(
                 result =>
                 {
@@ -79,7 +81,7 @@ public class BatchedProjectionStorage : IProjectionStorage
                                 break;
                             case QueueOfferResult.Dropped:
                                 promise.TrySetException(new Exception(
-                                    $"Failed to enqueue documents batch write, the queue buffer was full"));
+                                    "Failed to enqueue documents batch write, the queue buffer was full"));
 
                                 break;
 

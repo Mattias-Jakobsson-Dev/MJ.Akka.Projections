@@ -14,6 +14,8 @@ public class InMemoryProjectionStorage : IProjectionStorage
         object id,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         return Documents.TryGetValue(id, out var data) 
             ? (TDocument?)await DeserializeData(data.Data, data.Type) : 
             default;
@@ -24,6 +26,8 @@ public class InMemoryProjectionStorage : IProjectionStorage
         IImmutableList<DocumentToDelete> toDelete,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         foreach (var document in toUpsert)
         {
             var serialized = await SerializeData(document.Document);

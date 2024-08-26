@@ -4,6 +4,7 @@ using Akka.Actor;
 using Akka.Event;
 using Akka.Streams;
 using Akka.Streams.Dsl;
+using Akka.Util;
 using DC.Akka.Projections.Configuration;
 using JetBrains.Annotations;
 
@@ -85,12 +86,11 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                     if (_sequencer != null)
                         Context.Stop(_sequencer);
 
-                    var sequencer = ProjectionSequencer<TId, TDocument>.Create(Context, _configuration);
-
-                    _sequencer = sequencer;
-
-                    var source = _configuration
-                        .StartSource(latestPosition);
+                    var cancellation = new CancellationTokenSource();
+                    
+                    _sequencer = ProjectionSequencer<TId, TDocument>.Create(Context, _configuration, cancellation.Token);
+                    
+                    var source = _configuration.StartSource(latestPosition);
 
                     var flow = _configuration
                         .ProjectionEventBatchingStrategy
@@ -98,7 +98,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         .Select(x =>
                             new ProjectionSequencer<TId, TDocument>.Commands.StartProjecting(x.ToImmutableList()))
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.StartProjectingResponse>(
-                            sequencer,
+                            _sequencer,
                             _configuration.GetProjection().ProjectionTimeout,
                             1)
                         .SelectMany(x => x.Tasks.OrderBy(y => y.sortOrder))
@@ -120,7 +120,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                             x.groupId,
                             x.PositionData))
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.WaitForGroupToFinishResponse>(
-                            sequencer,
+                            _sequencer,
                             _configuration.GetProjection().ProjectionTimeout,
                             1)
                         .Select(x => x.PositionData);
@@ -132,9 +132,16 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         {
                             latestPosition = await _configuration.PositionStorage.StoreLatestPosition(
                                 _configuration.Name,
-                                highestPosition.Position);
+                                highestPosition.Position, 
+                                cancellation.Token);
 
                             return NotUsed.Instance;
+                        })
+                        .Recover(_ =>
+                        {
+                            cancellation.Cancel();
+
+                            return Option<NotUsed>.None;
                         });
                 }, _configuration.RestartSettings)
                 .ViaMaterialized(KillSwitches.Single<NotUsed>(), Keep.Right)

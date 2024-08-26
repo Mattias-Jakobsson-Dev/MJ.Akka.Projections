@@ -1,9 +1,11 @@
 using System.Collections.Immutable;
+using Akka.TestKit.Extensions;
 using DC.Akka.Projections.Storage;
 using DC.Akka.Projections.Storage.InfluxDb;
 using FluentAssertions;
 using InfluxDB.Client;
 using InfluxDB.Client.Api.Domain;
+using InfluxDB.Client.Core.Exceptions;
 using InfluxDB.Client.Writes;
 using JetBrains.Annotations;
 using Xunit;
@@ -126,6 +128,32 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
             .QueryAsync($"from(bucket:\"{fixture.BucketName}\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{_measurementName}\")", fixture.Organization);
 
         items.Should().HaveCount(0);
+    }
+    
+    [Fact]
+    public override async Task WriteWithCancelledTask()
+    {
+        var storage = GetStorage();
+
+        var id = CreateRandomId();
+        
+        var cancellationTokenSource = new CancellationTokenSource();
+
+        await cancellationTokenSource.CancelAsync();
+
+        await storage
+            .Store(
+                ImmutableList.Create(new DocumentToStore(
+                    id,
+                    new InfluxTimeSeries(
+                        ImmutableList<PointData>.Empty, 
+                        ImmutableList.Create(new InfluxTimeSeries.DeletePoint(
+                            _now.AddSeconds(-1),
+                            _now.AddSeconds(1),
+                            $"_measurement=\"{_measurementName}\""))))),
+                ImmutableList<DocumentToDelete>.Empty, 
+                cancellationTokenSource.Token)
+            .ShouldThrowWithin<HttpException>(TimeSpan.FromSeconds(1));
     }
 
     protected override IProjectionStorage GetStorage()

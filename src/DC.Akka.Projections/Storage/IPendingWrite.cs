@@ -5,6 +5,7 @@ namespace DC.Akka.Projections.Storage;
 
 public interface IPendingWrite
 {
+    CancellationToken CancellationToken { get; }
     IImmutableList<DocumentToStore> ToUpsert { get; }
     IImmutableList<DocumentToDelete> ToDelete { get; }
 

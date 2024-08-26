@@ -8,7 +8,7 @@ using JetBrains.Annotations;
 namespace DC.Akka.Projections;
 
 [PublicAPI]
-public class DocumentProjection<TId, TDocument> : ReceiveActor
+public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
     where TId : notnull where TDocument : notnull
 {
     public static class Commands
@@ -19,6 +19,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
         }
 
         public record ProjectEvents(TId Id, IImmutableList<EventWithPosition> Events) : IMessageWithId;
+
+        public record StopInProcessEvents(TId Id) : IMessageWithId;
     }
 
     private readonly ProjectionConfiguration _configuration;
@@ -39,47 +41,129 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
         Become(NotLoaded);
     }
 
+    public IStash Stash { get; set; } = null!;
+
     private void NotLoaded()
     {
-        ReceiveAsync<Commands.ProjectEvents>(async cmd =>
+        Receive<Commands.ProjectEvents>(cmd =>
         {
-            var document = await _configuration.DocumentStorage.LoadDocument<TDocument>(_id);
+            ProjectEvents(cmd.Events, () => _configuration.DocumentStorage.LoadDocument<TDocument>(_id));
+        });
 
-            document = await ProjectEvents(document, cmd.Events);
+        Receive<Commands.StopInProcessEvents>(_ =>
+        {
+            var waitingItems = Stash.ClearStash();
 
-            Become(() => Loaded(document));
+            foreach (var waitingItem in waitingItems)
+            {
+                waitingItem
+                    .Sender
+                    .Tell(new Messages.Reject(new Exception("Projection stopped")));
+            }
         });
     }
 
     private void Loaded(TDocument? document)
     {
-        ReceiveAsync<Commands.ProjectEvents>(async cmd =>
+        Receive<Commands.ProjectEvents>(cmd =>
         {
-            document = await ProjectEvents(document, cmd.Events);
+            ProjectEvents(cmd.Events, () => Task.FromResult(document));
+        });
 
-            Become(() => Loaded(document));
+        Receive<Commands.StopInProcessEvents>(_ =>
+        {
+            var waitingItems = Stash.ClearStash();
+
+            foreach (var waitingItem in waitingItems)
+            {
+                waitingItem
+                    .Sender
+                    .Tell(new Messages.Reject(new Exception("Projection stopped")));
+            }
+
+            Become(NotLoaded);
         });
     }
 
-    private async Task<TDocument?> ProjectEvents(TDocument? document, IImmutableList<EventWithPosition> events)
+    private void ProcessingEvents(IActorRef from, CancellationTokenSource cancellation)
     {
-        var documentToProject = document is IResetDocument<TDocument> reset ? reset.Reset() : document;
-        
+        Receive<Commands.ProjectEvents>(_ => { Stash.Stash(); });
+
+        Receive<ProjectionResponse>(cmd =>
+        {
+            from.Tell(cmd.Response);
+
+            Stash.UnstashAll();
+
+            if (cmd.Response is Messages.Acknowledge)
+                Become(() => Loaded(cmd.Document));
+            else
+                Become(NotLoaded);
+        });
+
+        ReceiveAsync<Commands.StopInProcessEvents>(async _ =>
+        {
+            await cancellation.CancelAsync();
+
+            var waitingItems = Stash.ClearStash();
+
+            foreach (var waitingItem in waitingItems)
+            {
+                waitingItem
+                    .Sender
+                    .Tell(new Messages.Reject(new Exception("Projection stopped")));
+            }
+
+            Become(NotLoaded);
+        });
+    }
+
+    private void ProjectEvents(
+        IImmutableList<EventWithPosition> events,
+        Func<Task<TDocument?>> loadDocument)
+    {
+        var cancellation = new CancellationTokenSource();
+
+        StartProjectingEvents(
+                loadDocument,
+                events,
+                cancellation.Token)
+            .PipeTo(Self);
+
+        Become(() => ProcessingEvents(Sender, cancellation));
+    }
+
+    private async Task<ProjectionResponse> StartProjectingEvents(
+        Func<Task<TDocument?>> loadDocument,
+        IImmutableList<EventWithPosition> events,
+        CancellationToken cancellationToken)
+    {
+        TDocument? document;
+
         try
         {
-            var result = await RunProjections();
-            
-            Sender.Tell(new Messages.Acknowledge(result.position));
-
-            return result.document;
+            document = await loadDocument();
         }
         catch (Exception e)
         {
-            Sender.Tell(new Messages.Reject(e));
-            
+            _logger.Error(e, "Failed loading document for {0}.{1}", _configuration.Name, _id);
+
+            return new ProjectionResponse(default, new Messages.Reject(e));
+        }
+
+        var documentToProject = document is IResetDocument<TDocument> reset ? reset.Reset() : document;
+
+        try
+        {
+            var result = await RunProjections();
+
+            return new ProjectionResponse(result.document, new Messages.Acknowledge(result.position));
+        }
+        catch (Exception e)
+        {
             _logger.Error(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, _id);
 
-            return document;
+            return new ProjectionResponse(document, new Messages.Reject(e));
         }
 
         async Task<(TDocument? document, long? position)> RunProjections()
@@ -94,16 +178,16 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
             foreach (var evnt in events.OrderBy(x => x.Position ?? 0))
             {
                 var (projectionResult, hasHandler) =
-                    await _configuration.HandleEvent(documentToProject, evnt.Event, evnt.Position ?? 0);
+                    await _configuration.HandleEvent(documentToProject, evnt.Event, evnt.Position ?? 0, cancellationToken);
 
                 documentToProject = (TDocument?)projectionResult;
 
                 wasHandled = wasHandled || hasHandler;
             }
 
-            if (!wasHandled) 
+            if (!wasHandled)
                 return (documentToProject, events.GetHighestEventNumber());
-            
+
             if (documentToProject != null)
             {
                 await _configuration
@@ -111,7 +195,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
                     .Store(
                         ImmutableList.Create(
                             new DocumentToStore(_id, documentToProject)),
-                        ImmutableList<DocumentToDelete>.Empty);
+                        ImmutableList<DocumentToDelete>.Empty,
+                        cancellationToken);
             }
             else if (exists)
             {
@@ -119,15 +204,18 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor
                     .DocumentStorage
                     .Store(
                         ImmutableList<DocumentToStore>.Empty,
-                        ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))));
+                        ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))),
+                        cancellationToken);
             }
 
             return (documentToProject, events.GetHighestEventNumber());
         }
     }
-    
+
     public static Props Init(string projectionName, TId id)
     {
         return Props.Create(() => new DocumentProjection<TId, TDocument>(projectionName, id));
     }
+
+    private record ProjectionResponse(TDocument? Document, Messages.IProjectEventsResponse Response);
 }
