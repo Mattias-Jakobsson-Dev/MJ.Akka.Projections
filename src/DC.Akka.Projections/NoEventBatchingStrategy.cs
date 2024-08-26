@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 
@@ -10,9 +11,9 @@ public class NoEventBatchingStrategy(int parallelism) : IEventBatchingStrategy
         return parallelism;
     }
 
-    public Source<IEnumerable<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)
+    public Source<ImmutableList<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)
     {
         return source
-            .Select(x => (IEnumerable<EventWithPosition>)new List<EventWithPosition> { x });
+            .Select(ImmutableList.Create);
     }
 }

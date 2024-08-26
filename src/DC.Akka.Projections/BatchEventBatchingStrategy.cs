@@ -13,13 +13,12 @@ public class BatchEventBatchingStrategy(int batchSize, int parallelism) : IEvent
         return parallelism;
     }
 
-    public Source<IEnumerable<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)
+    public Source<ImmutableList<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)
     {
         return source
             .Batch(
                 batchSize,
                 ImmutableList.Create,
-                (current, item) => current.Add(item))
-            .Select(x => (IEnumerable<EventWithPosition>)x);
+                (current, item) => current.Add(item));
     }
 }

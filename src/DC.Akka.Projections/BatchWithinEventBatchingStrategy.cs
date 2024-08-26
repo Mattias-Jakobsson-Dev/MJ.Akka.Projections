@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 using JetBrains.Annotations;
@@ -12,8 +13,10 @@ public class BatchWithinEventBatchingStrategy(int maxItems, TimeSpan timeout, in
         return parallelism;
     }
 
-    public Source<IEnumerable<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)
+    public Source<ImmutableList<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)
     {
-        return source.GroupedWithin(maxItems, timeout);
+        return source
+            .GroupedWithin(maxItems, timeout)
+            .Select(x => x.ToImmutableList());
     }
 }

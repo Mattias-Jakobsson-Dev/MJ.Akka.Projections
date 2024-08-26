@@ -1,5 +1,4 @@
-﻿using System.Collections.Immutable;
-using Akka;
+﻿using Akka;
 using Akka.Actor;
 using Akka.Event;
 using Akka.Streams;
@@ -96,12 +95,12 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         .ProjectionEventBatchingStrategy
                         .Get(source)
                         .Select(x =>
-                            new ProjectionSequencer<TId, TDocument>.Commands.StartProjecting(x.ToImmutableList()))
+                            new ProjectionSequencer<TId, TDocument>.Commands.StartProjecting(x))
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.StartProjectingResponse>(
                             _sequencer,
                             _configuration.GetProjection().ProjectionTimeout,
                             1)
-                        .SelectMany(x => x.Tasks.OrderBy(y => y.sortOrder))
+                        .SelectMany(x => x.Tasks)
                         .SelectAsync(
                             _configuration.ProjectionEventBatchingStrategy.GetParallelism(),
                             async task =>
@@ -122,7 +121,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.WaitForGroupToFinishResponse>(
                             _sequencer,
                             _configuration.GetProjection().ProjectionTimeout,
-                            1)
+                            _configuration.ProjectionEventBatchingStrategy.GetParallelism())
                         .Select(x => x.PositionData);
 
                     return _configuration

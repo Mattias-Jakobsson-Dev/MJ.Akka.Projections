@@ -96,13 +96,13 @@ public class LargeNumberOfEventsTests : TestKit
 
         var events = Enumerable
             .Range(1, numberOfEvents)
-            .Select(x =>
+            .Select(Events<string>.IEvent (x) =>
             {
                 var documentId = documentIds[x % numberOfDocuments];
 
                 if (failurePercentage > 0 && _random.Next(100) <= failurePercentage)
                 {
-                    return (Events<string>.IEvent)new Events<string>.FailProjection(
+                    return new Events<string>.FailProjection(
                         documentId,
                         _fixture.Create<string>(),
                         _fixture.Create<string>(),

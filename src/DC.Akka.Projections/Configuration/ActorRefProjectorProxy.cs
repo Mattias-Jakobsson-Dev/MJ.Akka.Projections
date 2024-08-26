@@ -7,7 +7,7 @@ public class ActorRefProjectorProxy<TId, TDocument>(TId id, IActorRef projector)
     where TId : notnull where TDocument : notnull
 {
     public Task<Messages.IProjectEventsResponse> ProjectEvents(
-        IImmutableList<EventWithPosition> events,
+        ImmutableList<EventWithPosition> events,
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {

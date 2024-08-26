@@ -38,7 +38,7 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
         where TId : notnull where TDocument : notnull
     {
         public Task<Messages.IProjectEventsResponse> ProjectEvents(
-            IImmutableList<EventWithPosition> events,
+            ImmutableList<EventWithPosition> events,
             TimeSpan timeout,
             CancellationToken cancellationToken)
         {
@@ -65,7 +65,7 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
         {
             public record Project(
                 TId Id,
-                IImmutableList<EventWithPosition> Events,
+                ImmutableList<EventWithPosition> Events,
                 TimeSpan Timeout);
             
             public record StopInProcessEvents(TId Id);

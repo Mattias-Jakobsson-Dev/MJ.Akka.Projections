@@ -18,7 +18,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
             TId Id { get; }
         }
 
-        public record ProjectEvents(TId Id, IImmutableList<EventWithPosition> Events) : IMessageWithId;
+        public record ProjectEvents(TId Id, ImmutableList<EventWithPosition> Events) : IMessageWithId;
 
         public record StopInProcessEvents(TId Id) : IMessageWithId;
     }
@@ -119,7 +119,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
     }
 
     private void ProjectEvents(
-        IImmutableList<EventWithPosition> events,
+        ImmutableList<EventWithPosition> events,
         Func<Task<TDocument?>> loadDocument)
     {
         var cancellation = new CancellationTokenSource();
@@ -135,7 +135,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
 
     private async Task<ProjectionResponse> StartProjectingEvents(
         Func<Task<TDocument?>> loadDocument,
-        IImmutableList<EventWithPosition> events,
+        ImmutableList<EventWithPosition> events,
         CancellationToken cancellationToken)
     {
         TDocument? document;
@@ -170,7 +170,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
         {
             var exists = documentToProject != null;
 
-            if (!events.Any())
+            if (events.IsEmpty)
                 return (documentToProject, null);
 
             var wasHandled = false;

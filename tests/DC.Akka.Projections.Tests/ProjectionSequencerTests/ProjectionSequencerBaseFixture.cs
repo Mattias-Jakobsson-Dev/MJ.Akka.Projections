@@ -99,7 +99,7 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
         private class TestProjectionProxy : IProjectorProxy
         {
             public async Task<Messages.IProjectEventsResponse> ProjectEvents(
-                IImmutableList<EventWithPosition> events,
+                ImmutableList<EventWithPosition> events,
                 TimeSpan timeout,
                 CancellationToken cancellationToken)
             {

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 
@@ -7,5 +8,5 @@ public interface IEventBatchingStrategy
 {
     int GetParallelism();
     
-    Source<IEnumerable<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source);
+    Source<ImmutableList<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source);
 }
