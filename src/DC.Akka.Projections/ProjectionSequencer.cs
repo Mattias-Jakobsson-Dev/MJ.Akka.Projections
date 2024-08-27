@@ -176,17 +176,10 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             if (!_inProcessGroups.TryGetValue(cmd.GroupId, out var group)) 
                 return;
             
-            var waitingGroup = group
-                .FinishTask(cmd.TaskId, cmd.Response);
+            group.FinishTask(cmd.TaskId);
 
-            if (waitingGroup.AllFinished())
-            {
+            if (group.AllFinished())
                 _inProcessGroups.Remove(cmd.GroupId);
-            }
-            else
-            {
-                _inProcessGroups[cmd.GroupId] = waitingGroup;
-            }
         });
 
         Receive<Commands.WaitForGroupToFinish>(cmd =>
@@ -198,7 +191,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                 return;
             }
 
-            _inProcessGroups[cmd.GroupId] = group.WithWaiter(Sender, cmd.PositionData);
+            group.WithWaiter(Sender, cmd.PositionData);
         });
 
         ReceiveAsync<Commands.StopAllInProgressHandlers>(async _ =>
@@ -278,49 +271,42 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             Props.Create(() => new ProjectionSequencer<TId, TDocument>(configuration, cancellationToken)));
     }
     
-    private record WaitingGroup(
-        ImmutableList<Guid> WaitingTasks,
-        ImmutableDictionary<Guid, Messages.IProjectEventsResponse> FinishedTasks,
-        ImmutableList<(IActorRef waiter, PositionData positionData)> Waiters)
+    private class WaitingGroup
     {
+        private readonly List<Guid> _waitingTasks;
+        private readonly List<(IActorRef waiter, PositionData positionData)> _waiters = [];
+
+        private WaitingGroup(IImmutableList<Guid> tasks)
+        {
+            _waitingTasks = tasks.ToList();
+        }
+        
         public static WaitingGroup NewGroup(ImmutableList<Guid> tasks)
         {
-            return new WaitingGroup(
-                tasks,
-                ImmutableDictionary<Guid, Messages.IProjectEventsResponse>.Empty,
-                ImmutableList<(IActorRef, PositionData)>.Empty);
+            return new WaitingGroup(tasks);
         }
 
-        public WaitingGroup FinishTask(Guid taskId, Messages.IProjectEventsResponse response)
+        public void FinishTask(Guid taskId)
         {
-            var result = this with
-            {
-                WaitingTasks = WaitingTasks.Remove(taskId),
-                FinishedTasks = FinishedTasks.SetItem(taskId, response)
-            };
+            _waitingTasks.Remove(taskId);
+            
+            if (!AllFinished()) 
+                return;
 
-            if (!result.AllFinished()) 
-                return result;
-
-            foreach (var waiter in result.Waiters)
+            foreach (var waiter in _waiters)
             {
                 waiter.waiter.Tell(new Responses.WaitForGroupToFinishResponse(waiter.positionData));
             }
-
-            return result;
         }
 
-        public WaitingGroup WithWaiter(IActorRef waiter, PositionData positionData)
+        public void WithWaiter(IActorRef waiter, PositionData positionData)
         {
-            return this with
-            {
-                Waiters = Waiters.Add((waiter, positionData))
-            };
+            _waiters.Add((waiter, positionData));
         }
 
         public bool AllFinished()
         {
-            return WaitingTasks.IsEmpty;
+            return _waitingTasks.Count == 0;
         }
     }
 }
