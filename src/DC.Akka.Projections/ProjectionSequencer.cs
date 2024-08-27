@@ -13,9 +13,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     {
         public record StartProjecting(IImmutableList<EventWithPosition> Events);
 
-        public record IdFinished(TId Id, Messages.IProjectEventsResponse Result);
-
-        public record TaskFinished(Guid GroupId, Guid TaskId);
+        public record TaskFinished(Guid GroupId, Guid TaskId, TId? Id, Messages.IProjectEventsResponse Response);
 
         public record WaitForGroupToFinish(Guid GroupId, PositionData PositionData);
 
@@ -25,14 +23,17 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     public static class Responses
     {
         public record StartProjectingResponse(
-            IImmutableList<(Guid groupId, Guid taskId, Task<Messages.IProjectEventsResponse> task)> Tasks);
+            ImmutableList<(
+                Guid groupId,
+                Guid taskId,
+                TId? documentId,
+                Task<Messages.IProjectEventsResponse> task)> Tasks);
 
         public record WaitForGroupToFinishResponse(PositionData PositionData);
     }
 
     private readonly List<TId> _inprogressIds = [];
-    private readonly Dictionary<Guid, List<Guid>> _groupWaitingTasks = new();
-    private readonly Dictionary<Guid, List<(PositionData positionData, IActorRef respondTo)>> _groupWaiters = new();
+    private readonly Dictionary<Guid, WaitingGroup> _inProcessGroups = new();
 
     private readonly ProjectionConfiguration _configuration;
 
@@ -52,7 +53,11 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
 
         Receive<Commands.StartProjecting>(cmd =>
         {
-            var tasks = new List<(Guid groupId, Guid taskId, Task<Messages.IProjectEventsResponse> task)>();
+            var tasks = new List<(
+                Guid groupId,
+                Guid taskId,
+                TId? documentId,
+                Task<Messages.IProjectEventsResponse> task)>();
 
             var groupedEvents = cmd
                 .Events
@@ -80,7 +85,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                     x.Id,
                     TaskId = Guid.NewGuid()
                 });
-            
+
             foreach (var chunk in groupedEvents
                          .Chunk(configuration.ProjectionEventBatchingStrategy.GetParallelism()))
             {
@@ -90,8 +95,12 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                 {
                     if (!groupedEvent.Id.IsUsable)
                     {
-                        tasks.Add((groupId, groupedEvent.TaskId, Task.FromResult<Messages.IProjectEventsResponse>(
-                            new Messages.Acknowledge(groupedEvent.Events.GetHighestEventNumber()))));
+                        tasks.Add((
+                            groupId,
+                            groupedEvent.TaskId,
+                            (TId?)groupedEvent.Id.Id,
+                            Task.FromResult<Messages.IProjectEventsResponse>(
+                                new Messages.Acknowledge(groupedEvent.Events.GetHighestEventNumber()))));
 
                         continue;
                     }
@@ -100,129 +109,96 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
 
                     if (!_inprogressIds.Contains(id))
                     {
-                        var task = Run(id, groupedEvent.Events, cancellationToken);
-
-                        task
-                            .ContinueWith(result => self.Tell(new Commands.IdFinished(
-                                id,
-                                result.IsCompletedSuccessfully
-                                    ? result.Result
-                                    : new Messages.Reject(result.Exception ?? new Exception("Failed projecting events")))));
-
                         _inprogressIds.Add(id);
 
-                        tasks.Add((groupId, groupedEvent.TaskId, task));
+                        tasks.Add((groupId, groupedEvent.TaskId, id, Run(id, groupedEvent.Events, cancellationToken)));
                     }
                     else
                     {
                         var promise = new TaskCompletionSource<Messages.IProjectEventsResponse>(
                             TaskCreationOptions.RunContinuationsAsynchronously);
 
-                        if (!_queues.TryGetValue(id, out var value))
+                        if (!_queues.TryGetValue(id, out var queue))
                         {
-                            value =
-                                new Queue<(ImmutableList<EventWithPosition>,
-                                    TaskCompletionSource<Messages.IProjectEventsResponse>)>();
+                            queue = new Queue<(
+                                ImmutableList<EventWithPosition>,
+                                TaskCompletionSource<Messages.IProjectEventsResponse>)>();
 
-                            _queues[id] = value;
+                            _queues[id] = queue;
                         }
 
-                        value.Enqueue((groupedEvent.Events, promise));
+                        queue.Enqueue((groupedEvent.Events, promise));
 
-                        tasks.Add((groupId, groupedEvent.TaskId, promise.Task));
+                        tasks.Add((groupId, groupedEvent.TaskId, id, promise.Task));
                     }
                 }
 
-                _groupWaitingTasks[groupId] = tasks.Select(x => x.taskId).ToList();
+                _inProcessGroups[groupId] = WaitingGroup.NewGroup(
+                    tasks.Select(x => x.taskId).ToImmutableList());
 
                 foreach (var task in tasks)
                 {
                     task
                         .task
-                        .ContinueWith(_ => self.Tell(new Commands.TaskFinished(groupId, task.taskId)));
+                        .ContinueWith(result =>
+                        {
+                            Commands.TaskFinished response;
+
+                            if (result.IsCompletedSuccessfully)
+                            {
+                                response = new Commands.TaskFinished(
+                                    groupId,
+                                    task.taskId,
+                                    task.documentId,
+                                    result.Result);
+                            }
+                            else
+                            {
+                                response = new Commands.TaskFinished(
+                                    groupId,
+                                    task.taskId,
+                                    task.documentId,
+                                    new Messages.Reject(result.Exception));
+                            }
+
+                            self.Tell(response);
+                        });
                 }
             }
 
             Sender.Tell(new Responses.StartProjectingResponse(tasks.ToImmutableList()));
         });
 
-        Receive<Commands.IdFinished>(cmd =>
-        {
-            if (_queues.TryGetValue(cmd.Id, out var value))
-            {
-                if (cmd.Result is not Messages.Acknowledge)
-                {
-                    while (value.TryDequeue(out var item))
-                    {
-                        item.task.SetResult(cmd.Result);
-                    }
-                }
-                else if (value.TryDequeue(out var item))
-                {
-                    Run(cmd.Id, item.events, cancellationToken)
-                        .ContinueWith(result =>
-                        {
-                            if (result.IsCompletedSuccessfully)
-                            {
-                                item.task.SetResult(result.Result);
-                                
-                                self.Tell(cmd with { Result = result.Result });
-                            }
-                            else
-                            {
-                                var error = result.Exception ??
-                                            new Exception("Failed projecting events");
-                                
-                                item.task.TrySetException(error);
-                                
-                                self.Tell(cmd with { Result = new Messages.Reject(result.Exception ?? error) });
-                            }
-                        });
-
-                    return;
-                }
-
-                _queues.Remove(cmd.Id);
-            }
-
-            if (_inprogressIds.Contains(cmd.Id))
-                _inprogressIds.Remove(cmd.Id);
-        });
-
         Receive<Commands.TaskFinished>(cmd =>
         {
-            if (_groupWaitingTasks.TryGetValue(cmd.GroupId, out var tasks))
-                tasks.Remove(cmd.TaskId);
+            HandleWaitingTasks(cmd.Id, cmd.Response, cancellationToken);
 
-            if (_groupWaitingTasks.TryGetValue(cmd.GroupId, out var value) && value.Count != 0)
+            if (!_inProcessGroups.TryGetValue(cmd.GroupId, out var group)) 
                 return;
+            
+            var waitingGroup = group
+                .FinishTask(cmd.TaskId, cmd.Response);
 
-            _groupWaitingTasks.Remove(cmd.GroupId);
-
-            if (!_groupWaiters.TryGetValue(cmd.GroupId, out var groupWaiter))
-                return;
-
-            foreach (var waiter in groupWaiter)
+            if (waitingGroup.AllFinished())
             {
-                waiter.respondTo.Tell(new Responses.WaitForGroupToFinishResponse(waiter.positionData));
+                _inProcessGroups.Remove(cmd.GroupId);
             }
-
-            _groupWaiters.Remove(cmd.GroupId);
+            else
+            {
+                _inProcessGroups[cmd.GroupId] = waitingGroup;
+            }
         });
 
         Receive<Commands.WaitForGroupToFinish>(cmd =>
         {
-            if (!_groupWaitingTasks.TryGetValue(cmd.GroupId, out var value) || value.Count == 0)
+            if (!_inProcessGroups.TryGetValue(cmd.GroupId, out var group))
             {
                 Sender.Tell(new Responses.WaitForGroupToFinishResponse(cmd.PositionData));
-
+                
                 return;
             }
 
-            if (!_groupWaiters.ContainsKey(cmd.GroupId))
-                _groupWaiters[cmd.GroupId] = [];
-
-            _groupWaiters[cmd.GroupId].Add((cmd.PositionData, Sender));
+            _inProcessGroups[cmd.GroupId] = group.WithWaiter(Sender, cmd.PositionData);
         });
 
         ReceiveAsync<Commands.StopAllInProgressHandlers>(async _ =>
@@ -232,10 +208,52 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                 var projector = await _configuration
                     .ProjectorFactory
                     .GetProjector<TId, TDocument>(inprogressId, _configuration);
-                
+
                 projector.StopAllInProgress();
             }
         });
+    }
+
+    private void HandleWaitingTasks(
+        TId? id,
+        Messages.IProjectEventsResponse response,
+        CancellationToken cancellationToken)
+    {
+        if (id == null)
+            return;
+        
+        if (_queues.TryGetValue(id, out var value))
+        {
+            if (response is not Messages.Acknowledge)
+            {
+                while (value.TryDequeue(out var item))
+                {
+                    item.task.SetResult(response);
+                }
+            } 
+            else if (value.TryDequeue(out var queuedItem))
+            {
+                Run(id, queuedItem.events, cancellationToken)
+                    .ContinueWith(result =>
+                    {
+                        if (result.IsCompletedSuccessfully)
+                        {
+                            queuedItem.task.SetResult(result.Result);
+                        }
+                        else
+                        {
+                            queuedItem.task.TrySetException(result.Exception ??
+                                                      new Exception("Failed projecting events"));
+                        }
+                    }, cancellationToken);
+
+                return;
+            }
+
+            _queues.Remove(id);
+        }
+
+        _inprogressIds.Remove(id);
     }
 
     private async Task<Messages.IProjectEventsResponse> Run(
@@ -258,5 +276,51 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     {
         return refFactory.ActorOf(
             Props.Create(() => new ProjectionSequencer<TId, TDocument>(configuration, cancellationToken)));
+    }
+    
+    private record WaitingGroup(
+        ImmutableList<Guid> WaitingTasks,
+        ImmutableDictionary<Guid, Messages.IProjectEventsResponse> FinishedTasks,
+        ImmutableList<(IActorRef waiter, PositionData positionData)> Waiters)
+    {
+        public static WaitingGroup NewGroup(ImmutableList<Guid> tasks)
+        {
+            return new WaitingGroup(
+                tasks,
+                ImmutableDictionary<Guid, Messages.IProjectEventsResponse>.Empty,
+                ImmutableList<(IActorRef, PositionData)>.Empty);
+        }
+
+        public WaitingGroup FinishTask(Guid taskId, Messages.IProjectEventsResponse response)
+        {
+            var result = this with
+            {
+                WaitingTasks = WaitingTasks.Remove(taskId),
+                FinishedTasks = FinishedTasks.SetItem(taskId, response)
+            };
+
+            if (!result.AllFinished()) 
+                return result;
+
+            foreach (var waiter in result.Waiters)
+            {
+                waiter.waiter.Tell(new Responses.WaitForGroupToFinishResponse(waiter.positionData));
+            }
+
+            return result;
+        }
+
+        public WaitingGroup WithWaiter(IActorRef waiter, PositionData positionData)
+        {
+            return this with
+            {
+                Waiters = Waiters.Add((waiter, positionData))
+            };
+        }
+
+        public bool AllFinished()
+        {
+            return WaitingTasks.IsEmpty;
+        }
     }
 }

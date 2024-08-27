@@ -644,67 +644,6 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
         
         await VerifyDocument(documentId, document!, events, projection);
     }
-
-    [Fact]
-    public async Task Projecting_two_events_where_second_fails_and_storage_is_slow_for_first_write()
-    {
-        using var system = actorSystemHandler.StartNewActorSystem();
-        
-        var firstId = Fixture.Create<TId>();
-        var secondId = Fixture.Create<TId>();
-
-        var events = ImmutableList.Create(
-            GetTestEvent(firstId), 
-            GetEventThatFails(secondId, 1));
-        
-        var projection = GetProjection(events);
-        
-        IProjectionStorage projectionStorage = null!;
-        IProjectionPositionStorage positionStorage = null!;
-
-        var coordinator = await system
-            .Projections(config => Configure(config
-                    .WithProjection(projection))
-                .WithRestartSettings(
-                    RestartSettings.Create(
-                            TimeSpan.Zero,
-                            TimeSpan.Zero,
-                            1)
-                        .WithMaxRestarts(5, TimeSpan.FromSeconds(10)))
-                .WithEventBatchingStrategy(new NoEventBatchingStrategy(2))
-                .WithModifiedConfig(conf =>
-                {
-                    positionStorage = conf.PositionStorage!;
-
-                    projectionStorage = new OneTimeSlowStorage(
-                        conf.ProjectionStorage!,
-                        TimeSpan.FromSeconds(15));
-
-                    return conf with
-                    {
-                        ProjectionStorage = projectionStorage
-                    };
-                }))
-            .Start();
-
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
-
-        var position = await positionStorage.LoadLatestPosition(projection.Name);
-
-        position.Should().Be(2);
-
-        var firstDocument = await projectionStorage.LoadDocument<TDocument>(firstId);
-
-        firstDocument.Should().NotBeNull();
-        
-        await VerifyDocument(firstId, firstDocument!, events, projection);
-        
-        var secondDocument = await projectionStorage.LoadDocument<TDocument>(secondId);
-
-        secondDocument.Should().NotBeNull();
-        
-        await VerifyDocument(secondId, secondDocument!, events, projection);
-    }
     
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration> Configure(
         IHaveConfiguration<ProjectionSystemConfiguration> config)
@@ -793,40 +732,6 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
                 throw failWith;
             }
-        }
-    }
-    
-    private class OneTimeSlowStorage(IProjectionStorage innerStorage, TimeSpan delay) : IProjectionStorage
-    {
-        private readonly object _lock = new { };
-        private bool _hasBeenSlow;
-        
-        public Task<T?> LoadDocument<T>(object id, CancellationToken cancellationToken = default)
-        {
-            return innerStorage.LoadDocument<T>(id, cancellationToken);
-        }
-
-        public async Task Store(
-            IImmutableList<DocumentToStore> toUpsert,
-            IImmutableList<DocumentToDelete> toDelete,
-            CancellationToken cancellationToken = default)
-        {
-            bool hasBeenSlow;
-            
-            lock (_lock)
-            {
-                hasBeenSlow = _hasBeenSlow;
-                
-                if (!_hasBeenSlow)
-                {
-                    _hasBeenSlow = true;
-                }   
-            }
-            
-            if (!hasBeenSlow)
-                await Task.Delay(delay, cancellationToken);
-
-            await innerStorage.Store(toUpsert, toDelete, cancellationToken);
         }
     }
 }

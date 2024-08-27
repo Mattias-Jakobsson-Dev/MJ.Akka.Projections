@@ -6,18 +6,22 @@ public class InMemoryPositionStorage : IProjectionPositionStorage
 {
     private readonly ConcurrentDictionary<string, long> _positions = new();
     
-    public Task<long?> LoadLatestPosition(string projectionName, CancellationToken cancellationToken = default)
+    public virtual Task<long?> LoadLatestPosition(string projectionName, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         return _positions.TryGetValue(projectionName, out var position)
             ? Task.FromResult<long?>(position)
             : Task.FromResult<long?>(default);
     }
 
-    public Task<long?> StoreLatestPosition(
+    public virtual Task<long?> StoreLatestPosition(
         string projectionName,
         long? position,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         if (position != null)
         {
             _positions.AddOrUpdate(projectionName, _ => position.Value,

@@ -105,19 +105,31 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                             _configuration.ProjectionEventBatchingStrategy.GetParallelism(),
                             async task =>
                             {
-                                var response = await task.task;
-
-                                return response switch
+                                try
                                 {
-                                    Messages.Acknowledge ack => (task.groupId,
-                                        PositionData: new PositionData(ack.Position)),
-                                    Messages.Reject nack => throw new Exception("Rejected projection", nack.Cause),
-                                    _ => throw new Exception("Unknown projection response")
-                                };
+                                    var response = await task.task;
+
+                                    return (task.groupId, response);
+                                }
+                                catch (Exception e)
+                                {
+                                    return (task.groupId, new Messages.Reject(e));
+                                }
                             })
-                        .Select(x => new ProjectionSequencer<TId, TDocument>.Commands.WaitForGroupToFinish(
-                            x.groupId,
-                            x.PositionData))
+                        .Select(x =>
+                        {
+                            var result = x.response switch
+                            {
+                                Messages.Acknowledge ack => (x.groupId,
+                                    PositionData: new PositionData(ack.Position)),
+                                Messages.Reject nack => throw new Exception("Rejected projection", nack.Cause),
+                                _ => throw new Exception("Unknown projection response")
+                            };
+                            
+                            return new ProjectionSequencer<TId, TDocument>.Commands.WaitForGroupToFinish(
+                                x.groupId,
+                                result.PositionData);
+                        })
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.WaitForGroupToFinishResponse>(
                             _sequencer,
                             _configuration.GetProjection().ProjectionTimeout,

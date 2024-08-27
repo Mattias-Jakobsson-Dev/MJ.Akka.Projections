@@ -16,6 +16,33 @@ public class LargeNumberOfEventsTests : TestKit
     private readonly Random _random = new();
     private readonly Fixture _fixture = new();
 
+    [Fact]
+    public Task Handling_events_without_failures_with_normal_storage_should_store_positions_sequentially()
+    {
+        return RunTest(
+            50,
+            1_000,
+            0,
+            x => x
+                .WithRestartSettings(null)
+                .WithPositionStorage(new SequentialPositionStorageTester()),
+            new InMemoryProjectionStorage());
+    }
+    
+    [Fact]
+    public Task Handling_events_without_failures_with_batched_storage_should_store_positions_sequentially()
+    {
+        return RunTest(
+            50,
+            1_000,
+            0,
+            x => x
+                .WithRestartSettings(null)
+                .WithPositionStorage(new SequentialPositionStorageTester()),
+            new InMemoryProjectionStorage()
+                .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
+    }
+    
     [Theory]
     [InlineData(50, 1_000)]
     [InlineData(100, 1_000)]
@@ -208,6 +235,39 @@ public class LargeNumberOfEventsTests : TestKit
             }
 
             return innerStorage.Store(toUpsert, toDelete, cancellationToken);
+        }
+    }
+    
+    private class SequentialPositionStorageTester : InMemoryPositionStorage
+    {
+        private readonly SemaphoreSlim _lock = new(1);
+        private int _storageCounter;
+
+        public override async Task<long?> StoreLatestPosition(
+            string projectionName,
+            long? position,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                await _lock.WaitAsync(cancellationToken);
+
+                var storedPosition = await base.StoreLatestPosition(
+                    projectionName, 
+                    position,
+                    cancellationToken);
+                
+                _storageCounter++;
+
+                if (storedPosition != _storageCounter)
+                    throw new Exception($"Storing position {storedPosition} when expecting {_storageCounter}");
+
+                return storedPosition;
+            }
+            finally
+            {
+                _lock.Release();
+            }
         }
     }
 }

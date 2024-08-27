@@ -17,6 +17,8 @@ public class ClusterSingletonPositionStorage : IProjectionPositionStorage
         string projectionName,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         var response = await _storage.Ask<Storage.Responses.LoadPositionResponse>(
             new Storage.Queries.LoadPosition(projectionName), 
             cancellationToken: cancellationToken);
@@ -32,6 +34,8 @@ public class ClusterSingletonPositionStorage : IProjectionPositionStorage
         long? position,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         var response = await _storage.Ask<Storage.Responses.StorePositionResponse>(
             new Storage.Commands.StorePosition(projectionName, position),
             cancellationToken: cancellationToken);
