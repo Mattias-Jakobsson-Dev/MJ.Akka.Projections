@@ -48,8 +48,7 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
             var response = await sequencer
                 .Ref
                 .Ask<ProjectionSequencer<string, TestDocument<string>>.Responses.StartProjectingResponse>(
-                    new ProjectionSequencer<string, TestDocument<string>>.Commands.StartProjecting(
-                        events));
+                    new ProjectionSequencer<string, TestDocument<string>>.Commands.StartProjecting(events));
 
             responses[batch.Key] = response.Tasks[0].task;
 
@@ -83,7 +82,7 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
 
     protected abstract Task FinishSetup(Func<string, AckWithTime?> getCompletionTime);
 
-    private class TestProjectionFactory : IKeepTrackOfProjectors
+    public class TestProjectionFactory : IKeepTrackOfProjectors
     {
         public Task<IProjectorProxy> GetProjector<TId, TDocument>(
             TId id,
@@ -125,12 +124,12 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
     public record AckWithTime(TimeSpan TimeSinceStarted, TimeSpan TimeSinceCompleted, long? Position) 
         : Messages.Acknowledge(Position);
 
-    private static class Events
+    public static class Events
     {
         public record DelayProcessingEvent(string DocumentId, TimeSpan Delay, Stopwatch SinceCreated);
     }
     
-    private class FakeEventHandler : IHandleEventInProjection<TestDocument<string>>
+    public class FakeEventHandler : IHandleEventInProjection<TestDocument<string>>
     {
         public IImmutableList<object> Transform(object evnt)
         {

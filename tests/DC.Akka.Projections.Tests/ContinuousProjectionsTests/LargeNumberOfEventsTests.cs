@@ -28,7 +28,7 @@ public class LargeNumberOfEventsTests : TestKit
                 .WithPositionStorage(new SequentialPositionStorageTester()),
             new InMemoryProjectionStorage());
     }
-    
+
     [Fact]
     public Task Handling_events_without_failures_with_batched_storage_should_store_positions_sequentially()
     {
@@ -42,7 +42,7 @@ public class LargeNumberOfEventsTests : TestKit
             new InMemoryProjectionStorage()
                 .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
     }
-    
+
     [Theory]
     [InlineData(50, 1_000)]
     [InlineData(100, 1_000)]
@@ -57,7 +57,7 @@ public class LargeNumberOfEventsTests : TestKit
             x => x.WithRestartSettings(null),
             new InMemoryProjectionStorage());
     }
-    
+
     [Theory]
     [InlineData(50, 1_000)]
     [InlineData(100, 1_000)]
@@ -70,6 +70,86 @@ public class LargeNumberOfEventsTests : TestKit
             numberOfEvents,
             0,
             x => x.WithRestartSettings(null),
+            new InMemoryProjectionStorage()
+                .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
+    }
+
+    [Theory]
+    [InlineData(50, 1_000)]
+    [InlineData(100, 1_000)]
+    [InlineData(1_000, 10_000)]
+    public Task Handling_events_without_failures_with_normal_storage_and_batched_within_strategy(
+        int numberOfDocuments,
+        int numberOfEvents)
+    {
+        return RunTest(
+            numberOfDocuments,
+            numberOfEvents,
+            0,
+            x => x
+                .WithEventBatchingStrategy(new BatchWithinEventBatchingStrategy(
+                    100,
+                    TimeSpan.FromMilliseconds(50),
+                    100))
+                .WithRestartSettings(null),
+            new InMemoryProjectionStorage());
+    }
+
+    [Theory]
+    [InlineData(50, 1_000)]
+    [InlineData(100, 1_000)]
+    [InlineData(1_000, 10_000)]
+    public Task Handling_events_without_failures_with_batched_storage_and_batched_within_strategy(
+        int numberOfDocuments,
+        int numberOfEvents)
+    {
+        return RunTest(
+            numberOfDocuments,
+            numberOfEvents,
+            0,
+            x => x
+                .WithEventBatchingStrategy(new BatchWithinEventBatchingStrategy(
+                    100,
+                    TimeSpan.FromMilliseconds(50),
+                    100))
+                .WithRestartSettings(null),
+            new InMemoryProjectionStorage()
+                .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
+    }
+    
+    [Theory]
+    [InlineData(50, 1_000)]
+    [InlineData(100, 1_000)]
+    [InlineData(1_000, 10_000)]
+    public Task Handling_events_without_failures_with_normal_storage_and_no_batching_strategy(
+        int numberOfDocuments,
+        int numberOfEvents)
+    {
+        return RunTest(
+            numberOfDocuments,
+            numberOfEvents,
+            0,
+            x => x
+                .WithEventBatchingStrategy(new NoEventBatchingStrategy(100))
+                .WithRestartSettings(null),
+            new InMemoryProjectionStorage());
+    }
+
+    [Theory]
+    [InlineData(50, 1_000)]
+    [InlineData(100, 1_000)]
+    [InlineData(1_000, 10_000)]
+    public Task Handling_events_without_failures_with_batched_storage_and_no_batching_strategy(
+        int numberOfDocuments,
+        int numberOfEvents)
+    {
+        return RunTest(
+            numberOfDocuments,
+            numberOfEvents,
+            0,
+            x => x
+                .WithEventBatchingStrategy(new NoEventBatchingStrategy(100))
+                .WithRestartSettings(null),
             new InMemoryProjectionStorage()
                 .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
     }
@@ -237,7 +317,7 @@ public class LargeNumberOfEventsTests : TestKit
             return innerStorage.Store(toUpsert, toDelete, cancellationToken);
         }
     }
-    
+
     private class SequentialPositionStorageTester : InMemoryPositionStorage
     {
         private readonly SemaphoreSlim _lock = new(1);
@@ -253,10 +333,10 @@ public class LargeNumberOfEventsTests : TestKit
                 await _lock.WaitAsync(cancellationToken);
 
                 var storedPosition = await base.StoreLatestPosition(
-                    projectionName, 
+                    projectionName,
                     position,
                     cancellationToken);
-                
+
                 _storageCounter++;
 
                 if (storedPosition != _storageCounter)

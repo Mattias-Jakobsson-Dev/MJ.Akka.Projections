@@ -194,6 +194,18 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             Sender.Tell(new Responses.StartProjectingResponse(tasks.ToImmutableList()));
         });
 
+        Receive<Commands.WaitForGroupToFinish>(cmd =>
+        {
+            if (!_inProcessGroups.TryGetValue(cmd.GroupId, out var group))
+            {
+                Sender.Tell(new Responses.WaitForGroupToFinishResponse(cmd.PositionData));
+                
+                return;
+            }
+
+            group.WithWaiter(Sender, cmd.PositionData);
+        });
+        
         Receive<InternalCommands.TaskFinished>(cmd =>
         {
             HandleWaitingTasks(cmd.Id, cmd.Response, cancellationToken);
@@ -205,18 +217,6 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
 
             if (group.AllFinished())
                 _inProcessGroups.Remove(cmd.GroupId);
-        });
-
-        Receive<Commands.WaitForGroupToFinish>(cmd =>
-        {
-            if (!_inProcessGroups.TryGetValue(cmd.GroupId, out var group))
-            {
-                Sender.Tell(new Responses.WaitForGroupToFinishResponse(cmd.PositionData));
-                
-                return;
-            }
-
-            group.WithWaiter(Sender, cmd.PositionData);
         });
 
         ReceiveAsync<InternalCommands.Reset>(async cmd =>
@@ -247,6 +247,14 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     {
         try
         {
+            foreach (var queue in _queues)
+            {
+                while (queue.Value.TryDequeue(out var item))
+                {
+                    item.task.TrySetResult(new Messages.Reject(new Exception("Projection was stopped")));
+                }
+            }
+            
             var projectors = await Task.WhenAll(_inprogressIds
                 .Select(id => _configuration.ProjectorFactory.GetProjector<TId, TDocument>(id, _configuration)));
 
@@ -282,7 +290,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             {
                 while (value.TryDequeue(out var item))
                 {
-                    item.task.SetResult(response);
+                    item.task.TrySetResult(response);
                 }
             } 
             else if (value.TryDequeue(out var queuedItem))
@@ -292,7 +300,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                     {
                         if (result.IsCompletedSuccessfully)
                         {
-                            queuedItem.task.SetResult(result.Result);
+                            queuedItem.task.TrySetResult(result.Result);
                         }
                         else
                         {

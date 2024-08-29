@@ -115,17 +115,17 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                             })
                         .Select(x =>
                         {
-                            var result = x.response switch
+                            var position = x.response switch
                             {
-                                Messages.Acknowledge ack => (x.groupId,
-                                    PositionData: new PositionData(ack.Position)),
+                                Messages.Acknowledge ack => new PositionData(ack.Position),
                                 Messages.Reject nack => throw new Exception("Rejected projection", nack.Cause),
-                                _ => throw new Exception("Unknown projection response")
+                                null => throw new Exception("No projection response"),
+                                _ => throw new Exception($"Unknown projection response: {x.response.GetType()}")
                             };
                             
                             return new ProjectionSequencer<TId, TDocument>.Commands.WaitForGroupToFinish(
                                 x.groupId,
-                                result.PositionData);
+                                position);
                         })
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.WaitForGroupToFinishResponse>(
                             _sequencer.Ref,

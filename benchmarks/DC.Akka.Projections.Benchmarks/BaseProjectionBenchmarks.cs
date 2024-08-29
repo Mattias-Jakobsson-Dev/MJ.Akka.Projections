@@ -39,12 +39,17 @@ public abstract class BaseProjectionBenchmarks
 
         _coordinator = ActorSystem
             .Projections(conf => conf
+                .WithEventBatchingStrategy(BatchingStrategy.Strategy)
                 .WithProjection(_projection, Configure));
     }
 
     [PublicAPI]
     [ParamsSource(nameof(GetAvailableConfigurations))]
     public ProjectEventsConfiguration Configuration { get; set; } = null!;
+
+    [PublicAPI]
+    [ParamsSource(nameof(GetAvailableBatchingStrategies))]
+    public BatchingStrategyConfiguration BatchingStrategy { get; set; } = null!;
 
     [Benchmark, EventsPerSecond(nameof(Configuration))]
     public async Task ProjectEvents()
@@ -65,11 +70,30 @@ public abstract class BaseProjectionBenchmarks
             new ProjectEventsConfiguration(1_000, 1));
     }
 
+    public static IImmutableList<BatchingStrategyConfiguration> GetAvailableBatchingStrategies()
+    {
+        return ImmutableList.Create(
+            new BatchingStrategyConfiguration("default", BatchEventBatchingStrategy.Default),
+            new BatchingStrategyConfiguration("100 within 50ms", 
+                new BatchWithinEventBatchingStrategy(100, TimeSpan.FromMilliseconds(50), 100)),
+            new BatchingStrategyConfiguration("1 000 within 50ms", 
+                new BatchWithinEventBatchingStrategy(1_000, TimeSpan.FromMilliseconds(50), 100)),
+            new BatchingStrategyConfiguration("no batching", new NoEventBatchingStrategy(100)));
+    }
+    
     public record ProjectEventsConfiguration(int NumberOfEvents, int NumberOfDocuments)
     {
         public override string ToString()
         {
             return $"e: {NumberOfEvents}, d: {NumberOfDocuments}";
+        }
+    }
+
+    public record BatchingStrategyConfiguration(string Name, IEventBatchingStrategy Strategy)
+    {
+        public override string ToString()
+        {
+            return Name;
         }
     }
 }
