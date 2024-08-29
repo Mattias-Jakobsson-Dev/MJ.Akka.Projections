@@ -4,7 +4,7 @@ using DC.Akka.Projections.Storage;
 
 namespace DC.Akka.Projections.OneTime;
 
-public static class AkkaSystemExtensions
+public static class ActorSystemExtensions
 {
     public static IOneTimeProjection<TId, TDocument> CreateOneTimeProjection<TId, TDocument>(
         this ActorSystem actorSystem,

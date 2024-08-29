@@ -9,12 +9,7 @@ public class ShardedProjectors(ActorSystem actorSystem, ClusterShardingSettings 
     : IKeepTrackOfProjectors
 {
     private readonly ConcurrentDictionary<string, Task<IActorRef>> _projectors = new();
-
-    public void Reset()
-    {
-        
-    }
-
+    
     public async Task<IProjectorProxy> GetProjector<TId, TDocument>(TId id, ProjectionConfiguration configuration)
         where TId : notnull where TDocument : notnull
     {

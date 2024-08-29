@@ -9,5 +9,5 @@ public interface IProjectorProxy
         TimeSpan timeout,
         CancellationToken cancellationToken);
 
-    void StopAllInProgress();
+    Task StopAllInProgress(TimeSpan timeout);
 }

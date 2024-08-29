@@ -22,6 +22,11 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
 
         public record StopInProcessEvents(TId Id) : IMessageWithId;
     }
+    
+    public static class Responses
+    {
+        public record StopInProcessEventsResponse(Exception? Error = null);
+    }
 
     private readonly ProjectionConfiguration _configuration;
     private readonly TId _id;
@@ -60,6 +65,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
                     .Sender
                     .Tell(new Messages.Reject(new Exception("Projection stopped")));
             }
+            
+            Sender.Tell(new Responses.StopInProcessEventsResponse());
         });
     }
 
@@ -82,6 +89,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
             }
 
             Become(NotLoaded);
+            
+            Sender.Tell(new Responses.StopInProcessEventsResponse());
         });
     }
 
@@ -105,16 +114,22 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
         {
             await cancellation.CancelAsync();
 
+            var rejectionResponse = new Messages.Reject(new Exception("Projection stopped"));
+
+            from.Tell(rejectionResponse);
+            
             var waitingItems = Stash.ClearStash();
 
             foreach (var waitingItem in waitingItems)
             {
                 waitingItem
                     .Sender
-                    .Tell(new Messages.Reject(new Exception("Projection stopped")));
+                    .Tell(rejectionResponse);
             }
 
             Become(NotLoaded);
+            
+            Sender.Tell(new Responses.StopInProcessEventsResponse());
         });
     }
 

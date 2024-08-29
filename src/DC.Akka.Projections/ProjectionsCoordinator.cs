@@ -48,7 +48,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
     private readonly HashSet<IActorRef> _waitingForCompletion = [];
 
-    private IActorRef? _sequencer;
+    private ProjectionSequencer<TId, TDocument>.Proxy _sequencer;
 
     public ProjectionsCoordinator(string projectionName)
     {
@@ -60,6 +60,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                              .GetConfigurationFor(projectionName) ??
                          throw new NoDocumentProjectionException<TDocument>(projectionName);
 
+        _sequencer = ProjectionSequencer<TId, TDocument>.Create(Context, _configuration);
+        
         Become(Stopped);
     }
 
@@ -79,15 +81,10 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             _killSwitch = MaybeCreateRestartSource(() =>
                 {
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Name, latestPosition);
-
-                    _configuration.ProjectorFactory.Reset();
-
-                    if (_sequencer != null)
-                        Context.Stop(_sequencer);
-
+                    
                     var cancellation = new CancellationTokenSource();
                     
-                    _sequencer = ProjectionSequencer<TId, TDocument>.Create(Context, _configuration, cancellation.Token);
+                    _sequencer.Reset(cancellation.Token);
                     
                     var source = _configuration.StartSource(latestPosition);
 
@@ -97,7 +94,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         .Select(x =>
                             new ProjectionSequencer<TId, TDocument>.Commands.StartProjecting(x))
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.StartProjectingResponse>(
-                            _sequencer,
+                            _sequencer.Ref,
                             _configuration.GetProjection().ProjectionTimeout,
                             1)
                         .SelectMany(x => x.Tasks)
@@ -131,7 +128,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                 result.PositionData);
                         })
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.WaitForGroupToFinishResponse>(
-                            _sequencer,
+                            _sequencer.Ref,
                             _configuration.GetProjection().ProjectionTimeout,
                             _configuration.ProjectionEventBatchingStrategy.GetParallelism())
                         .Select(x => x.PositionData);
@@ -183,8 +180,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
             _killSwitch?.Shutdown();
 
-            if (_sequencer != null)
-                Context.Stop(_sequencer);
+            _sequencer.Reset(CancellationToken.None);
 
             HandleCompletionWaiters();
 
@@ -199,8 +195,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
             _killSwitch?.Shutdown();
 
-            if (_sequencer != null)
-                Context.Stop(_sequencer);
+            _sequencer.Reset(CancellationToken.None);
 
             HandleCompletionWaiters(cmd.Cause);
 
@@ -211,8 +206,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         Receive<InternalCommands.Complete>(_ =>
         {
-            if (_sequencer != null)
-                Context.Stop(_sequencer);
+            _sequencer.Reset(CancellationToken.None);
 
             HandleCompletionWaiters();
 

@@ -26,7 +26,7 @@ public class When_projecting_three_batches_to_two_ids_with_settings_to_keep_one_
     {
         fixture.SecondResponse.Should().BeOfType<Messages.Acknowledge>();
     }
-    
+
     [Fact]
     public void Then_third_response_should_be_success()
     {
@@ -44,7 +44,7 @@ public class When_projecting_three_batches_to_two_ids_with_settings_to_keep_one_
     {
         fixture.SecondProjector.Should().BeNull();
     }
-    
+
     [PublicAPI]
     public class Fixture : TestKit, IAsyncLifetime
     {
@@ -67,7 +67,7 @@ public class When_projecting_three_batches_to_two_ids_with_settings_to_keep_one_
                 new InMemoryPositionStorage(),
                 factory,
                 null,
-                BatchEventBatchingStrategy.Default, 
+                BatchEventBatchingStrategy.Default,
                 BatchWithinEventPositionBatchingStrategy.Default,
                 new FakeEventsHandler());
 
@@ -80,16 +80,16 @@ public class When_projecting_three_batches_to_two_ids_with_settings_to_keep_one_
                     ImmutableList.Create(new EventWithPosition(new { }, 1)),
                     TimeSpan.FromSeconds(5),
                     CancellationToken.None);
-            
+
             SecondResponse = await secondProjector
                 .ProjectEvents(
-                    ImmutableList.Create(new EventWithPosition(new { }, 2)), 
+                    ImmutableList.Create(new EventWithPosition(new { }, 2)),
                     TimeSpan.FromSeconds(5),
                     CancellationToken.None);
-            
+
             ThirdResponse = await thirdProjector
                 .ProjectEvents(
-                    ImmutableList.Create(new EventWithPosition(new { }, 3)), 
+                    ImmutableList.Create(new EventWithPosition(new { }, 3)),
                     TimeSpan.FromSeconds(5),
                     CancellationToken.None);
 

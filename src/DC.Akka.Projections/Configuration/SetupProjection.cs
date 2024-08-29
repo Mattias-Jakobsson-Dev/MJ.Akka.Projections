@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace DC.Akka.Projections.Configuration;
 
-public class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument>
+internal class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument>
     where TId : notnull where TDocument : notnull
 {
     private readonly IImmutableDictionary<Type, Handler> _handlers;

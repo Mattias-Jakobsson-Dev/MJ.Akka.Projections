@@ -17,8 +17,13 @@ public class ActorRefProjectorProxy<TId, TDocument>(TId id, IActorRef projector)
             cancellationToken);
     }
 
-    public void StopAllInProgress()
+    public async Task StopAllInProgress(TimeSpan timeout)
     {
-        projector.Tell(new DocumentProjection<TId, TDocument>.Commands.StopInProcessEvents(id));
+        var response = await projector.Ask<DocumentProjection<TId, TDocument>.Responses.StopInProcessEventsResponse>(
+            new DocumentProjection<TId, TDocument>.Commands.StopInProcessEvents(id),
+            timeout);
+
+        if (response.Error is not null)
+            throw response.Error;
     }
 }

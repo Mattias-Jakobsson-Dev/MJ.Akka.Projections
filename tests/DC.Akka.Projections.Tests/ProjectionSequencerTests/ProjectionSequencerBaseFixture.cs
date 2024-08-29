@@ -23,8 +23,9 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
                 null,
                 BatchEventBatchingStrategy.Default,
                 BatchWithinEventPositionBatchingStrategy.Default,
-                new FakeEventHandler()),
-            CancellationToken.None);
+                new FakeEventHandler()));
+        
+        sequencer.Reset(CancellationToken.None);
 
         var batches = SetupBatches();
 
@@ -45,6 +46,7 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
                 .ToImmutableList();
             
             var response = await sequencer
+                .Ref
                 .Ask<ProjectionSequencer<string, TestDocument<string>>.Responses.StartProjectingResponse>(
                     new ProjectionSequencer<string, TestDocument<string>>.Commands.StartProjecting(
                         events));
@@ -83,11 +85,6 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
 
     private class TestProjectionFactory : IKeepTrackOfProjectors
     {
-        public void Reset()
-        {
-            
-        }
-
         public Task<IProjectorProxy> GetProjector<TId, TDocument>(
             TId id,
             ProjectionConfiguration configuration)
@@ -118,9 +115,9 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
                     events.GetHighestEventNumber());
             }
 
-            public void StopAllInProgress()
+            public Task StopAllInProgress(TimeSpan timeout)
             {
-                
+                return Task.CompletedTask;
             }
         }
     }

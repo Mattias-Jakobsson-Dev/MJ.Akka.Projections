@@ -63,6 +63,36 @@ public class TestProjection<TId>(IImmutableList<object> events)
 
                     return doc;
                 })
+            .On<Events<TId>.DelayHandlingWithoutCancellationToken>(
+                x => x.DocId,
+                async (evnt, doc) =>
+                {
+                    await Task.Delay(evnt.Delay);
+                    
+                    doc ??= new TestDocument<TId>
+                    {
+                        Id = evnt.DocId
+                    };
+                    
+                    doc.AddHandledEvent(evnt.EventId);
+
+                    return doc;
+                })
+            .On<Events<TId>.DelayHandlingWithCancellationToken>(
+                x => x.DocId,
+                async (evnt, doc, cancellationToken) =>
+                {
+                    await Task.Delay(evnt.Delay, cancellationToken);
+                    
+                    doc ??= new TestDocument<TId>
+                    {
+                        Id = evnt.DocId
+                    };
+                    
+                    doc.AddHandledEvent(evnt.EventId);
+
+                    return doc;
+                })
             .On<Events<TId>.FailProjection>(
                 x => x.DocId,
                 (evnt, doc) =>

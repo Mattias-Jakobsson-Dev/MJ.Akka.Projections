@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Akka.Actor;
+using Akka.Event;
 using DC.Akka.Projections.Configuration;
 using JetBrains.Annotations;
 
@@ -13,11 +14,16 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     {
         public record StartProjecting(IImmutableList<EventWithPosition> Events);
 
-        public record TaskFinished(Guid GroupId, Guid TaskId, TId? Id, Messages.IProjectEventsResponse Response);
-
         public record WaitForGroupToFinish(Guid GroupId, PositionData PositionData);
+    }
+    
+    private static class InternalCommands
+    {
+        public record TaskFinished(Guid GroupId, Guid TaskId, TId? Id, Messages.IProjectEventsResponse Response);
+        
+        public record Reset(CancellationToken CancellationToken);
 
-        public record StopAllInProgressHandlers;
+        public record Stop(Guid InstanceId);
     }
 
     public static class Responses
@@ -36,23 +42,42 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     private readonly Dictionary<Guid, WaitingGroup> _inProcessGroups = new();
 
     private readonly ProjectionConfiguration _configuration;
+    private readonly ILoggingAdapter _logger;
 
     private readonly
         Dictionary<TId, Queue<(ImmutableList<EventWithPosition> events,
             TaskCompletionSource<Messages.IProjectEventsResponse>
             task)>> _queues = new();
 
-    public ProjectionSequencer(ProjectionConfiguration configuration, CancellationToken cancellationToken)
+    public ProjectionSequencer(ProjectionConfiguration configuration)
     {
+        _logger = Context.GetLogger();
+        
         _configuration = configuration;
 
-        var self = Self;
+        Become(NotStarted);
+    }
 
-        cancellationToken
-            .Register(() => self.Tell(new Commands.StopAllInProgressHandlers()));
+    private void NotStarted()
+    {
+        Receive<InternalCommands.Reset>(cmd =>
+        {
+            var instanceId = Guid.NewGuid();
 
+            var self = Self;
+
+            cmd.CancellationToken.Register(() => self.Tell(new InternalCommands.Stop(instanceId)));
+            
+            Become(() => Started(instanceId, cmd.CancellationToken));
+        });
+    }
+
+    private void Started(Guid instanceId, CancellationToken cancellationToken)
+    {
         Receive<Commands.StartProjecting>(cmd =>
         {
+            var self = Self;
+            
             var tasks = new List<(
                 Guid groupId,
                 Guid taskId,
@@ -87,7 +112,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                 });
 
             foreach (var chunk in groupedEvents
-                         .Chunk(configuration.ProjectionEventBatchingStrategy.GetParallelism()))
+                         .Chunk(_configuration.ProjectionEventBatchingStrategy.GetParallelism()))
             {
                 var groupId = Guid.NewGuid();
 
@@ -142,11 +167,11 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                         .task
                         .ContinueWith(result =>
                         {
-                            Commands.TaskFinished response;
+                            InternalCommands.TaskFinished response;
 
                             if (result.IsCompletedSuccessfully)
                             {
-                                response = new Commands.TaskFinished(
+                                response = new InternalCommands.TaskFinished(
                                     groupId,
                                     task.taskId,
                                     task.documentId,
@@ -154,7 +179,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                             }
                             else
                             {
-                                response = new Commands.TaskFinished(
+                                response = new InternalCommands.TaskFinished(
                                     groupId,
                                     task.taskId,
                                     task.documentId,
@@ -162,14 +187,14 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                             }
 
                             self.Tell(response);
-                        });
+                        }, cancellationToken);
                 }
             }
 
             Sender.Tell(new Responses.StartProjectingResponse(tasks.ToImmutableList()));
         });
 
-        Receive<Commands.TaskFinished>(cmd =>
+        Receive<InternalCommands.TaskFinished>(cmd =>
         {
             HandleWaitingTasks(cmd.Id, cmd.Response, cancellationToken);
 
@@ -194,17 +219,53 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             group.WithWaiter(Sender, cmd.PositionData);
         });
 
-        ReceiveAsync<Commands.StopAllInProgressHandlers>(async _ =>
+        ReceiveAsync<InternalCommands.Reset>(async cmd =>
         {
-            foreach (var inprogressId in _inprogressIds)
-            {
-                var projector = await _configuration
-                    .ProjectorFactory
-                    .GetProjector<TId, TDocument>(inprogressId, _configuration);
+            var newInstanceId = Guid.NewGuid();
 
-                projector.StopAllInProgress();
-            }
+            var self = Self;
+
+            cmd.CancellationToken.Register(() => self.Tell(new InternalCommands.Stop(newInstanceId)));
+            
+            await StopInProgressHandlers();
+            
+            Become(() => Started(newInstanceId, cmd.CancellationToken));
         });
+        
+        ReceiveAsync<InternalCommands.Stop>(async cmd =>
+        {
+            if (instanceId != cmd.InstanceId)
+                return;
+            
+            await StopInProgressHandlers();
+            
+            Become(NotStarted);
+        });
+    }
+
+    private async Task StopInProgressHandlers()
+    {
+        try
+        {
+            var projectors = await Task.WhenAll(_inprogressIds
+                .Select(id => _configuration.ProjectorFactory.GetProjector<TId, TDocument>(id, _configuration)));
+
+            await Task.WhenAll(projectors
+                .Select(projector => projector.StopAllInProgress(_configuration.GetProjection().ProjectionTimeout)));
+        }
+        catch (Exception e)
+        {
+            _logger
+                .Warning(e, "Failed stopping one or more projectors for {0}", _configuration.Name);
+        }
+        finally
+        {
+            _inprogressIds.Clear();
+            
+            _inProcessGroups.Clear();
+            
+            _queues.Clear();
+        }
     }
 
     private void HandleWaitingTasks(
@@ -262,13 +323,24 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             cancellationToken);
     }
 
-    public static IActorRef Create(
+    public static Proxy Create(
         IActorRefFactory refFactory,
-        ProjectionConfiguration configuration,
-        CancellationToken cancellationToken)
+        ProjectionConfiguration configuration)
     {
-        return refFactory.ActorOf(
-            Props.Create(() => new ProjectionSequencer<TId, TDocument>(configuration, cancellationToken)));
+        var sequencer = refFactory.ActorOf(
+            Props.Create(() => new ProjectionSequencer<TId, TDocument>(configuration)));
+
+        return new Proxy(sequencer);
+    }
+    
+    public class Proxy(IActorRef sequencer)
+    {
+        public IActorRef Ref { get; } = sequencer;
+
+        public void Reset(CancellationToken cancellationToken)
+        {
+            Ref.Tell(new InternalCommands.Reset(cancellationToken));
+        }
     }
     
     private class WaitingGroup

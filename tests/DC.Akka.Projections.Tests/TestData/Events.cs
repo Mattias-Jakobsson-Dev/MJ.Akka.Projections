@@ -8,6 +8,10 @@ public static class Events<TId>
     
     public record UnHandledEvent(TId DocId);
 
+    public record DelayHandlingWithoutCancellationToken(TId DocId, string EventId, TimeSpan Delay) : IEvent;
+
+    public record DelayHandlingWithCancellationToken(TId DocId, string EventId, TimeSpan Delay) : IEvent;
+    
     public record TransformToMultipleEvents(IImmutableList<IEvent> Events);
 
     public record FailProjection(

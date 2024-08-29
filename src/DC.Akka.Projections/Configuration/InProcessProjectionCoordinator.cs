@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Akka.Actor;
-using Akka.Util;
 
 namespace DC.Akka.Projections.Configuration;
 
@@ -27,11 +26,8 @@ public class InProcessSingletonProjectionCoordinator(IImmutableDictionary<string
             
             foreach (var projection in _projections)
             {
-                var actorName = MurmurHash.StringHash(projection.Value.Name).ToString();
-            
                 var coordinator = actorSystem.ActorOf(
-                    projection.Value.CreateCoordinatorProps(),
-                    actorName);
+                    projection.Value.CreateCoordinatorProps());
                 
                 coordinator.Tell(new ProjectionsCoordinator.Commands.Start());
 
