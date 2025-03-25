@@ -1,4 +1,4 @@
-namespace DC.Akka.Projections.Benchmarks.Columns;
+namespace MJ.Akka.Projections.Benchmarks.Columns;
 
 public class EventsPerDocumentPerSecondColumn : EventsPerSecondColumn
 {

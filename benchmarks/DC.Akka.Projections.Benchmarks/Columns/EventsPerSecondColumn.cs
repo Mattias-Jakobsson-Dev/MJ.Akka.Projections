@@ -5,7 +5,7 @@ using BenchmarkDotNet.Engines;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
 
-namespace DC.Akka.Projections.Benchmarks.Columns;
+namespace MJ.Akka.Projections.Benchmarks.Columns;
 
 public abstract class EventsPerSecondColumn : IColumn
 {

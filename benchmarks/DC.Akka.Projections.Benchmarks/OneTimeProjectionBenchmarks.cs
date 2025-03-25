@@ -4,11 +4,11 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Loggers;
-using DC.Akka.Projections.Benchmarks.Columns;
-using DC.Akka.Projections.OneTime;
+using MJ.Akka.Projections.Benchmarks.Columns;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.OneTime;
 
-namespace DC.Akka.Projections.Benchmarks;
+namespace MJ.Akka.Projections.Benchmarks;
 
 [Config(typeof(Config))]
 public class OneTimeProjectionBenchmarks

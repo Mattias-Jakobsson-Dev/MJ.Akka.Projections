@@ -1,1 +1,1 @@
-# DC.Akka.Projections
+# MJ.Akka.Projections

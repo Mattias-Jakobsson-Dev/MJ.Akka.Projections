@@ -2,8 +2,9 @@ using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 using JetBrains.Annotations;
+using MJ.Akka.Projections;
 
-namespace DC.Akka.Projections.Benchmarks;
+namespace MJ.Akka.Projections.Benchmarks;
 
 public class TestProjection : StringIdProjection<TestProjection.TestDocument>
 {

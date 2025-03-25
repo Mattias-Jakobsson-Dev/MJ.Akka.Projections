@@ -5,7 +5,7 @@ using Raven.Client.Exceptions.Database;
 using Raven.Client.ServerWide;
 using Raven.Client.ServerWide.Operations;
 
-namespace DC.Akka.Projections.EventStoreToRavenDbExample;
+namespace MJ.Akka.Projections.EventStoreToRavenDbExample;
 
 public static class DocumentStoreExtensions
 {

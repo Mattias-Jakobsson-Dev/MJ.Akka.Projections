@@ -40,18 +40,18 @@ test:
 .PHONY: benchmark
 benchmark:
 ifeq ($(DETECTED_OS), Windows)
-	dotnet run -c Release --project ./benchmarks/DC.Akka.Projections.Benchmarks
+	dotnet run -c Release --project ./benchmarks/MJ.Akka.Projections.Benchmarks
 else
-	sudo dotnet run -c Release --project ./benchmarks/DC.Akka.Projections.Benchmarks
+	sudo dotnet run -c Release --project ./benchmarks/MJ.Akka.Projections.Benchmarks
 endif
 	$(MAKE) build
 
 .PHONY: package
 package: clean
-	dotnet pack ./src/DC.Akka.Projections -c Release -o ./.packages
-	dotnet pack ./src/DC.Akka.Projections.Cluster.Sharding -c Release -o ./.packages
-	dotnet pack ./src/DC.Akka.Projections.Storage.RavenDb -c Release -o ./.packages
-	dotnet pack ./src/DC.Akka.Projections.Storage.InfluxDb -c Release -o ./.packages
+	dotnet pack ./src/MJ.Akka.Projections -c Release -o ./.packages
+	dotnet pack ./src/MJ.Akka.Projections.Cluster.Sharding -c Release -o ./.packages
+	dotnet pack ./src/MJ.Akka.Projections.Storage.RavenDb -c Release -o ./.packages
+	dotnet pack ./src/MJ.Akka.Projections.Storage.InfluxDb -c Release -o ./.packages
 
 .PHONY: publish
 publish: package

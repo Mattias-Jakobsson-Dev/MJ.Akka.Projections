@@ -12,8 +12,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\DC.Akka.Projections\DC.Akka.Projections.csproj" />
-      <ProjectReference Include="..\..\tests\DC.Akka.Projections.Tests\DC.Akka.Projections.Tests.csproj" />
+      <ProjectReference Include="..\..\src\MJ.Akka.Projections\MJ.Akka.Projections.csproj" />
+      <ProjectReference Include="..\..\tests\MJ.Akka.Projections.Tests\MJ.Akka.Projections.Tests.csproj" />
     </ItemGroup>
 
 </Project>

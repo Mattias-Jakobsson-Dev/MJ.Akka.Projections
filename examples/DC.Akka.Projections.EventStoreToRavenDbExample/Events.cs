@@ -1,4 +1,4 @@
-namespace DC.Akka.Projections.EventStoreToRavenDbExample;
+namespace MJ.Akka.Projections.EventStoreToRavenDbExample;
 
 public static class Events
 {

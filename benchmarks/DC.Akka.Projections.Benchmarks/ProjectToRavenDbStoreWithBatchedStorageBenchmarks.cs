@@ -1,9 +1,9 @@
 using BenchmarkDotNet.Attributes;
-using DC.Akka.Projections.Configuration;
-using DC.Akka.Projections.Storage.RavenDb;
-using DC.Akka.Projections.Tests;
+using MJ.Akka.Projections.Storage.RavenDb;
+using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Tests;
 
-namespace DC.Akka.Projections.Benchmarks;
+namespace MJ.Akka.Projections.Benchmarks;
 
 public class ProjectToRavenDbStoreWithBatchedStorageBenchmarks : BaseProjectionBenchmarks
 {

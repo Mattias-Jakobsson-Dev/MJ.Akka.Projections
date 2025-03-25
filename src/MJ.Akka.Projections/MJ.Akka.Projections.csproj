@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>12</LangVersion>
+        <RootNamespace>MJ.Akka.Projections</RootNamespace>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Copyright>Copyright © 2025 Mattias Jakobsson</Copyright>
+        <Authors>Mattias Jakobsson</Authors>
+        <Version>0.1.0</Version>
+        <PackageProjectUrl>
+            https://github.com/Mattias-Jakobsson-Dev/MJ.Akka.Projections
+        </PackageProjectUrl>
+        <PackageTags>akka</PackageTags>
+        <PackageLicenseUrl>https://github.com/Mattias-Jakobsson-Dev/MJ.Akka.Projections/blob/master/LICENSE</PackageLicenseUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Akka" Version="1.5.40" />
+      <PackageReference Include="Akka.Streams" Version="1.5.40" />
+      <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" />
+    </ItemGroup>
+
+</Project>

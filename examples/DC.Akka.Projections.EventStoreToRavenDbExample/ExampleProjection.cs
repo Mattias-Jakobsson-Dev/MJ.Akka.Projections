@@ -4,8 +4,9 @@ using Akka.Actor;
 using Akka.Persistence.EventStore.Query;
 using Akka.Persistence.Query;
 using Akka.Streams.Dsl;
+using MJ.Akka.Projections;
 
-namespace DC.Akka.Projections.EventStoreToRavenDbExample;
+namespace MJ.Akka.Projections.EventStoreToRavenDbExample;
 
 public class ExampleProjection(ActorSystem actorSystem) : StringIdProjection<ExampleDocument>
 {

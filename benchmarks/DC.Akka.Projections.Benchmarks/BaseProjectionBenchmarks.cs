@@ -4,11 +4,12 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Loggers;
-using DC.Akka.Projections.Benchmarks.Columns;
-using DC.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Benchmarks.Columns;
 using JetBrains.Annotations;
+using MJ.Akka.Projections;
+using MJ.Akka.Projections.Configuration;
 
-namespace DC.Akka.Projections.Benchmarks;
+namespace MJ.Akka.Projections.Benchmarks;
 
 [Config(typeof(Config))]
 public abstract class BaseProjectionBenchmarks

@@ -1,7 +1,7 @@
-using DC.Akka.Projections.Configuration;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.Configuration;
 
-namespace DC.Akka.Projections.Benchmarks;
+namespace MJ.Akka.Projections.Benchmarks;
 
 [PublicAPI]
 public class ProjectToInMemoryStoreWithNormalStorageBenchmarks : BaseProjectionBenchmarks

@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using JetBrains.Annotations;
 
-namespace DC.Akka.Projections.EventStoreToRavenDbExample;
+namespace MJ.Akka.Projections.EventStoreToRavenDbExample;
 
 [PublicAPI]
 public class ExampleDocument

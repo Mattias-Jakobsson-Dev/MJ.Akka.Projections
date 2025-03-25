@@ -1,6 +1,6 @@
 using BenchmarkDotNet.Running;
 
-namespace DC.Akka.Projections.Benchmarks.Columns;
+namespace MJ.Akka.Projections.Benchmarks.Columns;
 
 public class EventsPerSecondAttribute : Attribute
 {

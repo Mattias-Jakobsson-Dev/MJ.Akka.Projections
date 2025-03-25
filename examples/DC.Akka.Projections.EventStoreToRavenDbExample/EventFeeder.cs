@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Akka.Persistence;
 using Akka.Actor;
 
-namespace DC.Akka.Projections.EventStoreToRavenDbExample;
+namespace MJ.Akka.Projections.EventStoreToRavenDbExample;
 
 public class EventFeeder : ReceivePersistentActor
 {

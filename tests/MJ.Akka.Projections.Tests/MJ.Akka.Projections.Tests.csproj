@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\MJ.Akka.Projections.Cluster.Sharding\MJ.Akka.Projections.Cluster.Sharding.csproj" />
+      <ProjectReference Include="..\..\src\MJ.Akka.Projections.Storage.InfluxDb\MJ.Akka.Projections.Storage.InfluxDb.csproj" />
+      <ProjectReference Include="..\..\src\MJ.Akka.Projections.Storage.RavenDb\MJ.Akka.Projections.Storage.RavenDb.csproj" />
+      <ProjectReference Include="..\..\src\MJ.Akka.Projections\MJ.Akka.Projections.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Akka.TestKit.Xunit2" Version="1.5.40" />
+      <PackageReference Include="AutoFixture" Version="4.18.1" />
+      <PackageReference Include="Docker.DotNet" Version="3.125.15" />
+      <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+      <PackageReference Include="RavenDB.TestDriver" Version="6.2.4" />
+    </ItemGroup>
+
+</Project>

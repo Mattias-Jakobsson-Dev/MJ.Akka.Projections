@@ -3,11 +3,11 @@
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using Akka.Actor;
-using DC.Akka.Projections.Configuration;
-using DC.Akka.Projections.EventStoreToRavenDbExample;
-using DC.Akka.Projections.Storage.RavenDb;
+using MJ.Akka.Projections.EventStoreToRavenDbExample;
+using MJ.Akka.Projections.Storage.RavenDb;
 using Docker.DotNet;
 using Docker.DotNet.Models;
+using MJ.Akka.Projections.Configuration;
 using Raven.Client.Documents;
 using Sharprompt;
 
