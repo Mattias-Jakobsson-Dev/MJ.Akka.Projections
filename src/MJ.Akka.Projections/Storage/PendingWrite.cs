@@ -40,6 +40,8 @@ internal class PendingWrite : IPendingWrite
     public IImmutableList<DocumentToStore> ToUpsert { get; }
     public IImmutableList<DocumentToDelete> ToDelete { get; }
     public CancellationToken CancellationToken { get; }
+    
+    public bool IsEmpty => ToUpsert.Count == 0 && ToDelete.Count == 0 && _completions.Count == 0;
 
     public IPendingWrite MergeWith(IPendingWrite other)
     {

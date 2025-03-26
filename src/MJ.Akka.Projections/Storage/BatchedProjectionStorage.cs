@@ -9,7 +9,7 @@ namespace MJ.Akka.Projections.Storage;
 public class BatchedProjectionStorage : IProjectionStorage
 {
     public static IStorageBatchingStrategy DefaultStrategy { get; } = new BatchSizeStorageBatchingStrategy(100);
-    
+
     private readonly IProjectionStorage _innerStorage;
     private readonly ISourceQueueWithComplete<IPendingWrite> _writeQueue;
 
@@ -24,18 +24,32 @@ public class BatchedProjectionStorage : IProjectionStorage
         var queue = Source
             .Queue<IPendingWrite>(int.MaxValue, OverflowStrategy.Backpressure);
 
-        queue = batchingStrategy.GetStrategy(queue);
-
-        _writeQueue = queue
+        _writeQueue = batchingStrategy
+            .GetStrategy(queue)
             .SelectAsync(
                 parallelism,
-                async write =>
+                async writes =>
                 {
+                    var cancelledWrite = writes
+                        .Where(x => x.CancellationToken.IsCancellationRequested)
+                        .Aggregate(
+                            (IPendingWrite)PendingWrite.Empty,
+                            (current, pending) => current.MergeWith(pending));
+
+                    cancelledWrite.Fail(new OperationCanceledException("Write was cancelled"));
+
+                    var write = writes
+                        .Where(x => !x.CancellationToken.IsCancellationRequested)
+                        .Aggregate(
+                            (IPendingWrite)PendingWrite.Empty,
+                            (current, pending) => current.MergeWith(pending));
+
+                    if (write.IsEmpty)
+                        return NotUsed.Instance;
+                    
                     try
                     {
-                        write.CancellationToken.ThrowIfCancellationRequested();
-                        
-                        await _innerStorage.Store(write.ToUpsert, write.ToDelete, write.CancellationToken);
+                        await _innerStorage.Store(write.ToUpsert, write.ToDelete);
 
                         write.Completed();
                     }

@@ -4,7 +4,6 @@ using Akka.TestKit.Xunit2;
 using AutoFixture;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
-using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -90,7 +89,7 @@ public class BatchedProjectionStorageTests : TestKit
     }
     
     [Fact]
-    public async Task Ensure_cancellation_token_cancels_two_writes()
+    public async Task Ensure_cancellation_token_cancels_two_writes_with_same_token()
     {
         var innerStorage = new StorageWithDelay(TimeSpan.FromSeconds(10));
         
@@ -102,6 +101,8 @@ public class BatchedProjectionStorageTests : TestKit
         var firstId = _fixture.Create<string>();
         var secondId = _fixture.Create<string>();
 
+        await cancellationTokenSource.CancelAsync();
+        
         var firstTask = batchedStorage
             .Store(
                 ImmutableList.Create(new DocumentToStore(firstId, new TestDocument<string>
@@ -120,13 +121,57 @@ public class BatchedProjectionStorageTests : TestKit
                 ImmutableList<DocumentToDelete>.Empty,
                 cancellationTokenSource.Token);
         
-        await cancellationTokenSource.CancelAsync();
-        
         await firstTask
             .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
         
         await secondTask
             .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+    }
+    
+    [Fact]
+    public async Task Ensure_cancellation_token_cancels_correct_write()
+    {
+        var innerStorage = new TestInMemoryProjectionStorage();
+        
+        var batchedStorage = innerStorage
+            .Batched(Sys, 1, new NoStorageBatchingStrategy());
+        
+        var firstCancellationTokenSource = new CancellationTokenSource();
+        var secondCancellationTokenSource = new CancellationTokenSource();
+        
+        var firstId = _fixture.Create<string>();
+        var secondId = _fixture.Create<string>();
+
+        await firstCancellationTokenSource.CancelAsync();
+        
+        var firstTask = batchedStorage
+            .Store(
+                ImmutableList.Create(new DocumentToStore(firstId, new TestDocument<string>
+                {
+                    Id = firstId
+                })),
+                ImmutableList<DocumentToDelete>.Empty,
+                firstCancellationTokenSource.Token);
+        
+        var secondTask = batchedStorage
+            .Store(
+                ImmutableList.Create(new DocumentToStore(secondId, new TestDocument<string>
+                {
+                    Id = secondId
+                })),
+                ImmutableList<DocumentToDelete>.Empty,
+                secondCancellationTokenSource.Token);
+        
+        await firstTask
+            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+
+        await secondTask
+            .ShouldCompleteWithin(TimeSpan.FromSeconds(1));
+        
+        var document = await innerStorage.LoadDocument<TestDocument<string>>(secondId, secondCancellationTokenSource.Token);
+
+        document.Should().NotBeNull();
+        document!.Id.Should().Be(secondId);
     }
     
     private class StorageWithDelay(TimeSpan delay) : IProjectionStorage

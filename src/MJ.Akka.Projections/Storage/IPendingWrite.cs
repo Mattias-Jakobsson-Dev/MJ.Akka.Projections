@@ -5,6 +5,8 @@ namespace MJ.Akka.Projections.Storage;
 
 public interface IPendingWrite
 {
+    public bool IsEmpty { get; }
+    
     CancellationToken CancellationToken { get; }
     IImmutableList<DocumentToStore> ToUpsert { get; }
     IImmutableList<DocumentToDelete> ToDelete { get; }
