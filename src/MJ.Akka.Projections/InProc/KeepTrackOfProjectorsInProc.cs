@@ -24,6 +24,14 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
         return Task.FromResult<IProjectorProxy>(new InProcDocumentProjectorProxy<TId, TDocument>(id, coordinator));
     }
 
+    public IKeepTrackOfProjectors Reset()
+    {
+        foreach (var coordinator in _coordinators)
+            actorSystem.Stop(coordinator.Value);
+
+        return new KeepTrackOfProjectorsInProc(actorSystem, passivationHandler);
+    }
+
     private class InProcDocumentProjectorProxy<TId, TDocument>(TId id, IActorRef coordinator) : IProjectorProxy
         where TId : notnull where TDocument : notnull
     {

@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using Akka.Actor;
 using Akka.Cluster.Sharding;
-using MJ.Akka.Projections;
 using MJ.Akka.Projections.Configuration;
 
 namespace MJ.Akka.Projections.Cluster.Sharding;
@@ -26,6 +25,11 @@ public class ShardedProjectors(ActorSystem actorSystem, ClusterShardingSettings 
                     new MessageExtractor<TId, TDocument>(maxNumberOfShards, configuration)));
 
         return new ActorRefProjectorProxy<TId, TDocument>(id, projector);
+    }
+
+    public IKeepTrackOfProjectors Reset()
+    {
+        return this;
     }
 
     private class MessageExtractor<TId, TDocument>(

@@ -44,6 +44,8 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     private readonly ProjectionConfiguration _configuration;
     private readonly ILoggingAdapter _logger;
 
+    private IKeepTrackOfProjectors _projectorFactory;
+
     private readonly
         Dictionary<TId, Queue<(ImmutableList<EventWithPosition> events,
             TaskCompletionSource<Messages.IProjectEventsResponse>
@@ -54,6 +56,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
         _logger = Context.GetLogger();
         
         _configuration = configuration;
+        _projectorFactory = configuration.ProjectorFactory;
 
         Become(NotStarted);
     }
@@ -67,6 +70,8 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             var self = Self;
 
             cmd.CancellationToken.Register(() => self.Tell(new InternalCommands.Stop(instanceId)));
+
+            _projectorFactory = _projectorFactory.Reset();
             
             Become(() => Started(instanceId, cmd.CancellationToken));
         });
@@ -228,6 +233,8 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             cmd.CancellationToken.Register(() => self.Tell(new InternalCommands.Stop(newInstanceId)));
             
             await StopInProgressHandlers();
+
+            _projectorFactory = _projectorFactory.Reset();
             
             Become(() => Started(newInstanceId, cmd.CancellationToken));
         });
@@ -238,7 +245,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                 return;
             
             await StopInProgressHandlers();
-            
+
             Become(NotStarted);
         });
     }
@@ -256,7 +263,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             }
             
             var projectors = await Task.WhenAll(_inprogressIds
-                .Select(id => _configuration.ProjectorFactory.GetProjector<TId, TDocument>(id, _configuration)));
+                .Select(id => _projectorFactory.GetProjector<TId, TDocument>(id, _configuration)));
 
             await Task.WhenAll(projectors
                 .Select(projector => projector.StopAllInProgress(_configuration.GetProjection().ProjectionTimeout)));
@@ -323,7 +330,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
         ImmutableList<EventWithPosition> events,
         CancellationToken cancellationToken)
     {
-        var projector = await _configuration.ProjectorFactory.GetProjector<TId, TDocument>(id, _configuration);
+        var projector = await _projectorFactory.GetProjector<TId, TDocument>(id, _configuration);
 
         return await projector.ProjectEvents(
             events,

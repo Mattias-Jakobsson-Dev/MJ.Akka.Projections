@@ -92,6 +92,11 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
             return Task.FromResult<IProjectorProxy>(new TestProjectionProxy());
         }
 
+        public IKeepTrackOfProjectors Reset()
+        {
+            return new TestProjectionFactory();
+        }
+
         private class TestProjectionProxy : IProjectorProxy
         {
             public async Task<Messages.IProjectEventsResponse> ProjectEvents(

@@ -6,4 +6,6 @@ public interface IKeepTrackOfProjectors
         TId id,
         ProjectionConfiguration configuration)
         where TId : notnull where TDocument : notnull;
+
+    IKeepTrackOfProjectors Reset();
 }

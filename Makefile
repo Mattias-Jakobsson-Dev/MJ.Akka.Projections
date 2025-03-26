@@ -37,6 +37,10 @@ build:
 test:
 	dotnet test
 
+.PHONY: example
+example:
+	dotnet run --project ./examples/MJ.Akka.Projections.EventStoreToRavenDbExample
+
 .PHONY: benchmark
 benchmark:
 ifeq ($(DETECTED_OS), Windows)
