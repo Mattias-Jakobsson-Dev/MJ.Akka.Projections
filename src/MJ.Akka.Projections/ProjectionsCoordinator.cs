@@ -130,7 +130,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         .Ask<ProjectionSequencer<TId, TDocument>.Responses.WaitForGroupToFinishResponse>(
                             _sequencer.Ref,
                             _configuration.GetProjection().ProjectionTimeout,
-                            _configuration.ProjectionEventBatchingStrategy.GetParallelism())
+                            _configuration.ProjectionEventBatchingStrategy.GetParallelism() * 2)
                         .Select(x => x.PositionData);
 
                     return _configuration
