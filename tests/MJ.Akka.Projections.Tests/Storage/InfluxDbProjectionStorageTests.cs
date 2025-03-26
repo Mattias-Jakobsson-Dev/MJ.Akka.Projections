@@ -8,7 +8,6 @@ using InfluxDB.Client.Api.Domain;
 using InfluxDB.Client.Core.Exceptions;
 using InfluxDB.Client.Writes;
 using JetBrains.Annotations;
-using MJ.Akka.Projections.Storage;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.Storage;
@@ -191,6 +190,6 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
 
     protected override InfluxDbTimeSeriesId CreateRandomId()
     {
-        return new InfluxDbTimeSeriesId(fixture.BucketName, fixture.Organization);
+        return new InfluxDbTimeSeriesId(fixture.BucketName, fixture.Organization, Guid.NewGuid().ToString());
     }
 }
