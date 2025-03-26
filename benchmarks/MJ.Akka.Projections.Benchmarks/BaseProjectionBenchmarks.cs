@@ -6,7 +6,6 @@ using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Loggers;
 using MJ.Akka.Projections.Benchmarks.Columns;
 using JetBrains.Annotations;
-using MJ.Akka.Projections;
 using MJ.Akka.Projections.Configuration;
 
 namespace MJ.Akka.Projections.Benchmarks;
@@ -76,9 +75,9 @@ public abstract class BaseProjectionBenchmarks
         return ImmutableList.Create(
             new BatchingStrategyConfiguration("default", BatchEventBatchingStrategy.Default),
             new BatchingStrategyConfiguration("100 within 50ms", 
-                new BatchWithinEventBatchingStrategy(100, TimeSpan.FromMilliseconds(50), 100)),
+                new BatchWithinEventBatchingStrategy(100, TimeSpan.FromMilliseconds(50))),
             new BatchingStrategyConfiguration("1 000 within 50ms", 
-                new BatchWithinEventBatchingStrategy(1_000, TimeSpan.FromMilliseconds(50), 100)),
+                new BatchWithinEventBatchingStrategy(1_000, TimeSpan.FromMilliseconds(50))),
             new BatchingStrategyConfiguration("no batching", new NoEventBatchingStrategy(100)));
     }
     

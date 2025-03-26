@@ -4,13 +4,13 @@ using Akka.Streams.Dsl;
 
 namespace MJ.Akka.Projections;
 
-public class BatchEventBatchingStrategy(int batchSize, int parallelism) : IEventBatchingStrategy
+public class BatchEventBatchingStrategy(int batchSize) : IEventBatchingStrategy
 {
-    public static BatchEventBatchingStrategy Default { get; } = new(1_000, 100);
+    public static BatchEventBatchingStrategy Default { get; } = new(100);
     
     public int GetParallelism()
     {
-        return parallelism;
+        return batchSize;
     }
 
     public Source<ImmutableList<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)

@@ -3,11 +3,9 @@ using System.Collections.Immutable;
 using Akka.Streams;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
-using MJ.Akka.Projections;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
-using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -91,8 +89,7 @@ public class LargeNumberOfEventsTests : TestKit
             x => x
                 .WithEventBatchingStrategy(new BatchWithinEventBatchingStrategy(
                     100,
-                    TimeSpan.FromMilliseconds(50),
-                    100))
+                    TimeSpan.FromMilliseconds(50)))
                 .WithRestartSettings(null),
             new InMemoryProjectionStorage());
     }
@@ -112,8 +109,7 @@ public class LargeNumberOfEventsTests : TestKit
             x => x
                 .WithEventBatchingStrategy(new BatchWithinEventBatchingStrategy(
                     100,
-                    TimeSpan.FromMilliseconds(50),
-                    100))
+                    TimeSpan.FromMilliseconds(50)))
                 .WithRestartSettings(null),
             new InMemoryProjectionStorage()
                 .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));

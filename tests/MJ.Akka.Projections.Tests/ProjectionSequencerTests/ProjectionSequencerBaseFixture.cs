@@ -2,10 +2,8 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
-using MJ.Akka.Projections;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Configuration;
-using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 

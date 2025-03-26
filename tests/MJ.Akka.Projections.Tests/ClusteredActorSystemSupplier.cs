@@ -5,7 +5,6 @@ using Akka.Cluster.Sharding;
 using Akka.Cluster.Tools.Singleton;
 using Akka.Configuration;
 using Akka.TestKit.Xunit2;
-using MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 using JetBrains.Annotations;
 
 namespace MJ.Akka.Projections.Tests;
@@ -26,7 +25,7 @@ public class ClusteredActorSystemSupplier : TestKit, IHaveActorSystem
                                               akka.remote.dot-netty.tcp.hostname = 127.0.0.1
                                               """)
                 .WithFallback(DefaultConfig)
-                .WithFallback(ClusterSingletonManager.DefaultConfig())
+                .WithFallback(ClusterSingleton.DefaultConfig())
                 .WithFallback(ClusterSharding.DefaultConfig()));
     }
     

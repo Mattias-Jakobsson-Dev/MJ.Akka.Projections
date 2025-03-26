@@ -6,11 +6,13 @@ using JetBrains.Annotations;
 namespace MJ.Akka.Projections;
 
 [PublicAPI]
-public class BatchWithinEventBatchingStrategy(int maxItems, TimeSpan timeout, int parallelism) : IEventBatchingStrategy
+public class BatchWithinEventBatchingStrategy(int maxItems, TimeSpan timeout) : IEventBatchingStrategy
 {
+    public static BatchWithinEventBatchingStrategy Default { get; } = new(100, TimeSpan.FromSeconds(1));
+    
     public int GetParallelism()
     {
-        return parallelism;
+        return maxItems;
     }
 
     public Source<ImmutableList<EventWithPosition>, NotUsed> Get(Source<EventWithPosition, NotUsed> source)

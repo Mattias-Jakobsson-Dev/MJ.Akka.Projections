@@ -3,7 +3,6 @@ using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.RavenDb;
 using FluentAssertions;
 using JetBrains.Annotations;
-using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Tests.TestData;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;

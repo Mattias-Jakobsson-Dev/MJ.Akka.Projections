@@ -2,13 +2,11 @@ using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using Akka.Util;
-using MJ.Akka.Projections;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.InProc;
-using MJ.Akka.Projections.Storage;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;

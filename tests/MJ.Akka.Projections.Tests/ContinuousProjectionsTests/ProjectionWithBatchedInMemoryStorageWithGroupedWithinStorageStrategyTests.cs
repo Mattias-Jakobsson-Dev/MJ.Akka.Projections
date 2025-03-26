@@ -1,6 +1,5 @@
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Configuration;
-using MJ.Akka.Projections.Storage;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;

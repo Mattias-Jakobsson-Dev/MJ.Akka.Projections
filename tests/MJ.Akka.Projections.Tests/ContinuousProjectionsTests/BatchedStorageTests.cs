@@ -5,7 +5,6 @@ using AutoFixture;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
-using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 

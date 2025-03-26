@@ -26,7 +26,7 @@ public record ProjectionSystemConfiguration(
     {
         return new ProjectionSystemConfiguration(
             null,
-            BatchEventBatchingStrategy.Default,
+            BatchWithinEventBatchingStrategy.Default,
             new InMemoryProjectionStorage(),
             new InMemoryPositionStorage(),
             BatchWithinEventPositionBatchingStrategy.Default,

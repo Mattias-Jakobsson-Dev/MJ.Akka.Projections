@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using MJ.Akka.Projections.Storage;
-using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.Tests.TestData;
 

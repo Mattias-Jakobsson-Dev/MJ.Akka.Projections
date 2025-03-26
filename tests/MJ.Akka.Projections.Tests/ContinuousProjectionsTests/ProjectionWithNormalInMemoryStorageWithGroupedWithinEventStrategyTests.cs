@@ -1,4 +1,3 @@
-using MJ.Akka.Projections;
 using MJ.Akka.Projections.Configuration;
 using Xunit;
 
@@ -16,8 +15,7 @@ public class ProjectionWithNormalInMemoryStorageWithGroupedWithinEventStrategyTe
                 .WithInMemoryStorage()
                 .WithEventBatchingStrategy(new BatchWithinEventBatchingStrategy(
                     100,
-                    TimeSpan.FromMilliseconds(100),
-                    100));
+                    TimeSpan.FromMilliseconds(100)));
         }
     }
 
@@ -31,8 +29,7 @@ public class ProjectionWithNormalInMemoryStorageWithGroupedWithinEventStrategyTe
                 .WithInMemoryStorage()
                 .WithEventBatchingStrategy(new BatchWithinEventBatchingStrategy(
                     100,
-                    TimeSpan.FromMilliseconds(100),
-                    100));
+                    TimeSpan.FromMilliseconds(100)));
         }
     }
 }

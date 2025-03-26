@@ -2,7 +2,6 @@ using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
-using MJ.Akka.Projections.Storage;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.Storage;

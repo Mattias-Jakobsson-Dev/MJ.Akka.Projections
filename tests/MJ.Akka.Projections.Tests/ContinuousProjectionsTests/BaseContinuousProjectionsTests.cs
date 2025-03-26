@@ -602,7 +602,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
     }
 
     [Fact]
-    public async Task Projecting_three_events_in_same_group_with_parallelism_1()
+    public async Task Projecting_three_events_in_same_group()
     {
         using var system = actorSystemHandler.StartNewActorSystem();
         
@@ -621,7 +621,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
             .Projections(config => Configure(config
                     .WithProjection(projection))
                 .WithEventBatchingStrategy(
-                    new BatchWithinEventBatchingStrategy(3, TimeSpan.FromSeconds(1), 1))
+                    new BatchWithinEventBatchingStrategy(3, TimeSpan.FromSeconds(1)))
                 .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
                 .WithModifiedConfig(conf =>
                 {
