@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Akka;
 using Akka.Actor;
 using Akka.Streams.Dsl;
-using MJ.Akka.Projections;
+using MJ.Akka.Projections.Configuration;
 
 namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
 
@@ -17,12 +17,12 @@ public class FakeProjection(TimeSpan delay) : IProjection<string, object>
         return Source.From(ImmutableList<EventWithPosition>.Empty);
     }
 
-    public Props CreateCoordinatorProps()
+    public Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier)
     {
-        return ProjectionsCoordinator<string, object>.Init(Name);
+        return ProjectionsCoordinator<string, object>.Init(configSupplier);
     }
 
-    public Props CreateProjectionProps(object id)
+    public Props CreateProjectionProps(object id, ISupplyProjectionConfigurations configSupplier)
     {
         return Props.Create(() => new FakeProjector(delay));
     }

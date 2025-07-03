@@ -1,17 +1,27 @@
 using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.Cluster.Sharding;
-using MJ.Akka.Projections;
 using MJ.Akka.Projections.Configuration;
 
 namespace MJ.Akka.Projections.Cluster.Sharding;
 
 public class ShardedDaemonProjectionCoordinator(
-    IImmutableDictionary<string, IProjectionProxy> projections) : IProjectionsCoordinator
+    IImmutableDictionary<string, IProjectionProxy> projections,
+    string runnerId) : IProjectionsCoordinator
 {
     public IProjectionProxy? Get(string projectionName)
     {
         return projections.GetValueOrDefault(projectionName);
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var coordinator in projections)
+            await coordinator.Value.Stop();
+        
+        StaticProjectionConfigurations.DisposeRunner(runnerId);
+        
+        GC.SuppressFinalize(this);
     }
 
     public class Setup(
@@ -19,18 +29,28 @@ public class ShardedDaemonProjectionCoordinator(
         string name,
         ShardedDaemonProcessSettings settings) : IConfigureProjectionCoordinator
     {
-        private readonly Dictionary<string, IProjection> _projections = new();
+        private readonly Dictionary<string, ProjectionConfiguration> _projections = new();
 
-        public void WithProjection(IProjection projection)
+        public void WithProjection(ProjectionConfiguration projection)
         {
             _projections[projection.Name] = projection;
         }
-
+        
         public async Task<IProjectionsCoordinator> Start()
         {
+            var runnerId = Guid.NewGuid().ToString();
+             
+            StaticProjectionConfigurations.ConfigureRunner(
+                runnerId,
+                _projections.ToImmutableDictionary());
+            
             var sortedProjections = _projections
-                .Select(x => x.Value)
-                .OrderBy(x => x.Name)
+                .Select(x => new
+                {
+                    Config = x.Value,
+                    Instance = x.Value.GetProjection()
+                })
+                .OrderBy(x => x.Config.Name)
                 .ToImmutableList();
 
             ShardedDaemonProcess
@@ -38,7 +58,10 @@ public class ShardedDaemonProjectionCoordinator(
                 .Init(
                     name,
                     sortedProjections.Count,
-                    id => sortedProjections[id].CreateCoordinatorProps(),
+                    id => sortedProjections[id]
+                        .Instance
+                        .CreateCoordinatorProps(
+                            StaticProjectionConfigurations.SupplierFor(runnerId, sortedProjections[id].Config.Name)),
                     settings,
                     new ProjectionsCoordinator.Commands.Kill());
 
@@ -56,13 +79,13 @@ public class ShardedDaemonProjectionCoordinator(
                     Projection = projection
                 })
                 .ToImmutableDictionary(
-                    x => x.Projection.Name, 
-                    x => (IProjectionProxy)new ShardedDaemonProjectionProxy(
-                        x.Projection,
+                    x => x.Projection.Config.Name, 
+                    IProjectionProxy (x) => new ShardedDaemonProjectionProxy(
+                        x.Projection.Instance,
                         x.Id,
                         shardingRef));
 
-            return new ShardedDaemonProjectionCoordinator(projectionProxies);
+            return new ShardedDaemonProjectionCoordinator(projectionProxies, runnerId);
         }
     }
     
@@ -73,8 +96,8 @@ public class ShardedDaemonProjectionCoordinator(
         
         public Task Stop()
         {
-            return coordinator.Ask<ProjectionsCoordinator.Responses.StopResponse>(
-                WrapMessage(new ProjectionsCoordinator.Commands.Stop()));
+            return coordinator.Ask<ProjectionsCoordinator.Responses.KillResponse>(
+                WrapMessage(new ProjectionsCoordinator.Commands.Kill()));
         }
 
         public async Task WaitForCompletion(TimeSpan? timeout = null)

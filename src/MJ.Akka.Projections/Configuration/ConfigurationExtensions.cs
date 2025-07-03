@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Akka.Streams;
 using MJ.Akka.Projections.Storage;
 
@@ -103,18 +102,12 @@ public static class ConfigurationExtensions
     internal static IConfigureProjectionCoordinator Build(
         this IHaveConfiguration<ProjectionSystemConfiguration> conf)
     {
-        var result = new Dictionary<string, ProjectionConfiguration>();
-
         foreach (var projection in conf.Config.Projections)
         {
             var configuration = projection.Value(conf.Config);
 
-            conf.Config.Coordinator.WithProjection(configuration.GetProjection());
-
-            result[projection.Key] = configuration;
+            conf.Config.Coordinator.WithProjection(configuration);
         }
-
-        ProjectionConfigurationsSupplier.Register(conf.ActorSystem, result.ToImmutableDictionary());
 
         return conf.Config.Coordinator;
     }

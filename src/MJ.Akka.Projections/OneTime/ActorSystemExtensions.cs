@@ -45,13 +45,11 @@ public static class ActorSystemExtensions
         {
             storage.Clear();
             
-            var result = await coordinator.Start();
+            await using var result = await coordinator.Start();
 
             var projectionProxy = result.Get(projectionName)!;
             
             await projectionProxy.WaitForCompletion(timeout);
-
-            await projectionProxy.Stop();
 
             return new Result(storage);
         }

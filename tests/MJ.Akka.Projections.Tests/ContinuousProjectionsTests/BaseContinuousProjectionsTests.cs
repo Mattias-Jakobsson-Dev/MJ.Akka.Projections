@@ -470,6 +470,45 @@ public abstract class BaseContinuousProjectionsTests<TId, TDocument>(IHaveActorS
 
         document.Should().BeNull();
     }
+    
+    [Fact]
+    public async Task Projecting_one_event_for_one_document()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+        
+        var id = Fixture.Create<TId>();
+
+        var firstEvent = GetTestEvent(id);
+        
+        var events = ImmutableList.Create(firstEvent);
+        var projection = GetProjection(events);
+        IProjectionStorage projectionStorage = null!;
+        IProjectionPositionStorage positionStorage = null!;
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedConfig(conf =>
+                {
+                    projectionStorage = conf.ProjectionStorage!;
+                    positionStorage = conf.PositionStorage!;
+
+                    return conf;
+                }))
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+
+        var position = await positionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(1);
+
+        var document = await projectionStorage.LoadDocument<TDocument>(id);
+
+        document.Should().NotBeNull();
+        
+        await VerifyDocument(id, document!, events, projection);
+    }
 
     [Fact]
     public async Task Projecting_two_events_for_one_document()

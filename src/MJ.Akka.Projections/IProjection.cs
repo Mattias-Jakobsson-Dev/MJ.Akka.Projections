@@ -1,6 +1,7 @@
 using Akka;
 using Akka.Actor;
 using Akka.Streams.Dsl;
+using MJ.Akka.Projections.Configuration;
 
 namespace MJ.Akka.Projections;
 
@@ -9,8 +10,8 @@ public interface IProjection
     string Name { get; }
     TimeSpan ProjectionTimeout { get; }
     Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
-    Props CreateCoordinatorProps();
-    Props CreateProjectionProps(object id);
+    Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier);
+    Props CreateProjectionProps(object id, ISupplyProjectionConfigurations configSupplier);
 }
 
 public interface IProjection<TId, TDocument> : IProjection where TId : notnull where TDocument : notnull

@@ -32,16 +32,12 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
     private readonly TId _id;
     private readonly ILoggingAdapter _logger;
 
-    public DocumentProjection(string projectionName, TId id)
+    public DocumentProjection(TId id, ISupplyProjectionConfigurations configSupplier)
     {
         _id = id;
         _logger = Context.GetLogger();
 
-        _configuration = Context
-                             .System
-                             .GetExtension<ProjectionConfigurationsSupplier>()?
-                             .GetConfigurationFor(projectionName) ??
-                         throw new NoDocumentProjectionException<TDocument>(projectionName);
+        _configuration = configSupplier.GetConfiguration();
 
         Become(NotLoaded);
     }
@@ -227,9 +223,9 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
         }
     }
 
-    public static Props Init(string projectionName, TId id)
+    public static Props Init(TId id, ISupplyProjectionConfigurations configSupplier)
     {
-        return Props.Create(() => new DocumentProjection<TId, TDocument>(projectionName, id));
+        return Props.Create(() => new DocumentProjection<TId, TDocument>(id, configSupplier));
     }
 
     private record ProjectionResponse(TDocument? Document, Messages.IProjectEventsResponse Response);

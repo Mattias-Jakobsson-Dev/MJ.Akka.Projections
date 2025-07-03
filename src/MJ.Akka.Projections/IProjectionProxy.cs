@@ -6,7 +6,8 @@ namespace MJ.Akka.Projections;
 public interface IProjectionProxy
 {
     IProjection Projection { get; }
-        
-    Task Stop();
+
     Task WaitForCompletion(TimeSpan? timeout = null);
+    
+    Task Stop();
 }

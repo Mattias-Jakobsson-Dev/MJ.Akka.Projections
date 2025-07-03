@@ -17,7 +17,8 @@ public static class ConfigurationExtensions
             .WithProjectionFactory(new ShardedProjectors(
                 setup.ActorSystem,
                 (configureShard ?? (x => x))(ClusterShardingSettings.Create(setup.ActorSystem)),
-                maxNumberOfShards));
+                maxNumberOfShards,
+                Guid.NewGuid().ToString()));
     }
 
     public static IConfigurePart<ProjectionSystemConfiguration, ClusterSingletonProjectionCoordinator.Setup>

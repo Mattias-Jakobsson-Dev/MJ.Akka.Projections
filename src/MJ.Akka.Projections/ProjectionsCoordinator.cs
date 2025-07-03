@@ -15,8 +15,6 @@ public static class ProjectionsCoordinator
     {
         public record Start;
 
-        public record Stop;
-
         public record Kill;
 
         public record WaitForCompletion;
@@ -26,7 +24,7 @@ public static class ProjectionsCoordinator
     {
         public record WaitForCompletionResponse(Exception? Error = null);
 
-        public record StopResponse;
+        public record KillResponse;
     }
 }
 
@@ -50,24 +48,20 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
     private ProjectionSequencer<TId, TDocument>.Proxy _sequencer;
 
-    public ProjectionsCoordinator(string projectionName)
+    public ProjectionsCoordinator(ISupplyProjectionConfigurations configSupplier)
     {
         _logger = Context.GetLogger();
 
-        _configuration = Context
-                             .System
-                             .GetExtension<ProjectionConfigurationsSupplier>()?
-                             .GetConfigurationFor(projectionName) ??
-                         throw new NoDocumentProjectionException<TDocument>(projectionName);
+        _configuration = configSupplier.GetConfiguration();
 
         _sequencer = ProjectionSequencer<TId, TDocument>.Create(Context, _configuration);
         
         Become(Stopped);
     }
 
-    public static Props Init(string projectionName)
+    public static Props Init(ISupplyProjectionConfigurations configSupplier)
     {
-        return Props.Create(() => new ProjectionsCoordinator<TId, TDocument>(projectionName));
+        return Props.Create(() => new ProjectionsCoordinator<TId, TDocument>(configSupplier));
     }
 
     private void Stopped()
@@ -162,33 +156,21 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             Become(Started);
         });
 
-        Receive<ProjectionsCoordinator.Commands.Kill>(_ => { Context.Stop(Self); });
-
-        Receive<ProjectionsCoordinator.Commands.Stop>(_ =>
+        Receive<ProjectionsCoordinator.Commands.Kill>(_ =>
         {
-            Sender.Tell(new ProjectionsCoordinator.Responses.StopResponse());
+            Context.Stop(Self);
+            
+            Sender.Tell(new ProjectionsCoordinator.Responses.KillResponse());
         });
-
-        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ => { _waitingForCompletion.Add(Sender); });
+        
+        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ =>
+        {
+            _waitingForCompletion.Add(Sender);
+        });
     }
 
     private void Started()
     {
-        Receive<ProjectionsCoordinator.Commands.Stop>(_ =>
-        {
-            _logger.Info("Stopping projection {0}", _configuration.Name);
-
-            _killSwitch?.Shutdown();
-
-            _sequencer.Reset(CancellationToken.None);
-
-            HandleCompletionWaiters();
-
-            Become(Stopped);
-
-            Sender.Tell(new ProjectionsCoordinator.Responses.StopResponse());
-        });
-
         Receive<InternalCommands.Fail>(cmd =>
         {
             _logger.Error(cmd.Cause, "Projection {0} failed", _configuration.Name);
@@ -202,7 +184,10 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             Become(Stopped);
         });
 
-        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ => { _waitingForCompletion.Add(Sender); });
+        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ =>
+        {
+            _waitingForCompletion.Add(Sender);
+        });
 
         Receive<InternalCommands.Complete>(_ =>
         {
@@ -218,8 +203,12 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             _logger.Info("Killing projection {0}", _configuration.Name);
 
             _killSwitch?.Shutdown();
+            
+            HandleCompletionWaiters();
 
             Context.Stop(Self);
+            
+            Sender.Tell(new ProjectionsCoordinator.Responses.KillResponse());
         });
     }
 
@@ -230,13 +219,13 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             Sender.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
         });
 
-        Receive<ProjectionsCoordinator.Commands.Kill>(_ => { Context.Stop(Self); });
-
-        Receive<ProjectionsCoordinator.Commands.Stop>(_ =>
+        Receive<ProjectionsCoordinator.Commands.Kill>(_ =>
         {
-            Become(Stopped);
-
-            Sender.Tell(new ProjectionsCoordinator.Responses.StopResponse());
+            Context.Stop(Self);
+            
+            HandleCompletionWaiters();
+            
+            Sender.Tell(new ProjectionsCoordinator.Responses.KillResponse());
         });
     }
 

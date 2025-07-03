@@ -52,13 +52,6 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_ha
                 BatchWithinEventPositionBatchingStrategy.Default,
                 projection.Configure(new SetupProjection<string, TestDocument<string>>()).Build());
             
-            ProjectionConfigurationsSupplier.Register(
-                Sys,
-                new Dictionary<string, ProjectionConfiguration>
-                {
-                    [projection.Name] = projectionConfiguration
-                }.ToImmutableDictionary());
-            
             var projector = await factory.GetProjector<string, TestDocument<string>>(id, projectionConfiguration);
             
             var projectorTask = projector

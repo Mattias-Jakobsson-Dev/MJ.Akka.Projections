@@ -104,7 +104,10 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
                 var projectionRef = Context
                     .Child(id)
                     .GetOrElse(() => Context.ActorOf(
-                        projectionConfiguration.GetProjection().CreateProjectionProps(cmd.Id),
+                        projectionConfiguration.GetProjection()
+                            .CreateProjectionProps(
+                                cmd.Id,
+                                new InProcessProjectionConfigurationsSupplier(projectionConfiguration)),
                         id));
 
                 var self = Self;

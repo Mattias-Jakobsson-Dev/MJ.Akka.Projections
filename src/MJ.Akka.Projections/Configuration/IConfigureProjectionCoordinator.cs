@@ -2,6 +2,6 @@ namespace MJ.Akka.Projections.Configuration;
 
 public interface IConfigureProjectionCoordinator
 {
-    void WithProjection(IProjection projection);
+    void WithProjection(ProjectionConfiguration projection);
     Task<IProjectionsCoordinator> Start();
 }
