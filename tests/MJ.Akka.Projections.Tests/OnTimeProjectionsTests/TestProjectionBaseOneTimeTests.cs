@@ -14,7 +14,12 @@ public abstract class TestProjectionBaseOneTimeTests<TId>(IHaveActorSystem actor
     {
         return new TestProjection<TId>(events);
     }
-    
+
+    protected override IProjection<TId, TestDocument<TId>> GetSecondaryProjection(IImmutableList<object> events)
+    {
+        return new TestProjection<TId>(events, $"SecondaryTestProjectionOf{typeof(TId).Name}");
+    }
+
     protected override object GetEventThatFails(TId id, int numberOfFailures)
     {
         return new Events<TId>.FailProjection(

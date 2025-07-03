@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Akka.Streams;
 using Akka.TestKit.Extensions;
 using AutoFixture;
-using MJ.Akka.Projections;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.OneTime;
@@ -165,6 +164,78 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         await VerifyDocument(id, document!, events);
     }
+    
+    [Fact]
+    public async Task Projecting_two_events_for_two_projections_with_different_names()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TId>();
+
+        var firstEvent = GetTestEvent(id);
+        var secondEvent = GetTestEvent(id);
+
+        var events = ImmutableList.Create(firstEvent, secondEvent);
+        var firstProjection = GetProjection(events);
+
+        var firstResult = await system
+            .CreateOneTimeProjection(firstProjection, Configure)
+            .Run(TimeSpan.FromSeconds(5));
+
+        var firstDocument = await firstResult.Load(id);
+
+        firstDocument.Should().NotBeNull();
+
+        await VerifyDocument(id, firstDocument!, events);
+        
+        var secondProjection = GetSecondaryProjection(events);
+        
+        var secondResult = await system
+            .CreateOneTimeProjection(secondProjection, Configure)
+            .Run(TimeSpan.FromSeconds(5));
+
+        var secondDocument = await secondResult.Load(id);
+
+        secondDocument.Should().NotBeNull();
+
+        await VerifyDocument(id, secondDocument!, events);
+    }
+    
+    [Fact]
+    public async Task Projecting_two_events_for_two_projections_with_same_name()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TId>();
+
+        var firstEvent = GetTestEvent(id);
+        var secondEvent = GetTestEvent(id);
+
+        var events = ImmutableList.Create(firstEvent, secondEvent);
+        var firstProjection = GetProjection(events);
+
+        var firstResult = await system
+            .CreateOneTimeProjection(firstProjection, Configure)
+            .Run(TimeSpan.FromSeconds(5));
+
+        var firstDocument = await firstResult.Load(id);
+
+        firstDocument.Should().NotBeNull();
+
+        await VerifyDocument(id, firstDocument!, events);
+        
+        var secondProjection = GetProjection(events);
+        
+        var secondResult = await system
+            .CreateOneTimeProjection(secondProjection, Configure)
+            .Run(TimeSpan.FromSeconds(5));
+
+        var secondDocument = await secondResult.Load(id);
+
+        secondDocument.Should().NotBeNull();
+
+        await VerifyDocument(id, secondDocument!, events);
+    }
 
     [Fact]
     public async Task Projecting_two_events_for_two_documents()
@@ -231,6 +302,8 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
     }
 
     protected abstract IProjection<TId, TDocument> GetProjection(IImmutableList<object> events);
+    
+    protected abstract IProjection<TId, TDocument> GetSecondaryProjection(IImmutableList<object> events);
 
     protected abstract object GetEventThatFails(TId id, int numberOfFailures);
 

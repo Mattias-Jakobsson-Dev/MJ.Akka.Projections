@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
-using MJ.Akka.Projections;
 
 namespace MJ.Akka.Projections.Tests.TestData;
 
@@ -17,7 +16,7 @@ public static class TestProjection
             .ToImmutableDictionary();
 }
 
-public class TestProjection<TId>(IImmutableList<object> events)
+public class TestProjection<TId>(IImmutableList<object> events, string? overrideName = null)
     : BaseProjection<TId, TestDocument<TId>>
     where TId : notnull
 {
@@ -30,7 +29,7 @@ public class TestProjection<TId>(IImmutableList<object> events)
         return $"TestProjectionOf{typeof(TId).Name}";
     }
 
-    public override string Name => GetName();
+    public override string Name => !string.IsNullOrEmpty(overrideName) ? overrideName : GetName();
 
     public override TId IdFromString(string id)
     {
