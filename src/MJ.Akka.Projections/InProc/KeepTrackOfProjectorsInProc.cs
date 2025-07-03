@@ -6,10 +6,30 @@ using MJ.Akka.Projections.Configuration;
 
 namespace MJ.Akka.Projections.InProc;
 
-public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProjectionPassivation passivationHandler)
-    : IKeepTrackOfProjectors
+public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
 {
     private readonly ConcurrentDictionary<string, IActorRef> _coordinators = new();
+    private readonly ActorSystem _actorSystem;
+    private readonly IHandleProjectionPassivation _passivationHandler;
+    private readonly string _instanceId;
+    
+    public KeepTrackOfProjectorsInProc(
+        ActorSystem actorSystem,
+        IHandleProjectionPassivation passivationHandler) 
+        : this(actorSystem, passivationHandler, Guid.NewGuid().ToString())
+    {
+        
+    }
+    
+    internal KeepTrackOfProjectorsInProc(
+        ActorSystem actorSystem,
+        IHandleProjectionPassivation passivationHandler,
+        string instanceId)
+    {
+        _actorSystem = actorSystem;
+        _passivationHandler = passivationHandler;
+        _instanceId = instanceId;
+    }
 
     public Task<IProjectorProxy> GetProjector<TId, TDocument>(TId id, ProjectionConfiguration configuration)
         where TId : notnull where TDocument : notnull
@@ -17,9 +37,9 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
         var coordinator = _coordinators
             .GetOrAdd(
                 configuration.Name,
-                _ => actorSystem.ActorOf(Props.Create(() =>
-                        new InProcDocumentProjectionCoordinator<TId, TDocument>(passivationHandler, configuration)),
-                    $"in-proc-projector-{configuration.Name}"));
+                _ => _actorSystem.ActorOf(Props.Create(() =>
+                        new InProcDocumentProjectionCoordinator<TId, TDocument>(_passivationHandler, configuration)),
+                    $"in-proc-projector-{_instanceId}-{configuration.Name}"));
 
         return Task.FromResult<IProjectorProxy>(new InProcDocumentProjectorProxy<TId, TDocument>(id, coordinator));
     }
@@ -27,9 +47,9 @@ public class KeepTrackOfProjectorsInProc(ActorSystem actorSystem, IHandleProject
     public IKeepTrackOfProjectors Reset()
     {
         foreach (var coordinator in _coordinators)
-            actorSystem.Stop(coordinator.Value);
+            _actorSystem.Stop(coordinator.Value);
 
-        return new KeepTrackOfProjectorsInProc(actorSystem, passivationHandler);
+        return new KeepTrackOfProjectorsInProc(_actorSystem, _passivationHandler);
     }
 
     private class InProcDocumentProjectorProxy<TId, TDocument>(TId id, IActorRef coordinator) : IProjectorProxy

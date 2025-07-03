@@ -56,7 +56,9 @@ public class When_projecting_three_batches_to_two_ids_with_settings_to_keep_one_
 
         public async Task InitializeAsync()
         {
-            var factory = new KeepTrackOfProjectorsInProc(Sys, new MaxNumberOfProjectorsPassivation(1));
+            const string instanceId = "test-instance";
+            
+            var factory = new KeepTrackOfProjectorsInProc(Sys, new MaxNumberOfProjectorsPassivation(1), instanceId);
 
             var firstId = Guid.NewGuid().ToString();
             var secondId = Guid.NewGuid().ToString();
@@ -96,7 +98,7 @@ public class When_projecting_three_batches_to_two_ids_with_settings_to_keep_one_
             var firstProjectorId = MurmurHash.StringHash(firstId).ToString();
             var secondProjectorId = MurmurHash.StringHash(secondId).ToString();
 
-            var coordinator = await Sys.ActorSelection($"/user/in-proc-projector-{projectionConfiguration.Name}")
+            var coordinator = await Sys.ActorSelection($"/user/in-proc-projector-{instanceId}-{projectionConfiguration.Name}")
                 .ResolveOne(TimeSpan.FromSeconds(1));
 
             try

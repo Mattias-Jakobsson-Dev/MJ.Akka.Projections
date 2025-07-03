@@ -37,8 +37,9 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_wi
         public async Task InitializeAsync()
         {
             var id = Guid.NewGuid().ToString();
+            const string instanceId = "test-instance";
             
-            var factory = new KeepTrackOfProjectorsInProc(Sys, new MaxNumberOfProjectorsPassivation(10));
+            var factory = new KeepTrackOfProjectorsInProc(Sys, new MaxNumberOfProjectorsPassivation(10), instanceId);
 
             var projection = new TestProjection<string>(ImmutableList<object>.Empty);
             
@@ -71,7 +72,7 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_wi
             
             var projectorId = MurmurHash.StringHash(id).ToString();
 
-            var coordinator = await Sys.ActorSelection($"/user/in-proc-projector-{projectionConfiguration.Name}")
+            var coordinator = await Sys.ActorSelection($"/user/in-proc-projector-{instanceId}-{projectionConfiguration.Name}")
                 .ResolveOne(TimeSpan.FromSeconds(1));
 
             try
