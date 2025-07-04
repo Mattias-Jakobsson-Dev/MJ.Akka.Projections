@@ -19,6 +19,7 @@
       <PackageReference Include="Docker.DotNet" Version="3.125.15" />
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
       <PackageReference Include="RavenDB.TestDriver" Version="6.2.4" />
+        <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" />
     </ItemGroup>
 
 </Project>
