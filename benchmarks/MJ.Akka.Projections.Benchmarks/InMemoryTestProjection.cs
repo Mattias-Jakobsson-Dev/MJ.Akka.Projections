@@ -2,20 +2,20 @@ using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 using JetBrains.Annotations;
-using MJ.Akka.Projections;
+using MJ.Akka.Projections.Storage.InMemory;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
-public class TestProjection : StringIdProjection<TestProjection.TestDocument>
+public class InMemoryTestProjection : InMemoryProjection<string, InMemoryTestProjection.TestDocument>
 {
     private readonly IImmutableList<TestEvent> _events;
 
-    public TestProjection(int numberOfEvents, int numberOfDocuments)
+    public InMemoryTestProjection(int numberOfEvents, int numberOfDocuments)
     {
         var currentDocumentId = 1;
 
         var events = new List<TestEvent>();
-        
+
         for (var i = 0; i < numberOfEvents; i++)
         {
             events.Add(new TestEvent(currentDocumentId.ToString()));
@@ -28,21 +28,35 @@ public class TestProjection : StringIdProjection<TestProjection.TestDocument>
 
         _events = events.ToImmutableList();
     }
-    
-    public override ISetupProjection<string, TestDocument> Configure(ISetupProjection<string, TestDocument> config)
+
+    public override string IdFromString(string id)
+    {
+        return id;
+    }
+
+    public override string IdToString(string id)
+    {
+        return id;
+    }
+
+    public override ISetupProjection<string, InMemoryProjectionContext<string, TestDocument>> Configure(
+        ISetupProjection<string, InMemoryProjectionContext<string, TestDocument>> config)
     {
         return config
             .On<TestEvent>(
                 evnt => evnt.DocId,
-                (evnt, doc) =>
+                (evnt, context) =>
                 {
-                    if (doc == null)
-                        return new TestDocument(evnt.DocId, 1);
-
-                    return doc with
+                    context.ModifyDocument(doc =>
                     {
-                        Version = doc.Version + 1
-                    };
+                        if (doc == null)
+                            return new TestDocument(evnt.DocId, 1);
+
+                        return doc with
+                        {
+                            Version = doc.Version + 1
+                        };
+                    });
                 });
     }
 
@@ -54,6 +68,6 @@ public class TestProjection : StringIdProjection<TestProjection.TestDocument>
 
     [PublicAPI]
     public record TestDocument(string DocId, int Version);
-    
-    private record TestEvent(string DocId);
+
+    public record TestEvent(string DocId);
 }

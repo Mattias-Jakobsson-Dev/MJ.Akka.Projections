@@ -4,8 +4,8 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Loggers;
-using MJ.Akka.Projections.Benchmarks.Columns;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.Benchmarks.Columns;
 using MJ.Akka.Projections.OneTime;
 
 namespace MJ.Akka.Projections.Benchmarks;
@@ -25,8 +25,8 @@ public class OneTimeProjectionBenchmarks
     }
     
     private ActorSystem ActorSystem { get; set; } = null!;
-    private TestProjection _projection = null!;
-    private IOneTimeProjection<string, TestProjection.TestDocument> _coordinator = null!;
+    private InMemoryTestProjection _projection = null!;
+    private IOneTimeProjection<string, InMemoryTestProjection.TestDocument> _coordinator = null!;
     
     [IterationSetup]
     public void Setup()
@@ -35,7 +35,7 @@ public class OneTimeProjectionBenchmarks
             "projections", 
             "akka.loglevel = ERROR");
 
-        _projection = new TestProjection(Configuration.NumberOfEvents, Configuration.NumberOfDocuments);
+        _projection = new InMemoryTestProjection(Configuration.NumberOfEvents, Configuration.NumberOfDocuments);
 
         _coordinator = ActorSystem
             .CreateOneTimeProjection(_projection);
@@ -49,13 +49,13 @@ public class OneTimeProjectionBenchmarks
 
     [PublicAPI]
     [ParamsSource(nameof(GetAvailableConfigurations))]
-    public BaseProjectionBenchmarks.ProjectEventsConfiguration Configuration { get; set; } = null!;
+    public ProjectEventsConfiguration Configuration { get; set; } = null!;
     
-    public static IImmutableList<BaseProjectionBenchmarks.ProjectEventsConfiguration> GetAvailableConfigurations()
+    public static IImmutableList<ProjectEventsConfiguration> GetAvailableConfigurations()
     {
         return ImmutableList.Create(
-            new BaseProjectionBenchmarks.ProjectEventsConfiguration(10_000, 1_000),
-            new BaseProjectionBenchmarks.ProjectEventsConfiguration(10_000, 100),
-            new BaseProjectionBenchmarks.ProjectEventsConfiguration(1_000, 1));
+            new ProjectEventsConfiguration(10_000, 1_000),
+            new ProjectEventsConfiguration(10_000, 100),
+            new ProjectEventsConfiguration(1_000, 1));
     }
 }

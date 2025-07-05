@@ -1,14 +1,20 @@
 using JetBrains.Annotations;
-using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage.InMemory;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
 [PublicAPI]
-public class ProjectToInMemoryStoreWithNormalStorageBenchmarks : BaseProjectionBenchmarks
+public class ProjectToInMemoryStoreWithNormalStorageBenchmarks 
+    : BaseProjectionBenchmarks<string, InMemoryProjectionContext<string, InMemoryTestProjection.TestDocument>, SetupInMemoryStorage>
 {
-    protected override IHaveConfiguration<ProjectionInstanceConfiguration> Configure(
-        IHaveConfiguration<ProjectionInstanceConfiguration> config)
+    protected override SetupInMemoryStorage GetStorageSetup()
     {
-        return config;
+        return new SetupInMemoryStorage();
+    }
+
+    protected override IProjection<string, InMemoryProjectionContext<string, InMemoryTestProjection.TestDocument>, SetupInMemoryStorage> 
+        CreateProjection(int numberOfEvents, int numberOfDocuments)
+    {
+        return new InMemoryTestProjection(numberOfEvents, numberOfDocuments);
     }
 }

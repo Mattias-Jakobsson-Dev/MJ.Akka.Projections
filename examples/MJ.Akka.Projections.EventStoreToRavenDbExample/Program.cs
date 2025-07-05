@@ -8,6 +8,7 @@ using MJ.Akka.Projections.Storage.RavenDb;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage.Batched;
 using Raven.Client.Documents;
 using Sharprompt;
 
@@ -143,12 +144,11 @@ async Task RunProjection()
     documentStore.EnsureDatabaseExists();
     
     var projectionsCoordinator = await actorSystem
-        .Projections(
+        .RavenDbProjections(
             conf => conf
                 .WithProjection(projection)
-                .WithRavenDbDocumentStorage(documentStore)
-                .Batched()
-                .WithRavenDbPositionStorage(documentStore))
+                .WithBatchedStorage(),
+            documentStore)
         .Start();
 
     var proxy = projectionsCoordinator

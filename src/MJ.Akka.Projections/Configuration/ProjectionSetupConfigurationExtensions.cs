@@ -5,12 +5,12 @@ namespace MJ.Akka.Projections.Configuration;
 
 public static class ProjectionSetupConfigurationExtensions
 {
-    public static IHaveConfiguration<ProjectionSystemConfiguration> WithProjection<TId, TContext>(
-        this IHaveConfiguration<ProjectionSystemConfiguration> source,
-        IProjection<TId, TContext> projection,
+    public static IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> WithProjection<TId, TContext, TStorageSetup>(
+        this IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> source,
+        IProjection<TId, TContext, TStorageSetup> projection,
         Func<IHaveConfiguration<ProjectionInstanceConfiguration>, IHaveConfiguration<ProjectionInstanceConfiguration>>?
             configure = null)
-        where TId : notnull where TContext : IProjectionContext<TId>
+        where TId : notnull where TContext : IProjectionContext<TId> where TStorageSetup : IStorageSetup
     {
         return source
             .WithModifiedConfig(x => x with
@@ -24,11 +24,19 @@ public static class ProjectionSetupConfigurationExtensions
                                 ProjectionInstanceConfiguration.Empty))
                             .Config
                             .MergeWith(conf);
+                        
+                        IStorageSetup storageSetup = conf.StorageSetup;
 
-                        return new ProjectionConfiguration<TId, TContext>(
+                        foreach (var modifier in conf.StorageModifiers)
+                        {
+                            storageSetup = modifier.Modify(storageSetup);
+                        }
+
+                        return new ProjectionConfiguration<TId, TContext, TStorageSetup>(
                             projection,
-                            loadStorage,
-                            configuredProjection.PositionStorage!,
+                            storageSetup.CreateProjectionStorage(),
+                            projection.GetLoadProjectionContext(conf.StorageSetup),
+                            storageSetup.CreatePositionStorage(),
                             conf.ProjectorFactory,
                             configuredProjection.RestartSettings,
                             configuredProjection.EventBatchingStrategy!,

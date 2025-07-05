@@ -1,6 +1,7 @@
 using Akka.Actor;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.Storage;
+using MJ.Akka.Projections.Storage.InMemory;
 
 namespace MJ.Akka.Projections.OneTime;
 
@@ -8,7 +9,7 @@ public static class ActorSystemExtensions
 {
     public static IOneTimeProjection<TId, TDocument> CreateOneTimeProjection<TId, TDocument>(
         this ActorSystem actorSystem,
-        IProjection<TId, ProjectedDocumentContext<TId, TDocument>> projection,
+        IProjection<TId, InMemoryProjectionContext<TId, TDocument>, SetupInMemoryStorage> projection,
         Func<IHaveConfiguration<OneTimeProjectionConfig>, IHaveConfiguration<OneTimeProjectionConfig>>? configure =
             null)
         where TId : notnull where TDocument : class
@@ -17,16 +18,16 @@ public static class ActorSystemExtensions
             actorSystem,
             OneTimeProjectionConfig.Default));
 
-        var storage = new OneTimeProjectionStorage<TId, TDocument>();
+        var storage = new SetupInMemoryStorage();
 
         var projectionCoordinator = actorSystem
             .Projections(config => config
+                    .WithPositionStorage(new StaticPositionStorage(configuration.Config.StartPosition))
                     .WithRestartSettings(configuration.Config.RestartSettings)
                     .WithEventBatchingStrategy(configuration.Config.EventBatchingStrategy!)
                     .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
                     .WithProjection(projection),
-                storage,
-                new StaticPositionStorage(configuration.Config.StartPosition));
+                storage);
 
         return new OneTimeProjection<TId, TDocument>(
             projectionCoordinator,
@@ -37,14 +38,14 @@ public static class ActorSystemExtensions
     private class OneTimeProjection<TId, TDocument>(
         IConfigureProjectionCoordinator coordinator,
         string projectionName,
-        OneTimeProjectionStorage<TId, TDocument> storage)
+        SetupInMemoryStorage storageSetup)
         : IOneTimeProjection<TId, TDocument>
         where TId : notnull
         where TDocument : class
     {
         public async Task<IOneTimeProjection<TId, TDocument>.IResult> Run(TimeSpan? timeout = null)
         {
-            storage.Clear();
+            storageSetup.Clear();
 
             await using var result = await coordinator.Start();
 
@@ -52,15 +53,16 @@ public static class ActorSystemExtensions
 
             await projectionProxy.WaitForCompletion(timeout);
 
-            return new Result(storage);
+            return new Result(new InMemoryProjectionLoader<TId, TDocument>(
+                id => storageSetup.LoadDocument(id)));
         }
 
-        private class Result(OneTimeProjectionStorage<TId, TDocument> storage)
+        private class Result(ILoadProjectionContext<TId, InMemoryProjectionContext<TId, TDocument>> loader)
             : IOneTimeProjection<TId, TDocument>.IResult
         {
             public async Task<TDocument?> Load(TId id)
             {
-                var result = await storage.Load(id);
+                var result = await loader.Load(id);
 
                 return result.Document;
             }
@@ -94,15 +96,6 @@ public static class ActorSystemExtensions
             CancellationToken cancellationToken = default)
         {
             return Task.FromResult(position);
-        }
-    }
-
-    private class OneTimeProjectionStorage<TId, TDocument> : InMemoryProjectionStorage
-        where TId : notnull where TDocument : class
-    {
-        public void Clear()
-        {
-            Documents.Clear();
         }
     }
 }

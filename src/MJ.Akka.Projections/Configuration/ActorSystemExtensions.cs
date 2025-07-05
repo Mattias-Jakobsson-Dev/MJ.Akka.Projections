@@ -5,25 +5,29 @@ namespace MJ.Akka.Projections.Configuration;
 
 public static class ActorSystemExtensions
 {
-    public static IConfigureProjectionCoordinator Projections(
+    public static IConfigureProjectionCoordinator Projections<TStorageSetup>(
         this ActorSystem actorSystem,
-        Func<IHaveConfiguration<ProjectionSystemConfiguration>, IHaveConfiguration<ProjectionSystemConfiguration>>
+        Func<IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>>,
+                IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>>>
             configure,
-        IProjectionStorage storage,
-        IProjectionPositionStorage positionStorage)
+        TStorageSetup storageSetup)
+        where TStorageSetup : IStorageSetup
     {
-        var defaultConfiguration = ProjectionSystemConfiguration.CreateDefaultConfiguration(actorSystem);
-        
-        return configure(new ConfigureProjectionSystem(actorSystem, defaultConfiguration)).Build();
+        var defaultConfiguration = ProjectionSystemConfiguration<TStorageSetup>
+            .CreateDefaultConfiguration(actorSystem, storageSetup);
+
+        return configure(
+            new ConfigureProjectionSystem<TStorageSetup>(actorSystem, defaultConfiguration)).Build();
     }
 
-    private record ConfigureProjectionSystem(
+    private record ConfigureProjectionSystem<TStorageSetup>(
         ActorSystem ActorSystem,
-        ProjectionSystemConfiguration Config)
-        : IHaveConfiguration<ProjectionSystemConfiguration>
+        ProjectionSystemConfiguration<TStorageSetup> Config)
+        : IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>>
+        where TStorageSetup : IStorageSetup
     {
-        public IHaveConfiguration<ProjectionSystemConfiguration> WithModifiedConfig(
-            Func<ProjectionSystemConfiguration, ProjectionSystemConfiguration> modify)
+        public IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> WithModifiedConfig(
+            Func<ProjectionSystemConfiguration<TStorageSetup>, ProjectionSystemConfiguration<TStorageSetup>> modify)
         {
             return this with
             {

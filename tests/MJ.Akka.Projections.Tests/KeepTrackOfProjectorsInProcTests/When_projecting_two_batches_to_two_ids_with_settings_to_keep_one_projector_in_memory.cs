@@ -2,11 +2,11 @@ using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using Akka.Util;
-using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.InProc;
+using MJ.Akka.Projections.Storage.InMemory;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
@@ -55,10 +55,18 @@ public class When_projecting_two_batches_to_two_ids_with_settings_to_keep_one_pr
 
             var firstId = Guid.NewGuid().ToString();
             var secondId = Guid.NewGuid().ToString();
+            
+            var storageSetup = new SetupInMemoryStorage();
 
-            var projectionConfiguration = new ProjectionConfiguration<string, object>(
-                new FakeProjection(TimeSpan.FromMilliseconds(100)),
-                new InMemoryProjectionStorage(),
+            var projection = new FakeProjection(TimeSpan.FromMilliseconds(100));
+
+            var projectionConfiguration = new ProjectionConfiguration<
+                object,
+                InMemoryProjectionContext<object, object>,
+                SetupInMemoryStorage>(
+                projection,
+                storageSetup.CreateProjectionStorage(),
+                projection.GetLoadProjectionContext(storageSetup),
                 new InMemoryPositionStorage(),
                 factory,
                 null,
@@ -66,8 +74,8 @@ public class When_projecting_two_batches_to_two_ids_with_settings_to_keep_one_pr
                 BatchWithinEventPositionBatchingStrategy.Default,
                 new FakeEventsHandler());
 
-            var firstProjector = await factory.GetProjector<string, object>(firstId, projectionConfiguration);
-            var secondProjector = await factory.GetProjector<string, object>(secondId, projectionConfiguration);
+            var firstProjector = await factory.GetProjector(firstId, projectionConfiguration);
+            var secondProjector = await factory.GetProjector(secondId, projectionConfiguration);
 
             FirstResponse = await firstProjector
                 .ProjectEvents(

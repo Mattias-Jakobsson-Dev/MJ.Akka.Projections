@@ -2,11 +2,12 @@ using Akka;
 using Akka.Actor;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections;
 
-public abstract class BaseProjection<TId, TContext> : IProjection<TId, TContext>
-    where TId : notnull where TContext : IProjectionContext<TId>
+public abstract class BaseProjection<TId, TContext, TStorageSetup> : IProjection<TId, TContext, TStorageSetup>
+    where TId : notnull where TContext : IProjectionContext<TId> where TStorageSetup : IStorageSetup
 {
     public virtual TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(30);
     
@@ -14,6 +15,9 @@ public abstract class BaseProjection<TId, TContext> : IProjection<TId, TContext>
     public abstract string IdToString(TId id);
 
     public abstract ISetupProjection<TId, TContext> Configure(ISetupProjection<TId, TContext> config);
+    
+    public abstract ILoadProjectionContext<TId, TContext> GetLoadProjectionContext(TStorageSetup storageSetup);
+
     public abstract Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
     
     public virtual Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier)

@@ -14,7 +14,9 @@ public record ProjectionInstanceConfiguration(
         null,
         null);
 
-    internal ProjectionInstanceConfiguration MergeWith(ProjectionSystemConfiguration parent)
+    internal ProjectionInstanceConfiguration MergeWith<TStorageSetup>(
+        ProjectionSystemConfiguration<TStorageSetup> parent)
+        where TStorageSetup : IStorageSetup
     {
         return new ProjectionInstanceConfiguration(
             RestartSettings ?? parent.RestartSettings,

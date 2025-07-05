@@ -9,6 +9,8 @@ public class InfluxDbProjectionStorage(IInfluxDBClient client) : IProjectionStor
         StoreProjectionRequest request, 
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        
         var writeApi = client.GetWriteApiAsync();
         var deleteApi = client.GetDeleteApi();
 

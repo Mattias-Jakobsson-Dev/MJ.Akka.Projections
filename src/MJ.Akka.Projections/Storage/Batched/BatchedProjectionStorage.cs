@@ -3,7 +3,7 @@ using Akka.Actor;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 
-namespace MJ.Akka.Projections.Storage;
+namespace MJ.Akka.Projections.Storage.Batched;
 
 internal class BatchedProjectionStorage : IProjectionStorage
 {

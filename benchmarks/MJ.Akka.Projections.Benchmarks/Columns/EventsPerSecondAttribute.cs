@@ -48,10 +48,10 @@ public class EventsPerSecondAttribute : Attribute
         return parse(parameterValue);
     }
     
-    private static BaseProjectionBenchmarks.ProjectEventsConfiguration ParameterAsConfiguration(
+    private static ProjectEventsConfiguration ParameterAsConfiguration(
         object? parameterValue)
     {
-        return parameterValue as BaseProjectionBenchmarks.ProjectEventsConfiguration 
-               ?? new BaseProjectionBenchmarks.ProjectEventsConfiguration(1, 1);
+        return parameterValue as ProjectEventsConfiguration 
+               ?? new ProjectEventsConfiguration(1, 1);
     }
 }

@@ -2,9 +2,9 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
-using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -35,11 +35,21 @@ public class When_waiting_for_group_to_finish_before_its_finished(
         {
             var id = Guid.NewGuid().ToString();
             
-            var sequencer = ProjectionSequencer<string, TestDocument<string>>.Create(
+            var projection = new TestProjection<string>(
+                ImmutableList<object>.Empty,
+                ImmutableList<StorageFailures>.Empty);
+
+            var storageSetup = new SetupInMemoryStorage();
+            
+            var sequencer = ProjectionSequencer.Create(
                 Sys,
-                new ProjectionConfiguration<string, TestDocument<string>>(
-                    new TestProjection<string>(ImmutableList<object>.Empty),
-                    new InMemoryProjectionStorage(),
+                new ProjectionConfiguration<
+                    string, 
+                    InMemoryProjectionContext<string, TestDocument<string>>, 
+                    SetupInMemoryStorage>(
+                    projection,
+                    storageSetup.CreateProjectionStorage(),
+                    projection.GetLoadProjectionContext(storageSetup),
                     new InMemoryPositionStorage(),
                     new ProjectionSequencerBaseFixture.TestProjectionFactory(),
                     null,
@@ -61,15 +71,15 @@ public class When_waiting_for_group_to_finish_before_its_finished(
             
             var startTasksResponse = await sequencer
                 .Ref
-                .Ask<ProjectionSequencer<string, TestDocument<string>>.Responses.StartProjectingResponse>(
-                    new ProjectionSequencer<string, TestDocument<string>>.Commands.StartProjecting(events));
+                .Ask<ProjectionSequencer.Responses.StartProjectingResponse>(
+                    new ProjectionSequencer.Commands.StartProjecting(events));
             
             TaskFinishedBeforeWait = startTasksResponse.Tasks[0].task.IsCompletedSuccessfully;
 
             await sequencer
                 .Ref
-                .Ask<ProjectionSequencer<string, TestDocument<string>>.Responses.WaitForGroupToFinishResponse>(
-                    new ProjectionSequencer<string, TestDocument<string>>.Commands.WaitForGroupToFinish(
+                .Ask<ProjectionSequencer.Responses.WaitForGroupToFinishResponse>(
+                    new ProjectionSequencer.Commands.WaitForGroupToFinish(
                         startTasksResponse.Tasks[0].groupId,
                         new PositionData(1)));
 

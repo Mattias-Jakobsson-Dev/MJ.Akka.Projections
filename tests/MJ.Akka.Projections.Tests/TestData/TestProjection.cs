@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
+using MJ.Akka.Projections.Storage;
+using MJ.Akka.Projections.Storage.InMemory;
 
 namespace MJ.Akka.Projections.Tests.TestData;
 
@@ -16,8 +18,11 @@ public static class TestProjection
             .ToImmutableDictionary();
 }
 
-public class TestProjection<TId>(IImmutableList<object> events, string? overrideName = null)
-    : BaseProjection<TId, TestDocument<TId>>
+public class TestProjection<TId>(
+    IImmutableList<object> events,
+    IImmutableList<StorageFailures> failures,
+    string? overrideName = null)
+    : InMemoryProjection<TId, TestDocument<TId>>
     where TId : notnull
 {
     public override TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(5);
@@ -41,89 +46,110 @@ public class TestProjection<TId>(IImmutableList<object> events, string? override
         return id.ToString() ?? "";
     }
 
-    public override ISetupProjection<TId, TestDocument<TId>> Configure(ISetupProjection<TId, TestDocument<TId>> config)
+    public override ILoadProjectionContext<TId, InMemoryProjectionContext<TId, TestDocument<TId>>> 
+        GetLoadProjectionContext(SetupInMemoryStorage storageSetup)
     {
-        var failures = new ConcurrentDictionary<TId, Dictionary<string, int>>();
+        return new LoaderWithStorageFailures<TId, InMemoryProjectionContext<TId, TestDocument<TId>>>(
+            base.GetLoadProjectionContext(storageSetup),
+            failures);
+    }
+
+    public override ISetupProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>> Configure(
+        ISetupProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>> config)
+    {
+        var runFailures = new ConcurrentDictionary<TId, Dictionary<string, int>>();
 
         return config
-            .TransformUsing<Events<TId>.TransformToMultipleEvents>(
-                evnt => evnt.Events.OfType<object>().ToImmutableList())
+            .TransformUsing<Events<TId>.TransformToMultipleEvents>(evnt =>
+                evnt.Events.OfType<object>().ToImmutableList())
             .On<Events<TId>.FirstEvent>(
                 x => x.DocId,
-                (evnt, doc) =>
+                (evnt, context) =>
                 {
-                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
-                    
-                    doc ??= new TestDocument<TId>
+                    context.ModifyDocument(doc =>
                     {
-                        Id = evnt.DocId
-                    };
+                        HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
 
-                    doc.AddHandledEvent(evnt.EventId);
+                        doc ??= new TestDocument<TId>
+                        {
+                            Id = evnt.DocId
+                        };
 
-                    return doc;
+                        doc.AddHandledEvent(evnt.EventId);
+
+                        return doc;
+                    });
                 })
             .On<Events<TId>.DelayHandlingWithoutCancellationToken>(
                 x => x.DocId,
-                async (evnt, doc) =>
+                async (evnt, context) =>
                 {
                     await Task.Delay(evnt.Delay);
-                    
-                    doc ??= new TestDocument<TId>
-                    {
-                        Id = evnt.DocId
-                    };
-                    
-                    doc.AddHandledEvent(evnt.EventId);
 
-                    return doc;
+                    context.ModifyDocument(doc =>
+                    {
+                        doc ??= new TestDocument<TId>
+                        {
+                            Id = evnt.DocId
+                        };
+
+                        doc.AddHandledEvent(evnt.EventId);
+
+                        return doc;
+                    });
                 })
             .On<Events<TId>.DelayHandlingWithCancellationToken>(
                 x => x.DocId,
-                async (evnt, doc, cancellationToken) =>
+                async (evnt, context, cancellationToken) =>
                 {
                     await Task.Delay(evnt.Delay, cancellationToken);
-                    
-                    doc ??= new TestDocument<TId>
-                    {
-                        Id = evnt.DocId
-                    };
-                    
-                    doc.AddHandledEvent(evnt.EventId);
 
-                    return doc;
+                    context.ModifyDocument(doc =>
+                    {
+                        doc ??= new TestDocument<TId>
+                        {
+                            Id = evnt.DocId
+                        };
+
+                        doc.AddHandledEvent(evnt.EventId);
+
+                        return doc;
+                    });
                 })
             .On<Events<TId>.FailProjection>(
                 x => x.DocId,
-                (evnt, doc) =>
+                (evnt, context) =>
                 {
-                    doc ??= new TestDocument<TId>
+                    context.ModifyDocument(doc =>
                     {
-                        Id = evnt.DocId
-                    };
+                        doc ??= new TestDocument<TId>
+                        {
+                            Id = evnt.DocId
+                        };
 
-                    var documentFailures = failures.GetOrAdd(
-                        evnt.DocId,
-                        _ => new Dictionary<string, int>());
+                        var documentFailures = runFailures.GetOrAdd(
+                            evnt.DocId,
+                            _ => new Dictionary<string, int>());
 
-                    documentFailures.TryAdd(evnt.FailureKey, 0);
+                        documentFailures.TryAdd(evnt.FailureKey, 0);
 
-                    if (documentFailures[evnt.FailureKey] < evnt.ConsecutiveFailures)
-                    {
-                        documentFailures[evnt.FailureKey]++;
+                        if (documentFailures[evnt.FailureKey] < evnt.ConsecutiveFailures)
+                        {
+                            documentFailures[evnt.FailureKey]++;
 
-                        throw evnt.FailWith;
-                    }
-                    
-                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                            throw evnt.FailWith;
+                        }
 
-                    doc.AddHandledEvent(evnt.EventId);
+                        HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
 
-                    doc.PreviousEventFailures = doc.PreviousEventFailures.SetItem(
-                        evnt.EventId,
-                        documentFailures[evnt.FailureKey]);
+                        doc.AddHandledEvent(evnt.EventId);
 
-                    return doc;
+                        doc.PreviousEventFailures = doc.PreviousEventFailures.SetItem(
+                            evnt.EventId,
+                            documentFailures[evnt.FailureKey]);
+
+                        return doc;
+                    });
                 });
     }
 

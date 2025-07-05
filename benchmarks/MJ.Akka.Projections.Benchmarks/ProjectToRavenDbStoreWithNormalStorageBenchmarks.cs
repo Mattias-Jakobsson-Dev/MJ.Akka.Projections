@@ -1,11 +1,12 @@
 using BenchmarkDotNet.Attributes;
 using MJ.Akka.Projections.Storage.RavenDb;
-using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.Tests;
+using Raven.Client.Documents.BulkInsert;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
-public class ProjectToRavenDbStoreWithNormalStorageBenchmarks : BaseProjectionBenchmarks
+public class ProjectToRavenDbStoreWithNormalStorageBenchmarks 
+    : BaseProjectionBenchmarks<string, RavenDbProjectionContext<RavenDbTestProjection.TestDocument>, SetupRavenDbStorage>
 {
     private RavenDbDockerContainerFixture _containerFixture = null!;
     
@@ -23,8 +24,7 @@ public class ProjectToRavenDbStoreWithNormalStorageBenchmarks : BaseProjectionBe
         await _containerFixture.DisposeAsync();
     }
     
-    protected override IHaveConfiguration<ProjectionInstanceConfiguration> Configure(
-        IHaveConfiguration<ProjectionInstanceConfiguration> config)
+    protected override SetupRavenDbStorage GetStorageSetup()
     {
         var databaseName = Guid.NewGuid().ToString();
 
@@ -32,8 +32,12 @@ public class ProjectToRavenDbStoreWithNormalStorageBenchmarks : BaseProjectionBe
 
         documentStore.EnsureDatabaseExists();
 
-        return config
-            .WithRavenDbPositionStorage(documentStore)
-            .WithRavenDbDocumentStorage(documentStore);
+        return new SetupRavenDbStorage(documentStore, new BulkInsertOptions());
+    }
+
+    protected override IProjection<string, RavenDbProjectionContext<RavenDbTestProjection.TestDocument>, SetupRavenDbStorage> 
+        CreateProjection(int numberOfEvents, int numberOfDocuments)
+    {
+        return new RavenDbTestProjection(numberOfEvents, numberOfDocuments);
     }
 }

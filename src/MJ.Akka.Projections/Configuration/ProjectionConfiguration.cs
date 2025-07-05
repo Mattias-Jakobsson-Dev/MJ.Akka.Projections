@@ -6,8 +6,8 @@ using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.Configuration;
 
-public class ProjectionConfiguration<TId, TContext>(
-    IProjection<TId, TContext> projection,
+public class ProjectionConfiguration<TId, TContext, TStorageSetup>(
+    IProjection<TId, TContext, TStorageSetup> projection,
     IProjectionStorage storage,
     ILoadProjectionContext<TId, TContext> loadStorage,
     IProjectionPositionStorage positionStorage,
@@ -22,7 +22,8 @@ public class ProjectionConfiguration<TId, TContext>(
         projectorFactory,
         restartSettings,
         projectionEventBatchingStrategy,
-        positionBatchingStrategy) where TId : notnull where TContext : IProjectionContext<TId>
+        positionBatchingStrategy) 
+    where TId : notnull where TContext : IProjectionContext<TId> where TStorageSetup : IStorageSetup
 {
     public override async Task<IProjectionContext> Load(object id, CancellationToken cancellationToken = default)
     {

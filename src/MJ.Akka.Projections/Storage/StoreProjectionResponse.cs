@@ -15,7 +15,7 @@ public class StoreProjectionResponse
         _taken = taken;
         
         Completed = items
-            .Any(x => !taken.Any(y => y.IsInstanceOfType(x)));
+            .All(x => taken.Any(y => y.IsInstanceOfType(x)));
     }
     
     internal static StoreProjectionResponse Empty { get; } 

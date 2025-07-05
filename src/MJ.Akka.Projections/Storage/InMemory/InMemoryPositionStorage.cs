@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace MJ.Akka.Projections.Storage;
+namespace MJ.Akka.Projections.Storage.InMemory;
 
 public class InMemoryPositionStorage : IProjectionPositionStorage
 {
@@ -12,7 +12,7 @@ public class InMemoryPositionStorage : IProjectionPositionStorage
         
         return _positions.TryGetValue(projectionName, out var position)
             ? Task.FromResult<long?>(position)
-            : Task.FromResult<long?>(default);
+            : Task.FromResult<long?>(null);
     }
 
     public virtual Task<long?> StoreLatestPosition(
