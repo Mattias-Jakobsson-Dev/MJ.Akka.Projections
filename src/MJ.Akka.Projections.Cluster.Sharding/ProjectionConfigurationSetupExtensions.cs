@@ -48,19 +48,6 @@ public static class ConfigurationExtensions
                         .WithShardingSettings(ClusterShardingSettings.Create(source.ActorSystem)))));
     }
 
-    public static IConfigurePart<T, ClusterSingletonProjectionStorage>
-        WithClusterSingletonInMemoryStorage<T>(
-            this IHaveConfiguration<T> setup,
-            string name = "projection-storage",
-            Func<ClusterSingletonManagerSettings, ClusterSingletonManagerSettings>? configureCoordinator = null) 
-        where T : ContinuousProjectionConfig
-    {
-        return setup
-            .WithProjectionStorage(ClusterSingletonProjectionStorage
-                .Create(setup.ActorSystem, name, (configureCoordinator ?? (x => x))(
-                    ClusterSingletonManagerSettings.Create(setup.ActorSystem))));
-    }
-    
     public static IConfigurePart<T, ClusterSingletonPositionStorage>
         WithClusterSingletonInMemoryPositionStorage<T>(
             this IHaveConfiguration<T> setup,

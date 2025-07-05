@@ -1,4 +1,5 @@
 using Akka.Actor;
+using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.Configuration;
 
@@ -7,7 +8,9 @@ public static class ActorSystemExtensions
     public static IConfigureProjectionCoordinator Projections(
         this ActorSystem actorSystem,
         Func<IHaveConfiguration<ProjectionSystemConfiguration>, IHaveConfiguration<ProjectionSystemConfiguration>>
-            configure)
+            configure,
+        IProjectionStorage storage,
+        IProjectionPositionStorage positionStorage)
     {
         var defaultConfiguration = ProjectionSystemConfiguration.CreateDefaultConfiguration(actorSystem);
         

@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Akka;
 using Akka.Actor;
 using Akka.Streams;
@@ -6,23 +5,21 @@ using Akka.Streams.Dsl;
 
 namespace MJ.Akka.Projections.Storage;
 
-public class BatchedProjectionStorage : IProjectionStorage
+internal class BatchedProjectionStorage : IProjectionStorage
 {
-    public static IStorageBatchingStrategy DefaultStrategy { get; } = new BatchSizeStorageBatchingStrategy(100);
+    public static IStorageBatchingStrategy DefaultStrategy { get; } 
+        = new BatchSizeStorageBatchingStrategy(100);
 
-    private readonly IProjectionStorage _innerStorage;
-    private readonly ISourceQueueWithComplete<IPendingWrite> _writeQueue;
-
+    private readonly ISourceQueueWithComplete<PendingWrite> _writeQueue;
+    
     public BatchedProjectionStorage(
         ActorSystem actorSystem,
         IProjectionStorage innerStorage,
         int parallelism,
         IStorageBatchingStrategy batchingStrategy)
     {
-        _innerStorage = innerStorage;
-
         var queue = Source
-            .Queue<IPendingWrite>(int.MaxValue, OverflowStrategy.Backpressure);
+            .Queue<PendingWrite>(int.MaxValue, OverflowStrategy.Backpressure);
 
         _writeQueue = batchingStrategy
             .GetStrategy(queue)
@@ -33,7 +30,7 @@ public class BatchedProjectionStorage : IProjectionStorage
                     var cancelledWrite = writes
                         .Where(x => x.CancellationToken.IsCancellationRequested)
                         .Aggregate(
-                            (IPendingWrite)PendingWrite.Empty,
+                            PendingWrite.Empty,
                             (current, pending) => current.MergeWith(pending));
 
                     cancelledWrite.Fail(new OperationCanceledException("Write was cancelled"));
@@ -41,7 +38,7 @@ public class BatchedProjectionStorage : IProjectionStorage
                     var write = writes
                         .Where(x => !x.CancellationToken.IsCancellationRequested)
                         .Aggregate(
-                            (IPendingWrite)PendingWrite.Empty,
+                            PendingWrite.Empty,
                             (current, pending) => current.MergeWith(pending));
 
                     if (write.IsEmpty)
@@ -49,9 +46,9 @@ public class BatchedProjectionStorage : IProjectionStorage
                     
                     try
                     {
-                        await _innerStorage.Store(write.ToUpsert, write.ToDelete);
+                        var response = await innerStorage.Store(write.Request);
 
-                        write.Completed();
+                        write.Completed(response);
                     }
                     catch (Exception e)
                     {
@@ -63,22 +60,14 @@ public class BatchedProjectionStorage : IProjectionStorage
             .ToMaterialized(Sink.Ignore<NotUsed>(), Keep.Left)
             .Run(actorSystem.Materializer());
     }
-
-    public Task<TDocument?> LoadDocument<TDocument>(
-        object id,
+    
+    public Task<StoreProjectionResponse> Store(
+        StoreProjectionRequest request, 
         CancellationToken cancellationToken = default)
     {
-        return _innerStorage.LoadDocument<TDocument>(id, cancellationToken);
-    }
+        var promise = new TaskCompletionSource<StoreProjectionResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public Task Store(
-        IImmutableList<DocumentToStore> toUpsert,
-        IImmutableList<DocumentToDelete> toDelete,
-        CancellationToken cancellationToken = default)
-    {
-        var promise = new TaskCompletionSource<NotUsed>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        _writeQueue.OfferAsync(new PendingWrite(toUpsert, toDelete, promise, cancellationToken))
+        _writeQueue.OfferAsync(new PendingWrite(request, promise, cancellationToken))
             .ContinueWith(
                 result =>
                 {

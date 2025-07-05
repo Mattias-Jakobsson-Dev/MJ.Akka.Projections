@@ -6,15 +6,15 @@ namespace MJ.Akka.Projections.Storage;
 
 public class BufferWithinStorageBatchingStrategy(int items, TimeSpan timeout) : IStorageBatchingStrategy
 {
-    public Source<IImmutableList<IPendingWrite>, ISourceQueueWithComplete<IPendingWrite>> GetStrategy(
-        Source<IPendingWrite, ISourceQueueWithComplete<IPendingWrite>> source)
+    public Source<IImmutableList<PendingWrite>, ISourceQueueWithComplete<PendingWrite>> 
+        GetStrategy(Source<PendingWrite, ISourceQueueWithComplete<PendingWrite>> source)
     {
         return source
             .GroupedWithin(items, timeout)
             .Select(x =>
             {
                 return x.Aggregate(
-                    (IImmutableList<IPendingWrite>)ImmutableList<IPendingWrite>.Empty,
+                    (IImmutableList<PendingWrite>)ImmutableList<PendingWrite>.Empty,
                     (current, pending) => current.Add(pending));
             });
     }

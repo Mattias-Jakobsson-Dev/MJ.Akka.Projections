@@ -10,10 +10,14 @@ public record InfluxDbTimeSeriesId(string Bucket, string Organization, string Id
         return $"{Bucket}|{Organization}|{Id}";
     }
 
-    public static InfluxDbTimeSeriesId FromString(string id)
+    private static InfluxDbTimeSeriesId FromString(string id)
     {
         var parts = id.Split('|', 3);
 
         return new InfluxDbTimeSeriesId(parts[0], parts[1], parts[2]);
     }
+
+    public static implicit operator string(InfluxDbTimeSeriesId item) => item.ToString();
+
+    public static implicit operator InfluxDbTimeSeriesId(string item) => FromString(item);
 }

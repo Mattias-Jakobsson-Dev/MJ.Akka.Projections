@@ -14,9 +14,9 @@ public interface IProjection
     Props CreateProjectionProps(object id, ISupplyProjectionConfigurations configSupplier);
 }
 
-public interface IProjection<TId, TDocument> : IProjection where TId : notnull where TDocument : notnull
+public interface IProjection<TId, TContext> : IProjection where TId : notnull where TContext : IProjectionContext<TId>
 {
     TId IdFromString(string id);
     string IdToString(TId id);
-    ISetupProjection<TId, TDocument> Configure(ISetupProjection<TId, TDocument> config);
+    ISetupProjection<TId, TContext> Configure(ISetupProjection<TId, TContext> config);
 }

@@ -2,8 +2,8 @@ using System.Collections.Immutable;
 
 namespace MJ.Akka.Projections.Configuration;
 
-internal class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument>
-    where TId : notnull where TDocument : notnull
+internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
+    where TId : notnull where TContext : IProjectionContext<TId>
 {
     private readonly IImmutableDictionary<Type, Handler> _handlers;
 
@@ -24,106 +24,111 @@ internal class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument
         _transformers = transformers;
     }
 
-    public ISetupProjection<TId, TDocument> On<TEvent>(
+    public ISetupProjection<TId, TContext> On<TEvent>(
         Func<TEvent, TId> getId,
-        Func<TEvent, TDocument?, long, Task<TDocument?>> handler,
-        Func<IProjectionFilterSetup<TDocument, TEvent>,
-            IProjectionFilterSetup<TDocument, TEvent>>? filter)
+        Func<TEvent, TContext, long, Task> handler,
+        Func<IProjectionFilterSetup<TId, TContext, TEvent>,
+            IProjectionFilterSetup<TId, TContext, TEvent>>? filter)
     {
         return On(
             getId, 
-            (evnt, doc, position, _) => handler(evnt, doc, position),
+            (evnt, ctx, position, _) => handler(evnt, ctx, position),
             filter);
     }
 
-    public ISetupProjection<TId, TDocument> On<TEvent>(
+    public ISetupProjection<TId, TContext> On<TEvent>(
         Func<TEvent, TId> getId,
-        Func<TEvent, TDocument?, CancellationToken, Task<TDocument?>> handler,
-        Func<IProjectionFilterSetup<TDocument, TEvent>, IProjectionFilterSetup<TDocument, TEvent>>? filter = null)
+        Func<TEvent, TContext, CancellationToken, Task> handler,
+        Func<IProjectionFilterSetup<TId, TContext, TEvent>, IProjectionFilterSetup<TId, TContext, TEvent>>? filter = null)
     {
         return On(
             getId, 
-            (evnt, doc, _, cancellationToken) => handler(evnt, doc, cancellationToken),
+            (evnt, ctx, _, cancellationToken) => handler(evnt, ctx, cancellationToken),
             filter);
     }
 
-    public ISetupProjection<TId, TDocument> On<TEvent>(
+    public ISetupProjection<TId, TContext> On<TEvent>(
         Func<TEvent, TId> getId, 
-        Func<TEvent, TDocument?, long, CancellationToken, Task<TDocument?>> handler,
-        Func<IProjectionFilterSetup<TDocument, TEvent>, IProjectionFilterSetup<TDocument, TEvent>>? filter = null)
+        Func<TEvent, TContext, long, CancellationToken, Task> handler,
+        Func<IProjectionFilterSetup<TId, TContext, TEvent>, IProjectionFilterSetup<TId, TContext, TEvent>>? filter = null)
     {
-        IProjectionFilterSetup<TDocument, TEvent> projectionFilterSetup
-            = ProjectionFilterSetup<TDocument, TEvent>.Create();
+        IProjectionFilterSetup<TId, TContext, TEvent> projectionFilterSetup
+            = ProjectionFilterSetup<TId, TContext, TEvent>.Create();
 
         projectionFilterSetup = filter?.Invoke(projectionFilterSetup) ?? projectionFilterSetup;
 
-        return new SetupProjection<TId, TDocument>(
+        return new SetupProjection<TId, TContext>(
             _handlers.SetItem(typeof(TEvent), new Handler(
                 evnt => getId((TEvent)evnt),
-                (evnt, doc, position, cancellationToken) =>
-                    handler((TEvent)evnt, doc, position, cancellationToken),
+                (evnt, ctx, position, cancellationToken) =>
+                    handler((TEvent)evnt, ctx, position, cancellationToken),
                 projectionFilterSetup.Build())),
             _transformers);
     }
 
-    public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
+    public ISetupProjection<TId, TContext> On<TProjectedEvent>(
         Func<TProjectedEvent, TId> getId,
-        Func<TProjectedEvent, TDocument?, Task<TDocument?>> handler,
-        Func<IProjectionFilterSetup<TDocument, TProjectedEvent>,
-            IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
+        Func<TProjectedEvent, TContext, Task> handler,
+        Func<IProjectionFilterSetup<TId, TContext, TProjectedEvent>,
+            IProjectionFilterSetup<TId, TContext, TProjectedEvent>>? filter)
     {
         return On(
             getId,
-            (evnt, doc, _, _) => handler(evnt, doc),
+            (evnt, ctx, _, _) => handler(evnt, ctx),
             filter);
     }
 
-    public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
+    public ISetupProjection<TId, TContext> On<TProjectedEvent>(
         Func<TProjectedEvent, TId> getId,
-        Func<TProjectedEvent, TDocument?, TDocument?> handler,
-        Func<IProjectionFilterSetup<TDocument, TProjectedEvent>,
-            IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
+        Action<TProjectedEvent, TContext> handler,
+        Func<IProjectionFilterSetup<TId, TContext, TProjectedEvent>,
+            IProjectionFilterSetup<TId, TContext, TProjectedEvent>>? filter)
     {
         return On(
             getId,
-            (evnt, doc, _) => handler(evnt, doc),
+            (evnt, ctx, _) => handler(evnt, ctx),
             filter);
     }
 
-    public ISetupProjection<TId, TDocument> On<TProjectedEvent>(
+    public ISetupProjection<TId, TContext> On<TProjectedEvent>(
         Func<TProjectedEvent, TId> getId,
-        Func<TProjectedEvent, TDocument?, long, TDocument?> handler,
-        Func<IProjectionFilterSetup<TDocument, TProjectedEvent>,
-            IProjectionFilterSetup<TDocument, TProjectedEvent>>? filter)
+        Action<TProjectedEvent, TContext, long> handler,
+        Func<IProjectionFilterSetup<TId, TContext, TProjectedEvent>,
+            IProjectionFilterSetup<TId, TContext, TProjectedEvent>>? filter)
     {
         return On(
             getId,
-            (evnt, doc, offset) => Task.FromResult(handler(evnt, doc, offset)),
+            (evnt, ctx, offset) =>
+            {
+                handler(evnt, ctx, offset);
+
+                return Task.CompletedTask;
+            },
             filter);
     }
 
-    public ISetupProjection<TId, TDocument> TransformUsing<TEvent>(
+    public ISetupProjection<TId, TContext> TransformUsing<TEvent>(
         Func<TEvent, IImmutableList<object>> transform)
     {
-        return new SetupProjection<TId, TDocument>(
+        return new SetupProjection<TId, TContext>(
             _handlers,
             _transformers.SetItem(typeof(TEvent), evnt => transform((TEvent)evnt)));
     }
 
-    public IHandleEventInProjection<TDocument> Build()
+    public IHandleEventInProjection<TId, TContext> Build()
     {
         return new EventHandler(_handlers, _transformers);
     }
 
     private record Handler(
         Func<object, TId> GetId,
-        Func<object, TDocument?, long, CancellationToken, Task<TDocument?>> Handle,
-        IProjectionFilter<TDocument> Filter);
+        Func<object, TContext, long, CancellationToken, Task> Handle,
+        IProjectionFilter<TContext> Filter);
 
     private class EventHandler(
         IImmutableDictionary<Type, Handler> handlers,
         IImmutableDictionary<Type, Func<object, IImmutableList<object>>> transformers)
-        : IHandleEventInProjection<TDocument>
+        : IHandleEventInProjection<TId, TContext>
     {
         public IImmutableList<object> Transform(object evnt)
         {
@@ -160,8 +165,8 @@ internal class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument
                 !ids.IsEmpty);
         }
 
-        public async Task<(TDocument? document, bool hasHandler)> Handle(
-            TDocument? document,
+        public async Task<bool> Handle(
+            TContext context,
             object evnt,
             long position,
             CancellationToken cancellationToken)
@@ -175,15 +180,15 @@ internal class SetupProjection<TId, TDocument> : ISetupProjection<TId, TDocument
                 if (!handlers.TryGetValue(type, out var handler))
                     continue;
 
-                if (!handler.Filter.FilterDocument(document))
-                    return (document, handled);
+                if (!handler.Filter.FilterResult(context))
+                    return handled;
 
-                document = await handler.Handle(evnt, document, position, cancellationToken);
+                await handler.Handle(evnt, context, position, cancellationToken);
 
                 handled = true;
             }
 
-            return (document, handled);
+            return handled;
         }
     }
 }

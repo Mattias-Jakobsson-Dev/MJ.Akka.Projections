@@ -1,15 +1,16 @@
 using Akka.Actor;
+using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.Configuration;
 
 public static class ProjectionSetupConfigurationExtensions
 {
-    public static IHaveConfiguration<ProjectionSystemConfiguration> WithProjection<TId, TDocument>(
+    public static IHaveConfiguration<ProjectionSystemConfiguration> WithProjection<TId, TContext>(
         this IHaveConfiguration<ProjectionSystemConfiguration> source,
-        IProjection<TId, TDocument> projection,
+        IProjection<TId, TContext> projection,
         Func<IHaveConfiguration<ProjectionInstanceConfiguration>, IHaveConfiguration<ProjectionInstanceConfiguration>>?
             configure = null)
-        where TId : notnull where TDocument : notnull
+        where TId : notnull where TContext : IProjectionContext<TId>
     {
         return source
             .WithModifiedConfig(x => x with
@@ -24,15 +25,15 @@ public static class ProjectionSetupConfigurationExtensions
                             .Config
                             .MergeWith(conf);
 
-                        return new ProjectionConfiguration<TId, TDocument>(
+                        return new ProjectionConfiguration<TId, TContext>(
                             projection,
-                            configuredProjection.ProjectionStorage!,
+                            loadStorage,
                             configuredProjection.PositionStorage!,
                             conf.ProjectorFactory,
                             configuredProjection.RestartSettings,
                             configuredProjection.EventBatchingStrategy!,
                             configuredProjection.PositionBatchingStrategy!,
-                            projection.Configure(new SetupProjection<TId, TDocument>()).Build());
+                            projection.Configure(new SetupProjection<TId, TContext>()).Build());
                     })
             });
     }

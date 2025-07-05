@@ -1,7 +1,7 @@
 namespace MJ.Akka.Projections;
 
-public interface IProjectionFilter<in TDocument> where TDocument : notnull
+public interface IProjectionFilter<in TContext> where TContext : IProjectionContext
 {
     bool FilterEvent(object evnt);
-    bool FilterDocument(TDocument? document);
+    bool FilterResult(TContext context);
 }

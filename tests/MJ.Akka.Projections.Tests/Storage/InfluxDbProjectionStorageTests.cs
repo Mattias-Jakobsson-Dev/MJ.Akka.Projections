@@ -14,7 +14,7 @@ namespace MJ.Akka.Projections.Tests.Storage;
 
 [PublicAPI]
 public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixture) 
-    : ProjectionStorageTests<InfluxDbTimeSeriesId, InfluxTimeSeries>, IClassFixture<InfluxDbDockerContainerFixture>
+    : ProjectionStorageTests<InfluxDbTimeSeriesId, InfluxDbTimeSeries>, IClassFixture<InfluxDbDockerContainerFixture>
 {
     private readonly IInfluxDBClient _client = fixture.CreateClient();
     private readonly string _measurementName = Guid.NewGuid().ToString();
@@ -32,14 +32,14 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
                     id,
                     CreateTestDocument(id) with
                     {
-                        ToDelete = ImmutableList.Create(new InfluxTimeSeries.DeletePoint(
+                        ToDelete = ImmutableList.Create(new InfluxDbTimeSeries.DeletePoint(
                             _now.AddSeconds(-1),
                             _now.AddSeconds(1),
                             $"_measurement=\"{_measurementName}\""))
                     })),
                 ImmutableList<DocumentToDelete>.Empty);
         
-        var document = await storage.LoadDocument<InfluxTimeSeries>(id);
+        var document = await storage.LoadDocument<InfluxDbTimeSeries>(id);
 
         document.Should().NotBeNull();
         
@@ -66,7 +66,7 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
                 ImmutableList.Create(new DocumentToStore(id, testDocument)),
                 ImmutableList<DocumentToDelete>.Empty);
         
-        var document = await storage.LoadDocument<InfluxTimeSeries>(id);
+        var document = await storage.LoadDocument<InfluxDbTimeSeries>(id);
 
         document.Should().NotBeNull();
         
@@ -76,15 +76,15 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
             .Store(
                 ImmutableList.Create(new DocumentToStore(
                     id,
-                    new InfluxTimeSeries(
+                    new InfluxDbTimeSeries(
                         ImmutableList<PointData>.Empty, 
-                        ImmutableList.Create(new InfluxTimeSeries.DeletePoint(
+                        ImmutableList.Create(new InfluxDbTimeSeries.DeletePoint(
                             _now.AddSeconds(-1),
                             _now.AddSeconds(1),
                             $"_measurement=\"{_measurementName}\""))))),
                 ImmutableList<DocumentToDelete>.Empty);
         
-        document = await storage.LoadDocument<InfluxTimeSeries>(id);
+        document = await storage.LoadDocument<InfluxDbTimeSeries>(id);
 
         document.Should().NotBeNull();
         
@@ -108,15 +108,15 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
             .Store(
                 ImmutableList.Create(new DocumentToStore(
                     id,
-                    new InfluxTimeSeries(
+                    new InfluxDbTimeSeries(
                         ImmutableList<PointData>.Empty, 
-                        ImmutableList.Create(new InfluxTimeSeries.DeletePoint(
+                        ImmutableList.Create(new InfluxDbTimeSeries.DeletePoint(
                             _now.AddSeconds(-1),
                             _now.AddSeconds(1),
                             $"_measurement=\"{_measurementName}\""))))),
                 ImmutableList<DocumentToDelete>.Empty);
         
-        var document = await storage.LoadDocument<InfluxTimeSeries>(id);
+        var document = await storage.LoadDocument<InfluxDbTimeSeries>(id);
 
         document.Should().NotBeNull();
         
@@ -145,9 +145,9 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
             .Store(
                 ImmutableList.Create(new DocumentToStore(
                     id,
-                    new InfluxTimeSeries(
+                    new InfluxDbTimeSeries(
                         ImmutableList<PointData>.Empty, 
-                        ImmutableList.Create(new InfluxTimeSeries.DeletePoint(
+                        ImmutableList.Create(new InfluxDbTimeSeries.DeletePoint(
                             _now.AddSeconds(-1),
                             _now.AddSeconds(1),
                             $"_measurement=\"{_measurementName}\""))))),
@@ -161,18 +161,18 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
         return new InfluxDbProjectionStorage(_client);
     }
 
-    protected override InfluxTimeSeries CreateTestDocument(InfluxDbTimeSeriesId id)
+    protected override InfluxDbTimeSeries CreateTestDocument(InfluxDbTimeSeriesId id)
     {
-        return new InfluxTimeSeries(
+        return new InfluxDbTimeSeries(
             ImmutableList.Create(PointData
                 .Measurement(_measurementName)
                 .Timestamp(_now, WritePrecision.S)
                 .Field("test-field", 5d)
                 .Tag("test-tag", "test")),
-            ImmutableList<InfluxTimeSeries.DeletePoint>.Empty);
+            ImmutableList<InfluxDbTimeSeries.DeletePoint>.Empty);
     }
 
-    protected override async Task VerifyDocument(InfluxTimeSeries original, InfluxTimeSeries loaded)
+    protected override async Task VerifyDocument(InfluxDbTimeSeries original, InfluxDbTimeSeries loaded)
     {
         loaded.Points.Should().BeEmpty();
         loaded.ToDelete.Should().BeEmpty();

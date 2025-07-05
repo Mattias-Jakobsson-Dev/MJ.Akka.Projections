@@ -51,8 +51,7 @@ public class ShardedProjectors(
 {
     private readonly ConcurrentDictionary<string, Task<IActorRef>> _projectors = new();
     
-    public async Task<IProjectorProxy> GetProjector<TId, TDocument>(TId id, ProjectionConfiguration configuration)
-        where TId : notnull where TDocument : notnull
+    public async Task<IProjectorProxy> GetProjector(object id, ProjectionConfiguration configuration)
     {
         var projector = await _projectors
             .GetOrAdd(
@@ -74,9 +73,9 @@ public class ShardedProjectors(
                                 new ShardedProjectionConfigurationSupplier(runnerId, name));
                     },
                     settings,
-                    new MessageExtractor<TId, TDocument>(maxNumberOfShards, configuration)));
+                    new MessageExtractor(maxNumberOfShards, configuration)));
 
-        return new ActorRefProjectorProxy<TId, TDocument>(id, projector);
+        return new ActorRefProjectorProxy(id, projector);
     }
 
     public IKeepTrackOfProjectors Reset()
@@ -84,14 +83,14 @@ public class ShardedProjectors(
         return this;
     }
 
-    private class MessageExtractor<TId, TDocument>(
+    private class MessageExtractor(
         int maxNumberOfShards,
         ProjectionConfiguration configuration)
-        : HashCodeMessageExtractor(maxNumberOfShards) where TId : notnull where TDocument : notnull
+        : HashCodeMessageExtractor(maxNumberOfShards)
     {
         public override string EntityId(object message)
         {
-            return message is DocumentProjection<TId, TDocument>.Commands.IMessageWithId messageWithId 
+            return message is DocumentProjection.Commands.IMessageWithId messageWithId 
                 ? configuration.IdToString(messageWithId.Id) 
                 : "";
         }

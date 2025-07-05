@@ -5,33 +5,6 @@ namespace MJ.Akka.Projections.Configuration;
 
 public static class ConfigurationExtensions
 {
-    public static IConfigurePart<T, TStorage> WithProjectionStorage<T, TStorage>(
-        this IHaveConfiguration<T> source,
-        TStorage storage) where TStorage : IProjectionStorage
-        where T : ContinuousProjectionConfig
-    {
-        var config = source.WithModifiedConfig(conf => conf with
-        {
-            ProjectionStorage = storage
-        });
-
-        return new ConfigurePart<T, TStorage>(config, storage);
-    }
-
-    public static IConfigurePart<T, TStorage> WithPositionStorage<T, TStorage>(
-        this IHaveConfiguration<T> source,
-        TStorage storage)
-        where TStorage : IProjectionPositionStorage
-        where T : ContinuousProjectionConfig
-    {
-        var config = source.WithModifiedConfig(conf => conf with
-        {
-            PositionStorage = storage
-        });
-
-        return new ConfigurePart<T, TStorage>(config, storage);
-    }
-
     public static IConfigurePart<T, RestartSettings?> WithRestartSettings<T>(
         this IHaveConfiguration<T> source,
         RestartSettings? restartSettings)

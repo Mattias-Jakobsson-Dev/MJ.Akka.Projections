@@ -4,14 +4,14 @@ using Akka.Actor;
 using Akka.Persistence.EventStore.Query;
 using Akka.Persistence.Query;
 using Akka.Streams.Dsl;
-using MJ.Akka.Projections;
 
 namespace MJ.Akka.Projections.EventStoreToRavenDbExample;
 
-public class ExampleProjection(ActorSystem actorSystem) : StringIdProjection<ExampleDocument>
+public class ExampleProjection(ActorSystem actorSystem) 
+    : StringIdProjection<ProjectedDocumentContext<string, ExampleDocument>>
 {
-    public override ISetupProjection<string, ExampleDocument> Configure(
-        ISetupProjection<string, ExampleDocument> config)
+    public override ISetupProjection<string, ProjectedDocumentContext<string, ExampleDocument>> Configure(
+        ISetupProjection<string, ProjectedDocumentContext<string, ExampleDocument>> config)
     {
         return config
             .TransformUsing<Events.ThirdEvent>(
@@ -47,7 +47,7 @@ public class ExampleProjection(ActorSystem actorSystem) : StringIdProjection<Exa
                     return doc;
                 });
     }
-
+    
     public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
     {
         return PersistenceQuery.Get(actorSystem)

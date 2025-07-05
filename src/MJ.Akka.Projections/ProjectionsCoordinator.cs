@@ -9,7 +9,8 @@ using MJ.Akka.Projections.Configuration;
 
 namespace MJ.Akka.Projections;
 
-public static class ProjectionsCoordinator
+[PublicAPI]
+public class ProjectionsCoordinator : ReceiveActor
 {
     public static class Commands
     {
@@ -26,11 +27,7 @@ public static class ProjectionsCoordinator
 
         public record KillResponse;
     }
-}
-
-[PublicAPI]
-public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : notnull where TDocument : notnull
-{
+    
     private static class InternalCommands
     {
         public record Fail(Exception Cause);
@@ -46,7 +43,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
     private readonly HashSet<IActorRef> _waitingForCompletion = [];
 
-    private ProjectionSequencer<TId, TDocument>.Proxy _sequencer;
+    private ProjectionSequencer.Proxy _sequencer;
 
     public ProjectionsCoordinator(ISupplyProjectionConfigurations configSupplier)
     {
@@ -54,19 +51,19 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
         _configuration = configSupplier.GetConfiguration();
 
-        _sequencer = ProjectionSequencer<TId, TDocument>.Create(Context, _configuration);
+        _sequencer = ProjectionSequencer.Create(Context, _configuration);
         
         Become(Stopped);
     }
 
     public static Props Init(ISupplyProjectionConfigurations configSupplier)
     {
-        return Props.Create(() => new ProjectionsCoordinator<TId, TDocument>(configSupplier));
+        return Props.Create(() => new ProjectionsCoordinator(configSupplier));
     }
 
     private void Stopped()
     {
-        ReceiveAsync<ProjectionsCoordinator.Commands.Start>(async _ =>
+        ReceiveAsync<Commands.Start>(async _ =>
         {
             _logger.Info("Starting projection {0}", _configuration.Name);
 
@@ -86,8 +83,8 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                         .ProjectionEventBatchingStrategy
                         .Get(source)
                         .Select(x =>
-                            new ProjectionSequencer<TId, TDocument>.Commands.StartProjecting(x))
-                        .Ask<ProjectionSequencer<TId, TDocument>.Responses.StartProjectingResponse>(
+                            new ProjectionSequencer.Commands.StartProjecting(x))
+                        .Ask<ProjectionSequencer.Responses.StartProjectingResponse>(
                             _sequencer.Ref,
                             _configuration.GetProjection().ProjectionTimeout,
                             1)
@@ -117,11 +114,11 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
                                 _ => throw new Exception($"Unknown projection response: {x.response.GetType()}")
                             };
                             
-                            return new ProjectionSequencer<TId, TDocument>.Commands.WaitForGroupToFinish(
+                            return new ProjectionSequencer.Commands.WaitForGroupToFinish(
                                 x.groupId,
                                 position);
                         })
-                        .Ask<ProjectionSequencer<TId, TDocument>.Responses.WaitForGroupToFinishResponse>(
+                        .Ask<ProjectionSequencer.Responses.WaitForGroupToFinishResponse>(
                             _sequencer.Ref,
                             _configuration.GetProjection().ProjectionTimeout,
                             _configuration.ProjectionEventBatchingStrategy.GetParallelism() * 2)
@@ -160,10 +157,10 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
         {
             Context.Stop(Self);
             
-            Sender.Tell(new ProjectionsCoordinator.Responses.KillResponse());
+            Sender.Tell(new Responses.KillResponse());
         });
         
-        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ =>
+        Receive<Commands.WaitForCompletion>(_ =>
         {
             _waitingForCompletion.Add(Sender);
         });
@@ -184,7 +181,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             Become(Stopped);
         });
 
-        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ =>
+        Receive<Commands.WaitForCompletion>(_ =>
         {
             _waitingForCompletion.Add(Sender);
         });
@@ -208,15 +205,15 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
 
             Context.Stop(Self);
             
-            Sender.Tell(new ProjectionsCoordinator.Responses.KillResponse());
+            Sender.Tell(new Responses.KillResponse());
         });
     }
 
     private void Completed()
     {
-        Receive<ProjectionsCoordinator.Commands.WaitForCompletion>(_ =>
+        Receive<Commands.WaitForCompletion>(_ =>
         {
-            Sender.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse());
+            Sender.Tell(new Responses.WaitForCompletionResponse());
         });
 
         Receive<ProjectionsCoordinator.Commands.Kill>(_ =>
@@ -225,21 +222,21 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
             
             HandleCompletionWaiters();
             
-            Sender.Tell(new ProjectionsCoordinator.Responses.KillResponse());
+            Sender.Tell(new Responses.KillResponse());
         });
     }
 
     private void HandleCompletionWaiters(Exception? error = null)
     {
         foreach (var item in _waitingForCompletion)
-            item.Tell(new ProjectionsCoordinator.Responses.WaitForCompletionResponse(error));
+            item.Tell(new Responses.WaitForCompletionResponse(error));
 
         _waitingForCompletion.Clear();
     }
 
     protected override void PreStart()
     {
-        Self.Tell(new ProjectionsCoordinator.Commands.Start());
+        Self.Tell(new Commands.Start());
 
         base.PreStart();
     }
@@ -248,7 +245,7 @@ public class ProjectionsCoordinator<TId, TDocument> : ReceiveActor where TId : n
     {
         _killSwitch?.Shutdown();
 
-        Self.Tell(new ProjectionsCoordinator.Commands.Start());
+        Self.Tell(new Commands.Start());
 
         base.PreRestart(reason, message);
     }

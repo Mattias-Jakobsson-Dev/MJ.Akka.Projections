@@ -141,7 +141,7 @@ async Task RunProjection()
     var documentStore = CreateDocumentStore();
 
     documentStore.EnsureDatabaseExists();
-
+    
     var projectionsCoordinator = await actorSystem
         .Projections(
             conf => conf

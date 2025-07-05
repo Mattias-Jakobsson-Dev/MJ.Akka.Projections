@@ -3,7 +3,7 @@ using JetBrains.Annotations;
 namespace MJ.Akka.Projections;
 
 [PublicAPI]
-public abstract class IntIdProjection<TDocument> : BaseProjection<int, TDocument> where TDocument : notnull
+public abstract class IntIdProjection<TContext> : BaseProjection<int, TContext> where TContext : IProjectionContext<int>
 {
     public override int IdFromString(string id)
     {

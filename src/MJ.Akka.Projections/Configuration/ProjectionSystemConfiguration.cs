@@ -9,8 +9,6 @@ namespace MJ.Akka.Projections.Configuration;
 public record ProjectionSystemConfiguration(
     RestartSettings? RestartSettings,
     IEventBatchingStrategy EventBatchingStrategy,
-    IProjectionStorage ProjectionStorage,
-    IProjectionPositionStorage PositionStorage,
     IEventPositionBatchingStrategy PositionBatchingStrategy,
     IConfigureProjectionCoordinator Coordinator,
     IKeepTrackOfProjectors ProjectorFactory,
@@ -18,8 +16,6 @@ public record ProjectionSystemConfiguration(
     : ContinuousProjectionConfig(
         RestartSettings,
         EventBatchingStrategy,
-        ProjectionStorage,
-        PositionStorage,
         PositionBatchingStrategy)
 {
     public static ProjectionSystemConfiguration CreateDefaultConfiguration(ActorSystem actorSystem)
@@ -27,8 +23,6 @@ public record ProjectionSystemConfiguration(
         return new ProjectionSystemConfiguration(
             null,
             BatchWithinEventBatchingStrategy.Default,
-            new InMemoryProjectionStorage(),
-            new InMemoryPositionStorage(),
             BatchWithinEventPositionBatchingStrategy.Default,
             new InProcessSingletonProjectionCoordinator.Setup(actorSystem),
             new KeepTrackOfProjectorsInProc(actorSystem, MaxNumberOfProjectorsPassivation.Default),
