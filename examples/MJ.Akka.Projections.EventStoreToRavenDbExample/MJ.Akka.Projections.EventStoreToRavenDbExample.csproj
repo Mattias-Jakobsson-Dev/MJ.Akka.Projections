@@ -12,7 +12,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Akka.Persistence.EventStore" Version="1.5.37" />
+      <PackageReference Include="Akka.Persistence.EventStore" Version="1.5.42" />
+      <PackageReference Include="Akka.Streams" Version="1.5.44" />
       <PackageReference Include="Docker.DotNet" Version="3.125.15" />
       <PackageReference Include="Sharprompt" Version="3.0.0" />
     </ItemGroup>
