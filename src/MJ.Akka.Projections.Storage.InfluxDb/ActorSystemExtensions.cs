@@ -13,7 +13,7 @@ public static class ActorSystemExtensions
         Func<
             IHaveConfiguration<ProjectionSystemConfiguration<SetupInfluxDbStorage>>,
             IHaveConfiguration<ProjectionSystemConfiguration<SetupInfluxDbStorage>>> configure,
-        InfluxDBClient client,
+        IInfluxDBClient client,
         IProjectionPositionStorage positionStorage)
     {
         return actorSystem.Projections(
