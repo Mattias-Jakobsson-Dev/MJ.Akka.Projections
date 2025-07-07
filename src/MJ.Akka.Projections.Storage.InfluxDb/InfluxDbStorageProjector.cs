@@ -15,8 +15,8 @@ public static class InfluxDbStorageProjector
                         .PointsToWrite
                         .SetItem(evnt.Id, 
                             result.PointsToWrite.TryGetValue(evnt.Id, out var existingPoints)
-                                ? existingPoints.Add(evnt.Data)
-                                : ImmutableList<PointData>.Empty.Add(evnt.Data))
+                                ? existingPoints.AddRange(evnt.Data)
+                                : ImmutableList<PointData>.Empty.AddRange(evnt.Data))
                 })
             .On<InfluxDbDeletePoint>((evnt, result) =>
                 result with

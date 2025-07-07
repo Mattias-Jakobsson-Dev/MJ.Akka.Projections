@@ -124,11 +124,11 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
     protected override StoreProjectionRequest CreateInsertRequest(InfluxDbTimeSeriesId id)
     {
         return new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-            new InfluxDbWritePoint(id, PointData
+            new InfluxDbWritePoint(id, [PointData
                 .Measurement(_measurementName)
                 .Timestamp(_now, WritePrecision.S)
                 .Field("test-field", 5d)
-                .Tag("test-tag", "test"))));
+                .Tag("test-tag", "test")])));
     }
 
     protected override StoreProjectionRequest CreateDeleteRequest(InfluxDbTimeSeriesId id)

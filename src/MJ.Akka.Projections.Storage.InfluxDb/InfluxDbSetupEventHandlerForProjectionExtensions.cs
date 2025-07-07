@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using InfluxDB.Client.Writes;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Setup;
@@ -10,55 +11,55 @@ public static class InfluxDbSetupEventHandlerForProjectionExtensions
     public static ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent>
         AddTimeSeries<TEvent>(
             this ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent> setup,
-            Func<TEvent, PointData> getTimeSeries) =>
+            Func<TEvent, IEnumerable<PointData>> getTimeSeries) =>
         setup.AddTimeSeries((evnt, _, _, _) => Task.FromResult(getTimeSeries(evnt)));
 
     public static ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent>
         AddTimeSeries<TEvent>(
             this ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent> setup,
-            Func<TEvent, InfluxDbTimeSeriesContext, PointData> getTimeSeries) =>
+            Func<TEvent, InfluxDbTimeSeriesContext, IEnumerable<PointData>> getTimeSeries) =>
         setup.AddTimeSeries((evnt, context, _, _) => Task.FromResult(getTimeSeries(evnt, context)));
 
     public static ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent>
         AddTimeSeries<TEvent>(
             this ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent> setup,
-            Func<TEvent, InfluxDbTimeSeriesContext, long?, PointData> getTimeSeries) =>
+            Func<TEvent, InfluxDbTimeSeriesContext, long?, IEnumerable<PointData>> getTimeSeries) =>
         setup.AddTimeSeries((evnt, context, position, _) =>
             Task.FromResult(getTimeSeries(evnt, context, position)));
 
     public static ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent>
         AddTimeSeries<TEvent>(
             this ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent> setup,
-            Func<TEvent, Task<PointData>> getTimeSeries) => setup.AddTimeSeries((evnt, _, _, _) => getTimeSeries(evnt));
+            Func<TEvent, Task<IEnumerable<PointData>>> getTimeSeries) => setup.AddTimeSeries((evnt, _, _, _) => getTimeSeries(evnt));
 
     public static ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent>
         AddTimeSeries<TEvent>(
             this ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent> setup,
-            Func<TEvent, InfluxDbTimeSeriesContext, Task<PointData>> getTimeSeries) =>
+            Func<TEvent, InfluxDbTimeSeriesContext, Task<IEnumerable<PointData>>> getTimeSeries) =>
         setup.AddTimeSeries((evnt, context, _, _) => getTimeSeries(evnt, context));
 
     public static ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent>
         AddTimeSeries<TEvent>(
             this ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent> setup,
-            Func<TEvent, InfluxDbTimeSeriesContext, long?, Task<PointData>> getTimeSeries) =>
+            Func<TEvent, InfluxDbTimeSeriesContext, long?, Task<IEnumerable<PointData>>> getTimeSeries) =>
         setup.AddTimeSeries((evnt, context, position, _) =>
             getTimeSeries(evnt, context, position));
 
     public static ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent>
         AddTimeSeries<TEvent>(
             this ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent> setup,
-            Func<TEvent, InfluxDbTimeSeriesContext, CancellationToken, Task<PointData>> getTimeSeries) =>
+            Func<TEvent, InfluxDbTimeSeriesContext, CancellationToken, Task<IEnumerable<PointData>>> getTimeSeries) =>
         setup.AddTimeSeries((evnt, context, _, cancellationToken) =>
             getTimeSeries(evnt, context, cancellationToken));
 
     public static ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent>
         AddTimeSeries<TEvent>(
             this ISetupEventHandlerForProjection<string, InfluxDbTimeSeriesContext, TEvent> setup,
-            Func<TEvent, InfluxDbTimeSeriesContext, long?, CancellationToken, Task<PointData>> getTimeSeries)
+            Func<TEvent, InfluxDbTimeSeriesContext, long?, CancellationToken, Task<IEnumerable<PointData>>> getTimeSeries)
     {
         return setup.HandleWith(async (evnt, context, position, cancellationToken) =>
         [
-            new InfluxDbWritePoint(context.Id, await getTimeSeries(evnt, context, position, cancellationToken))
+            new InfluxDbWritePoint(context.Id, (await getTimeSeries(evnt, context, position, cancellationToken)).ToImmutableList())
         ]);
     }
     
