@@ -18,6 +18,8 @@ public static class RavenDbStorageProjector
                 .On<StoreTimeSeries>((evnt, result) => result.WithTimeSeries(
                     evnt.DocumentId,
                     evnt.Name,
-                    evnt.Records)));
+                    evnt.Records))
+                .On<StoreMetadata>((evnt, result) =>
+                    result.WithMetadata(evnt.DocumentId, evnt.Key, evnt.Value)));
     }
 }

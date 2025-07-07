@@ -1,17 +1,29 @@
+using System.Collections.Immutable;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Documents;
+using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections.Storage.RavenDb;
 
 [PublicAPI]
 public class RavenDbProjectionContext<TDocument>(
     string id,
-    TDocument? document)
-    : ContextWithDocument<string, TDocument>(id, document), IResettableProjectionContext
+    TDocument? document,
+    IImmutableDictionary<string, object> metadata)
+    : ContextWithDocument<string, TDocument>(id, document)
     where TDocument : class
 {
-    public IProjectionContext Reset()
+    private IImmutableDictionary<string, object> _metadata = metadata;
+
+    public IEnumerable<IProjectionResult> SetMetadata(string key, object value)
     {
-        return new RavenDbProjectionContext<TDocument>(Id, Document);
+        _metadata = _metadata.SetItem(key, value);
+
+        return [new StoreMetadata(Id, key, value)];
+    }
+    
+    public object? GetMetadata(string key)
+    {
+        return _metadata.GetValueOrDefault(key);
     }
 }

@@ -1,6 +1,9 @@
 ﻿using System.Collections.Immutable;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;
+using Raven.Client.Documents.Commands.Batches;
+using Raven.Client.Documents.Operations;
+using Raven.Client.Json;
 
 namespace MJ.Akka.Projections.Storage.RavenDb;
 
@@ -9,7 +12,7 @@ public class RavenDbDocumentProjectionStorage(IDocumentStore documentStore, Bulk
 {
     private readonly InProcessProjector<RavenDbStorageProjectorResult> _storageProjector = RavenDbStorageProjector
         .Setup();
-    
+
     public async Task<StoreProjectionResponse> Store(
         StoreProjectionRequest request,
         CancellationToken cancellationToken = default)
@@ -24,9 +27,16 @@ public class RavenDbDocumentProjectionStorage(IDocumentStore documentStore, Bulk
 
             foreach (var item in toStore.DocumentsToUpsert)
             {
-                await bulkInsert.StoreAsync(item.Value, (string)item.Key);
+                var metadata = toStore
+                    .MetadataToUpsert
+                    .TryGetValue((string)item.Key, out var metadataValue)
+                    ? metadataValue
+                    : ImmutableDictionary<string, object>.Empty;
+
+                await bulkInsert.StoreAsync(item.Value, (string)item.Key,
+                    new MetadataAsDictionary(metadata.ToDictionary()));
             }
-            
+
             foreach (var timeSeriesDocument in toStore.TimeSeriesToAdd)
             {
                 foreach (var timeSeries in timeSeriesDocument.Value)
@@ -47,13 +57,38 @@ public class RavenDbDocumentProjectionStorage(IDocumentStore documentStore, Bulk
             }
         }
 
-        if (!toStore.DocumentsToDelete.Any())
+        var metadataToUpsert = toStore.MetadataToUpsert
+            .Where(kvp => !toStore.DocumentsToUpsert.ContainsKey(kvp.Key))
+            .ToImmutableDictionary();
+
+        if (!toStore.DocumentsToDelete.Any() && metadataToUpsert.IsEmpty)
             return StoreProjectionResponse.From(unhandledEvents);
 
         using var session = documentStore.OpenAsyncSession();
 
         foreach (var item in toStore.DocumentsToDelete)
             session.Delete((string)item);
+
+        foreach (var metadataItem in metadataToUpsert)
+        {
+            session.Advanced.Defer(new PatchCommandData(
+                metadataItem.Key,
+                null,
+                new PatchRequest
+                {
+                    Script = """
+                             const metadata = getMetadata(this);
+
+                             for (const prop in args.NewMetadata) {
+                                metadata[prop] = args.NewMetadata[prop];
+                             }
+                             """,
+                    Values = new Dictionary<string, object?>
+                    {
+                        ["NewMetadata"] = metadataItem.Value.ToDictionary()
+                    }
+                }));
+        }
 
         await session.SaveChangesAsync(cancellationToken);
 

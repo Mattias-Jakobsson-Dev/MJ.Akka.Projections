@@ -5,14 +5,31 @@ namespace MJ.Akka.Projections.Storage.RavenDb;
 
 public record RavenDbStorageProjectorResult(
     IImmutableDictionary<object, object> DocumentsToUpsert,
+    IImmutableDictionary<string, IImmutableDictionary<string, object>> MetadataToUpsert,
     IImmutableList<object> DocumentsToDelete,
     IImmutableDictionary<string, IImmutableDictionary<string, IImmutableList<TimeSeriesRecord>>> TimeSeriesToAdd)
     : DocumentsStorageProjectorResult(DocumentsToUpsert, DocumentsToDelete)
 {
     public static RavenDbStorageProjectorResult Empty =>
         new(ImmutableDictionary<object, object>.Empty,
+            ImmutableDictionary<string, IImmutableDictionary<string, object>>.Empty, 
             ImmutableList<object>.Empty,
             ImmutableDictionary<string, IImmutableDictionary<string, IImmutableList<TimeSeriesRecord>>>.Empty);
+    
+    public RavenDbStorageProjectorResult WithMetadata(string id, string key, object value)
+    {
+        if (!MetadataToUpsert.TryGetValue(id, out var existingMetadata))
+        {
+            existingMetadata = ImmutableDictionary<string, object>.Empty;
+        }
+
+        existingMetadata = existingMetadata.SetItem(key, value);
+
+        return this with
+        {
+            MetadataToUpsert = MetadataToUpsert.SetItem(id, existingMetadata)
+        };
+    }
     
     public RavenDbStorageProjectorResult WithTimeSeries(
         string id,
