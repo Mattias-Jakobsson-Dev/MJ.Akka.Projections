@@ -7,8 +7,7 @@ using MJ.Akka.Projections.Configuration;
 namespace MJ.Akka.Projections;
 
 [PublicAPI]
-public class ProjectionSequencer<TId, TDocument> : ReceiveActor
-    where TId : notnull where TDocument : notnull
+public class ProjectionSequencer : ReceiveActor
 {
     public static class Commands
     {
@@ -19,7 +18,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     
     private static class InternalCommands
     {
-        public record TaskFinished(Guid GroupId, Guid TaskId, TId? Id, Messages.IProjectEventsResponse Response);
+        public record TaskFinished(Guid GroupId, Guid TaskId, object? Id, Messages.IProjectEventsResponse Response);
         
         public record Reset(CancellationToken CancellationToken);
 
@@ -32,13 +31,13 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             ImmutableList<(
                 Guid groupId,
                 Guid taskId,
-                TId? documentId,
+                object? documentId,
                 Task<Messages.IProjectEventsResponse> task)> Tasks);
 
         public record WaitForGroupToFinishResponse(PositionData PositionData);
     }
 
-    private readonly List<TId> _inprogressIds = [];
+    private readonly List<object> _inprogressIds = [];
     private readonly Dictionary<Guid, WaitingGroup> _inProcessGroups = new();
 
     private readonly ProjectionConfiguration _configuration;
@@ -47,7 +46,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     private IKeepTrackOfProjectors _projectorFactory;
 
     private readonly
-        Dictionary<TId, Queue<(ImmutableList<EventWithPosition> events,
+        Dictionary<object, Queue<(ImmutableList<EventWithPosition> events,
             TaskCompletionSource<Messages.IProjectEventsResponse>
             task)>> _queues = new();
 
@@ -86,7 +85,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             var tasks = new List<(
                 Guid groupId,
                 Guid taskId,
-                TId? documentId,
+                object? documentId,
                 Task<Messages.IProjectEventsResponse> task)>();
 
             var groupedEvents = cmd
@@ -128,14 +127,14 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
                         tasks.Add((
                             groupId,
                             groupedEvent.TaskId,
-                            (TId?)groupedEvent.Id.Id,
+                            groupedEvent.Id.Id,
                             Task.FromResult<Messages.IProjectEventsResponse>(
                                 new Messages.Acknowledge(groupedEvent.Events.GetHighestEventNumber()))));
 
                         continue;
                     }
 
-                    var id = (TId)groupedEvent.Id.Id;
+                    var id = groupedEvent.Id.Id;
 
                     if (!_inprogressIds.Contains(id))
                     {
@@ -263,7 +262,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
             }
             
             var projectors = await Task.WhenAll(_inprogressIds
-                .Select(id => _projectorFactory.GetProjector<TId, TDocument>(id, _configuration)));
+                .Select(id => _projectorFactory.GetProjector(id, _configuration)));
 
             await Task.WhenAll(projectors
                 .Select(projector => projector.StopAllInProgress(_configuration.GetProjection().ProjectionTimeout)));
@@ -284,7 +283,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     }
 
     private void HandleWaitingTasks(
-        TId? id,
+        object? id,
         Messages.IProjectEventsResponse response,
         CancellationToken cancellationToken)
     {
@@ -326,11 +325,11 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
     }
 
     private async Task<Messages.IProjectEventsResponse> Run(
-        TId id,
+        object id,
         ImmutableList<EventWithPosition> events,
         CancellationToken cancellationToken)
     {
-        var projector = await _projectorFactory.GetProjector<TId, TDocument>(id, _configuration);
+        var projector = await _projectorFactory.GetProjector(id, _configuration);
 
         return await projector.ProjectEvents(
             events,
@@ -343,7 +342,7 @@ public class ProjectionSequencer<TId, TDocument> : ReceiveActor
         ProjectionConfiguration configuration)
     {
         var sequencer = refFactory.ActorOf(
-            Props.Create(() => new ProjectionSequencer<TId, TDocument>(configuration)));
+            Props.Create(() => new ProjectionSequencer(configuration)));
 
         return new Proxy(sequencer);
     }

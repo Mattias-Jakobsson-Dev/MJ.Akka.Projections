@@ -2,8 +2,9 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
-using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage.InMemory;
+using MJ.Akka.Projections.Storage.Messages;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -13,11 +14,21 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
 {
     public async Task InitializeAsync()
     {
-        var sequencer = ProjectionSequencer<string, TestDocument<string>>.Create(
+        var projection = new TestProjection<string>(
+            ImmutableList<object>.Empty, 
+            ImmutableList<StorageFailures>.Empty);
+
+        var storageSetup = new SetupInMemoryStorage();
+        
+        var sequencer = ProjectionSequencer.Create(
             Sys,
-            new ProjectionConfiguration<string, TestDocument<string>>(
-                new TestProjection<string>(ImmutableList<object>.Empty),
-                new InMemoryProjectionStorage(),
+            new ProjectionConfiguration<
+                string, 
+                InMemoryProjectionContext<string, TestDocument<string>>, 
+                SetupInMemoryStorage>(
+                projection,
+                storageSetup.CreateProjectionStorage(),
+                projection.GetLoadProjectionContext(storageSetup),
                 new InMemoryPositionStorage(),
                 new TestProjectionFactory(),
                 null,
@@ -47,8 +58,8 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
             
             var response = await sequencer
                 .Ref
-                .Ask<ProjectionSequencer<string, TestDocument<string>>.Responses.StartProjectingResponse>(
-                    new ProjectionSequencer<string, TestDocument<string>>.Commands.StartProjecting(events));
+                .Ask<ProjectionSequencer.Responses.StartProjectingResponse>(
+                    new ProjectionSequencer.Commands.StartProjecting(events));
 
             responses[batch.Key] = response.Tasks[0].task;
 
@@ -84,10 +95,9 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
 
     public class TestProjectionFactory : IKeepTrackOfProjectors
     {
-        public Task<IProjectorProxy> GetProjector<TId, TDocument>(
-            TId id,
+        public Task<IProjectorProxy> GetProjector(
+            object id,
             ProjectionConfiguration configuration)
-            where TId : notnull where TDocument : notnull
         {
             return Task.FromResult<IProjectorProxy>(new TestProjectionProxy());
         }
@@ -134,7 +144,7 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
         public record DelayProcessingEvent(string DocumentId, TimeSpan Delay, Stopwatch SinceCreated);
     }
     
-    public class FakeEventHandler : IHandleEventInProjection<TestDocument<string>>
+    public class FakeEventHandler : IHandleEventInProjection<string, InMemoryProjectionContext<string, TestDocument<string>>>
     {
         public IImmutableList<object> Transform(object evnt)
         {
@@ -149,13 +159,14 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
             return new DocumentId(null, false);
         }
 
-        public Task<(TestDocument<string>? document, bool hasHandler)> Handle(
-            TestDocument<string>? document,
+        public Task<(bool handled, IImmutableList<IProjectionResult> results)> Handle(
+            InMemoryProjectionContext<string, TestDocument<string>> context, 
             object evnt,
-            long position,
+            long position, 
             CancellationToken cancellationToken)
         {
-            return Task.FromResult((document, false));
+            return Task.FromResult<(bool handled, IImmutableList<IProjectionResult> results)>(
+                (false, ImmutableList<IProjectionResult>.Empty));
         }
     }
 }

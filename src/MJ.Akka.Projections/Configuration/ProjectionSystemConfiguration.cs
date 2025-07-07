@@ -6,32 +6,32 @@ using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.Configuration;
 
-public record ProjectionSystemConfiguration(
+public record ProjectionSystemConfiguration<TStorageSetup>(
+    TStorageSetup StorageSetup,
+    IImmutableList<IModifyStorage> StorageModifiers,
     RestartSettings? RestartSettings,
     IEventBatchingStrategy EventBatchingStrategy,
-    IProjectionStorage ProjectionStorage,
-    IProjectionPositionStorage PositionStorage,
     IEventPositionBatchingStrategy PositionBatchingStrategy,
     IConfigureProjectionCoordinator Coordinator,
     IKeepTrackOfProjectors ProjectorFactory,
-    IImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>> Projections)
+    IImmutableDictionary<string, Func<ProjectionSystemConfiguration<TStorageSetup>, ProjectionConfiguration>> Projections)
     : ContinuousProjectionConfig(
         RestartSettings,
         EventBatchingStrategy,
-        ProjectionStorage,
-        PositionStorage,
-        PositionBatchingStrategy)
+        PositionBatchingStrategy) where TStorageSetup : IStorageSetup
 {
-    public static ProjectionSystemConfiguration CreateDefaultConfiguration(ActorSystem actorSystem)
+    public static ProjectionSystemConfiguration<TStorageSetup> CreateDefaultConfiguration(
+        ActorSystem actorSystem,
+        TStorageSetup storageSetup)
     {
-        return new ProjectionSystemConfiguration(
+        return new ProjectionSystemConfiguration<TStorageSetup>(
+            storageSetup,
+            ImmutableList<IModifyStorage>.Empty, 
             null,
             BatchWithinEventBatchingStrategy.Default,
-            new InMemoryProjectionStorage(),
-            new InMemoryPositionStorage(),
             BatchWithinEventPositionBatchingStrategy.Default,
             new InProcessSingletonProjectionCoordinator.Setup(actorSystem),
             new KeepTrackOfProjectorsInProc(actorSystem, MaxNumberOfProjectorsPassivation.Default),
-            ImmutableDictionary<string, Func<ProjectionSystemConfiguration, ProjectionConfiguration>>.Empty);
+            ImmutableDictionary<string, Func<ProjectionSystemConfiguration<TStorageSetup>, ProjectionConfiguration>>.Empty);
     }
 }

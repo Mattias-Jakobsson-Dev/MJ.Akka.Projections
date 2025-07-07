@@ -1,11 +1,11 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Akka.Streams;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
-using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage.Batched;
+using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -25,8 +25,7 @@ public class LargeNumberOfEventsTests : TestKit
             0,
             x => x
                 .WithRestartSettings(null)
-                .WithPositionStorage(new SequentialPositionStorageTester()),
-            new InMemoryProjectionStorage());
+                .WithPositionStorage(new SequentialPositionStorageTester()));
     }
 
     [Fact]
@@ -38,9 +37,8 @@ public class LargeNumberOfEventsTests : TestKit
             0,
             x => x
                 .WithRestartSettings(null)
-                .WithPositionStorage(new SequentialPositionStorageTester()),
-            new InMemoryProjectionStorage()
-                .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
+                .WithPositionStorage(new SequentialPositionStorageTester())
+                .WithBatchedStorage(1, new BatchSizeStorageBatchingStrategy(100)));
     }
 
     [Theory]
@@ -54,8 +52,7 @@ public class LargeNumberOfEventsTests : TestKit
             numberOfDocuments,
             numberOfEvents,
             0,
-            x => x.WithRestartSettings(null),
-            new InMemoryProjectionStorage());
+            x => x.WithRestartSettings(null));
     }
 
     [Theory]
@@ -69,9 +66,9 @@ public class LargeNumberOfEventsTests : TestKit
             numberOfDocuments,
             numberOfEvents,
             0,
-            x => x.WithRestartSettings(null),
-            new InMemoryProjectionStorage()
-                .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
+            x => x
+                .WithRestartSettings(null)
+                .WithBatchedStorage(1, new BatchSizeStorageBatchingStrategy(100)));
     }
 
     [Theory]
@@ -90,8 +87,7 @@ public class LargeNumberOfEventsTests : TestKit
                 .WithEventBatchingStrategy(new BatchWithinEventBatchingStrategy(
                     100,
                     TimeSpan.FromMilliseconds(50)))
-                .WithRestartSettings(null),
-            new InMemoryProjectionStorage());
+                .WithRestartSettings(null));
     }
 
     [Theory]
@@ -110,9 +106,8 @@ public class LargeNumberOfEventsTests : TestKit
                 .WithEventBatchingStrategy(new BatchWithinEventBatchingStrategy(
                     100,
                     TimeSpan.FromMilliseconds(50)))
-                .WithRestartSettings(null),
-            new InMemoryProjectionStorage()
-                .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
+                .WithRestartSettings(null)
+                .WithBatchedStorage(1, new BatchSizeStorageBatchingStrategy(100)));
     }
     
     [Theory]
@@ -129,8 +124,7 @@ public class LargeNumberOfEventsTests : TestKit
             0,
             x => x
                 .WithEventBatchingStrategy(new NoEventBatchingStrategy(100))
-                .WithRestartSettings(null),
-            new InMemoryProjectionStorage());
+                .WithRestartSettings(null));
     }
 
     [Theory]
@@ -147,9 +141,8 @@ public class LargeNumberOfEventsTests : TestKit
             0,
             x => x
                 .WithEventBatchingStrategy(new NoEventBatchingStrategy(100))
-                .WithRestartSettings(null),
-            new InMemoryProjectionStorage()
-                .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
+                .WithRestartSettings(null)
+                .WithBatchedStorage(1, new BatchSizeStorageBatchingStrategy(100)));
     }
 
     [Theory]
@@ -164,8 +157,8 @@ public class LargeNumberOfEventsTests : TestKit
             numberOfDocuments,
             numberOfEvents,
             failurePercentage,
-            x => x,
-            new RandomFailureProjectionStorage(failurePercentage));
+            x => x
+                .WithModifiedStorage(new RandomFailureStorageWrapper.Modifier(failurePercentage)));
     }
 
     [Theory]
@@ -180,9 +173,9 @@ public class LargeNumberOfEventsTests : TestKit
             numberOfDocuments,
             numberOfEvents,
             failurePercentage,
-            x => x,
-            new RandomFailureProjectionStorage(failurePercentage)
-                .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(100)));
+            x => x
+                .WithModifiedStorage(new RandomFailureStorageWrapper.Modifier(failurePercentage))
+                .WithBatchedStorage());
     }
 
     private async Task RunTest(
@@ -190,9 +183,8 @@ public class LargeNumberOfEventsTests : TestKit
         int numberOfEvents,
         int failurePercentage,
         Func<
-            IHaveConfiguration<ProjectionSystemConfiguration>,
-            IHaveConfiguration<ProjectionSystemConfiguration>> configure,
-        IProjectionStorage projectionStorage)
+            IHaveConfiguration<ProjectionSystemConfiguration<SetupInMemoryStorage>>,
+            IHaveConfiguration<ProjectionSystemConfiguration<SetupInMemoryStorage>>> configure)
     {
         var documentIds = Enumerable
             .Range(0, numberOfDocuments)
@@ -219,101 +211,53 @@ public class LargeNumberOfEventsTests : TestKit
             })
             .ToImmutableList();
 
-        var projection = new TestProjection<string>(events.OfType<object>().ToImmutableList());
+        var projection = new TestProjection<string>(
+            events.OfType<object>().ToImmutableList(), 
+            ImmutableList<StorageFailures>.Empty);
 
-        IProjectionPositionStorage positionStorage = null!;
-        ProjectionStorageWithEventStoredTracker usedProjectionStorageWithEventStoredTracker = null!;
-
+        var storageSetup = new SetupInMemoryStorage();
+        
+        var loader = projection
+            .GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+        var eventTracker = new TrackEventsStorageWrapper.Modifier();
+        
         var coordinator = await Sys
             .Projections(config => configure(config
                     .WithRestartSettings(RestartSettings.Create(TimeSpan.Zero, TimeSpan.Zero, 1))
                     .WithProjection(projection)
                     .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
-                    .WithProjectionStorage(projectionStorage)
                     .WithEventBatchingStrategy(new NoEventBatchingStrategy(100)))
-                .WithModifiedConfig(conf =>
-                {
-                    usedProjectionStorageWithEventStoredTracker =
-                        new ProjectionStorageWithEventStoredTracker(conf.ProjectionStorage!);
-
-                    positionStorage = conf.PositionStorage!;
-
-                    return conf with
-                    {
-                        ProjectionStorage = usedProjectionStorageWithEventStoredTracker
-                    };
-                }))
+                .WithModifiedStorage(storageWrapper)
+                .WithModifiedStorage(eventTracker),
+                storageSetup)
             .Start();
 
         await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(30));
 
-        var position = await positionStorage.LoadLatestPosition(projection.Name);
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(numberOfEvents);
 
         foreach (var documentId in documentIds)
         {
-            var document = await projectionStorage.LoadDocument<TestDocument<string>>(documentId);
+            var context = await loader.Load(documentId);
 
-            document.Should().NotBeNull();
+            context.Exists().Should().BeTrue();
 
             var documentEvents = events
-                .Where(x => x.DocId == document!.Id)
+                .Where(x => x.DocId == context.Id)
                 .ToImmutableList();
 
-            document!.HandledEvents.Should().HaveCount(documentEvents.Count);
+            context.Document!.HandledEvents.Should().HaveCount(documentEvents.Count);
 
-            document.HandledEvents.Should().BeEquivalentTo(documentEvents.Select(x => x.EventId));
+            context.Document!.HandledEvents.Should().BeEquivalentTo(documentEvents.Select(x => x.EventId));
         }
 
         projection.HandledEvents.Should().HaveCount(numberOfEvents);
 
-        usedProjectionStorageWithEventStoredTracker.StoredEvents.Distinct().Should().HaveCount(numberOfEvents);
-    }
-
-    private class RandomFailureProjectionStorage(int failurePercentage) : InMemoryProjectionStorage
-    {
-        private readonly Random _random = new();
-
-        public override Task Store(
-            IImmutableList<DocumentToStore> toUpsert,
-            IImmutableList<DocumentToDelete> toDelete,
-            CancellationToken cancellationToken = default)
-        {
-            if (_random.Next(100) <= failurePercentage)
-                throw new Exception("Random failure");
-
-            return base.Store(toUpsert, toDelete, cancellationToken);
-        }
-    }
-
-    private class ProjectionStorageWithEventStoredTracker(IProjectionStorage innerStorage) : IProjectionStorage
-    {
-        public readonly ConcurrentBag<string> StoredEvents = [];
-
-        public Task<TDocument?> LoadDocument<TDocument>(object id, CancellationToken cancellationToken = default)
-        {
-            return innerStorage.LoadDocument<TDocument>(id, cancellationToken);
-        }
-
-        public Task Store(
-            IImmutableList<DocumentToStore> toUpsert,
-            IImmutableList<DocumentToDelete> toDelete,
-            CancellationToken cancellationToken = default)
-        {
-            var events = toUpsert
-                .Select(x => x.Document as TestDocument<string>)
-                .Where(x => x != null)
-                .SelectMany(x => x!.HandledEvents)
-                .ToImmutableList();
-
-            foreach (var evnt in events)
-            {
-                StoredEvents.Add(evnt);
-            }
-
-            return innerStorage.Store(toUpsert, toDelete, cancellationToken);
-        }
+        eventTracker.StoredEvents.Distinct().Should().HaveCount(numberOfEvents);
     }
 
     private class SequentialPositionStorageTester : InMemoryPositionStorage

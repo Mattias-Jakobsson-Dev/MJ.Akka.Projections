@@ -1,93 +1,62 @@
 ﻿using System.Collections.Immutable;
-using System.Reflection;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;
 
 namespace MJ.Akka.Projections.Storage.RavenDb;
 
-public class RavenDbProjectionStorage(IDocumentStore documentStore, BulkInsertOptions insertOptions)
+public class RavenDbDocumentProjectionStorage(IDocumentStore documentStore, BulkInsertOptions insertOptions)
     : IProjectionStorage
 {
-    public async Task<TDocument?> LoadDocument<TDocument>(
-        object id,
+    private readonly InProcessProjector<RavenDbStorageProjectorResult> _storageProjector = RavenDbStorageProjector
+        .Setup();
+    
+    public async Task<StoreProjectionResponse> Store(
+        StoreProjectionRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (typeof(TDocument).IsOfGenericType(typeof(DocumentWithTimeSeries<>)))
-        {
-            var documentType = typeof(TDocument).GenericTypeArguments[0];
+        var (unhandledEvents, toStore) = _storageProjector.RunFor(
+            request.Results.OfType<object>().ToImmutableList(),
+            RavenDbStorageProjectorResult.Empty);
 
-            return await (Task<TDocument?>)typeof(RavenDbProjectionStorage)
-                .GetMethod(nameof(LoadTimeSeries), BindingFlags.Instance | BindingFlags.NonPublic)!
-                .MakeGenericMethod(documentType)
-                .Invoke(this, [id, cancellationToken])!;
-        }
-
-        using var session = documentStore.OpenAsyncSession();
-
-        return await session.LoadAsync<TDocument>(id.ToString(), cancellationToken);
-    }
-
-    public async Task Store(
-        IImmutableList<DocumentToStore> toUpsert,
-        IImmutableList<DocumentToDelete> toDelete,
-        CancellationToken cancellationToken = default)
-    {
-        if (toUpsert.Any())
+        if (toStore.DocumentsToUpsert.Any() || toStore.TimeSeriesToAdd.Any())
         {
             await using var bulkInsert = documentStore.BulkInsert(insertOptions, cancellationToken);
 
-            foreach (var item in toUpsert)
+            foreach (var item in toStore.DocumentsToUpsert)
             {
-                if (item.Document is IHaveTimeSeries timeSeriesDocument)
+                await bulkInsert.StoreAsync(item.Value, (string)item.Key);
+            }
+            
+            foreach (var timeSeriesDocument in toStore.TimeSeriesToAdd)
+            {
+                foreach (var timeSeries in timeSeriesDocument.Value)
                 {
-                    await bulkInsert.StoreAsync(timeSeriesDocument.GetDocument(), item.Id.ToString());
+                    using var timeSeriesBatch = bulkInsert.TimeSeriesFor(
+                        timeSeriesDocument.Key,
+                        timeSeries.Key);
 
-                    foreach (var timeSeries in timeSeriesDocument.TimeSeries)
+                    foreach (var timeSeriesRecord in timeSeries.Value)
                     {
-                        if (!timeSeries.Value.Any())
-                            continue;
-
-                        using var timeSeriesBatch = bulkInsert.TimeSeriesFor(
-                            item.Id.ToString(),
-                            timeSeries.Key);
-
-                        foreach (var timeSeriesRecord in timeSeries.Value)
-                        {
-                            await timeSeriesBatch
-                                .AppendAsync(
-                                    timeSeriesRecord.TimeStamp,
-                                    timeSeriesRecord.Values.ToList(),
-                                    timeSeriesRecord.Tag);
-                        }
+                        await timeSeriesBatch
+                            .AppendAsync(
+                                timeSeriesRecord.TimeStamp,
+                                timeSeriesRecord.Values.ToList(),
+                                timeSeriesRecord.Tag);
                     }
-                }
-                else
-                {
-                    await bulkInsert.StoreAsync(item.Document, item.Id.ToString());
                 }
             }
         }
 
-        if (toDelete.Any())
-        {
-            using var session = documentStore.OpenAsyncSession();
+        if (!toStore.DocumentsToDelete.Any())
+            return StoreProjectionResponse.From(unhandledEvents);
 
-            foreach (var item in toDelete)
-                session.Delete(item.Id.ToString());
+        using var session = documentStore.OpenAsyncSession();
 
-            await session.SaveChangesAsync(cancellationToken);
-        }
-    }
+        foreach (var item in toStore.DocumentsToDelete)
+            session.Delete((string)item);
 
-    private async Task<DocumentWithTimeSeries<TDocument>?> LoadTimeSeries<TDocument>(
-        object id,
-        CancellationToken cancellationToken)
-        where TDocument : notnull
-    {
-        var document = await LoadDocument<TDocument>(id, cancellationToken);
+        await session.SaveChangesAsync(cancellationToken);
 
-        return document == null
-            ? null
-            : DocumentWithTimeSeries<TDocument>.FromDocument(document);
+        return StoreProjectionResponse.From(unhandledEvents);
     }
 }

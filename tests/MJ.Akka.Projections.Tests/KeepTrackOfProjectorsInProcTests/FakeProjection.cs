@@ -3,10 +3,14 @@ using Akka;
 using Akka.Actor;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Setup;
+using MJ.Akka.Projections.Storage;
+using MJ.Akka.Projections.Storage.InMemory;
 
 namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
 
-public class FakeProjection(TimeSpan delay) : IProjection<string, object>
+public class FakeProjection(TimeSpan delay) 
+    : IProjection<object, InMemoryProjectionContext<object, object>, SetupInMemoryStorage>
 {
     public string Name => GetType().Name;
     
@@ -19,34 +23,31 @@ public class FakeProjection(TimeSpan delay) : IProjection<string, object>
 
     public Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier)
     {
-        return ProjectionsCoordinator<string, object>.Init(configSupplier);
+        return ProjectionsCoordinator.Init(configSupplier);
     }
 
-    public Props CreateProjectionProps(object id, ISupplyProjectionConfigurations configSupplier)
+    public Props CreateProjectionProps(ISupplyProjectionConfigurations configSupplier)
     {
         return Props.Create(() => new FakeProjector(delay));
     }
-
-    public string IdFromString(string id)
-    {
-        return id;
-    }
-
-    public string IdToString(string id)
-    {
-        return id;
-    }
-
-    public ISetupProjection<string, object> Configure(ISetupProjection<string, object> config)
+    
+    public ISetupProjectionHandlers<object, InMemoryProjectionContext<object, object>> Configure(
+        ISetupProjection<object, InMemoryProjectionContext<object, object>> config)
     {
         return config;
     }
-
+    
+    public ILoadProjectionContext<object, InMemoryProjectionContext<object, object>> GetLoadProjectionContext(
+        SetupInMemoryStorage storageSetup)
+    {
+        return new InMemoryProjectionLoader<object, object>(storageSetup.LoadDocument);
+    }
+    
     private class FakeProjector : ReceiveActor
     {
         public FakeProjector(TimeSpan delay)
         {
-            ReceiveAsync<DocumentProjection<string, object>.Commands.ProjectEvents>(async cmd =>
+            ReceiveAsync<DocumentProjection.Commands.ProjectEvents>(async cmd =>
             {
                 await Task.Delay(delay);
 

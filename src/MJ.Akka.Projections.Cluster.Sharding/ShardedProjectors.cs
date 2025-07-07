@@ -22,11 +22,6 @@ internal class ShardedProjectionConfigurationSupplier(string runnerId, string pr
             : throw new NoDocumentProjectionException(projectionName);
     }
     
-    public static void DisposeRunner(string runnerId)
-    {
-        Configurations.TryRemove(runnerId, out _);
-    }
-    
     public static void ConfigureProjection(
         string runnerId,
         string projectionName,
@@ -51,15 +46,14 @@ public class ShardedProjectors(
 {
     private readonly ConcurrentDictionary<string, Task<IActorRef>> _projectors = new();
     
-    public async Task<IProjectorProxy> GetProjector<TId, TDocument>(TId id, ProjectionConfiguration configuration)
-        where TId : notnull where TDocument : notnull
+    public async Task<IProjectorProxy> GetProjector(object id, ProjectionConfiguration configuration)
     {
         var projector = await _projectors
             .GetOrAdd(
                 configuration.Name,
                 name => ClusterSharding.Get(actorSystem).StartAsync(
                     $"projection-{name}",
-                    documentId =>
+                    _ =>
                     {
                         ShardedProjectionConfigurationSupplier
                             .ConfigureProjection(
@@ -70,13 +64,12 @@ public class ShardedProjectors(
                         return configuration
                             .GetProjection()
                             .CreateProjectionProps(
-                                configuration.IdFromString(documentId),
                                 new ShardedProjectionConfigurationSupplier(runnerId, name));
                     },
                     settings,
-                    new MessageExtractor<TId, TDocument>(maxNumberOfShards, configuration)));
+                    new MessageExtractor(maxNumberOfShards)));
 
-        return new ActorRefProjectorProxy<TId, TDocument>(id, projector);
+        return new ActorRefProjectorProxy(id, projector);
     }
 
     public IKeepTrackOfProjectors Reset()
@@ -84,15 +77,13 @@ public class ShardedProjectors(
         return this;
     }
 
-    private class MessageExtractor<TId, TDocument>(
-        int maxNumberOfShards,
-        ProjectionConfiguration configuration)
-        : HashCodeMessageExtractor(maxNumberOfShards) where TId : notnull where TDocument : notnull
+    private class MessageExtractor(int maxNumberOfShards)
+        : HashCodeMessageExtractor(maxNumberOfShards)
     {
         public override string EntityId(object message)
         {
-            return message is DocumentProjection<TId, TDocument>.Commands.IMessageWithId messageWithId 
-                ? configuration.IdToString(messageWithId.Id) 
+            return message is DocumentProjection.Commands.IMessageWithId messageWithId 
+                ? messageWithId.Id.ToString() ?? "" 
                 : "";
         }
     }

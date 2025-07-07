@@ -2,9 +2,10 @@ using System.Collections.Immutable;
 using Akka.Streams;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
-using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage.Batched;
+using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -13,7 +14,7 @@ namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 public class BatchedStorageTests : TestKit
 {
     private readonly Fixture _fixture = new();
-    
+
     [Fact]
     public async Task Projecting_events_when_storage_fails_once_with_restart_settings()
     {
@@ -21,60 +22,46 @@ public class BatchedStorageTests : TestKit
         var eventId = _fixture.Create<string>();
 
         var events = ImmutableList.Create<object>(new Events<string>.FirstEvent(id, eventId));
-        var projection = new TestProjection<string>(events);
+        var failures = ImmutableList.Create(new StorageFailures(
+            _ => true,
+            _ => false,
+            new Exception("Failure")));
 
-        var projectionStorage = new FailOnceStorage();
-        var positionStorage = new InMemoryPositionStorage();
+        var projection = new TestProjection<string>(events, failures);
+        var storageSetup = new SetupInMemoryStorage();
+
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+
+        var storageWrapper = new TestStorageWrapper.Modifier();
+        var failureWrapper = new TestFailureStorageWrapper.Modifier(failures);
 
         var coordinator = await Sys
             .Projections(config => config
-                .WithRestartSettings(
-                    RestartSettings.Create(
-                            TimeSpan.Zero,
-                            TimeSpan.Zero,
-                            1)
-                        .WithMaxRestarts(5, TimeSpan.FromSeconds(10)))
-                .WithProjectionStorage(projectionStorage)
-                .Batched()
-                .WithPositionStorage(positionStorage)
-                .WithProjection(projection))
+                    .WithRestartSettings(
+                        RestartSettings.Create(
+                                TimeSpan.Zero,
+                                TimeSpan.Zero,
+                                1)
+                            .WithMaxRestarts(5, TimeSpan.FromSeconds(10)))
+                    .WithProjection(projection)
+                    .WithBatchedStorage()
+                    .WithModifiedStorage(storageWrapper)
+                    .WithModifiedStorage(failureWrapper),
+                storageSetup)
             .Start();
 
         await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
 
-        var position = await positionStorage.LoadLatestPosition(projection.Name);
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(1);
 
-        var document = await projectionStorage.LoadDocument<TestDocument<string>>(id);
+        var context = await loader.Load(id);
 
-        document.Should().NotBeNull();
+        context.Exists().Should().BeTrue();
 
-        document!.HandledEvents.Should().HaveCount(1);
+        context.Document!.HandledEvents.Should().HaveCount(1);
 
-        document.HandledEvents[0].Should().Be(eventId);
-    }
-    
-    private class FailOnceStorage : InMemoryProjectionStorage
-    {
-        private readonly object _lock = new { };
-        private bool _hasFailed;
-        
-        public override async Task Store(
-            IImmutableList<DocumentToStore> toUpsert,
-            IImmutableList<DocumentToDelete> toDelete, CancellationToken cancellationToken = default)
-        {
-            lock (_lock)
-            {
-                if (!_hasFailed)
-                {
-                    _hasFailed = true;
-
-                    throw new Exception("Storage failed");
-                }
-            }
-
-            await base.Store(toUpsert, toDelete, cancellationToken);
-        }
+        context.Document!.HandledEvents[0].Should().Be(eventId);
     }
 }

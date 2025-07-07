@@ -1,49 +1,42 @@
 using System.Collections.Immutable;
-using Akka;
 
 namespace MJ.Akka.Projections.Storage;
 
-internal class PendingWrite : IPendingWrite
+public class PendingWrite
 {
-    private readonly IImmutableList<TaskCompletionSource<NotUsed>> _completions;
+    private readonly IImmutableList<TaskCompletionSource<StoreProjectionResponse>> _completions;
 
     public static PendingWrite Empty { get; } = new(
-        ImmutableList<DocumentToStore>.Empty,
-        ImmutableList<DocumentToDelete>.Empty,
-        ImmutableList<TaskCompletionSource<NotUsed>>.Empty,
+        StoreProjectionRequest.Empty,
+        ImmutableList<TaskCompletionSource<StoreProjectionResponse>>.Empty,
         CancellationToken.None);
 
     public PendingWrite(
-        IImmutableList<DocumentToStore> toUpsert,
-        IImmutableList<DocumentToDelete> toDelete,
-        TaskCompletionSource<NotUsed> completion,
+        StoreProjectionRequest request,
+        TaskCompletionSource<StoreProjectionResponse> completion,
         CancellationToken cancellationToken) : this(
-        toUpsert,
-        toDelete,
+        request,
         ImmutableList.Create(completion),
         cancellationToken)
     {
     }
 
     private PendingWrite(
-        IImmutableList<DocumentToStore> toUpsert,
-        IImmutableList<DocumentToDelete> toDelete,
-        IImmutableList<TaskCompletionSource<NotUsed>> completions,
+        StoreProjectionRequest request,
+        IImmutableList<TaskCompletionSource<StoreProjectionResponse>> completions,
         CancellationToken cancellationToken)
     {
-        ToUpsert = toUpsert;
-        ToDelete = toDelete;
+        Request = request;
         _completions = completions;
         CancellationToken = cancellationToken;
     }
     
-    public IImmutableList<DocumentToStore> ToUpsert { get; }
-    public IImmutableList<DocumentToDelete> ToDelete { get; }
+    public StoreProjectionRequest Request { get; }
     public CancellationToken CancellationToken { get; }
     
-    public bool IsEmpty => ToUpsert.Count == 0 && ToDelete.Count == 0 && _completions.Count == 0;
+    public bool IsEmpty => Request.IsEmpty && _completions.Count == 0;
 
-    public IPendingWrite MergeWith(IPendingWrite other)
+    public PendingWrite MergeWith(PendingWrite other)
     {
         var cancellationToken = CancellationToken == other.CancellationToken
             ? CancellationToken
@@ -52,16 +45,15 @@ internal class PendingWrite : IPendingWrite
                 .Token;
         
         return new PendingWrite(
-            Merge(ToUpsert, other.ToUpsert),
-            Merge(ToDelete, other.ToDelete),
+            Request.MergeWith(other.Request),
             _completions.AddRange(other.GetCompletions()),
             cancellationToken);
     }
 
-    public void Completed()
+    public void Completed(StoreProjectionResponse response)
     {
         foreach (var completion in _completions)
-            completion.TrySetResult(NotUsed.Instance);
+            completion.TrySetResult(response);
     }
 
     public void Fail(Exception exception)
@@ -70,27 +62,8 @@ internal class PendingWrite : IPendingWrite
             completion.TrySetException(exception);
     }
 
-    public IImmutableList<TaskCompletionSource<NotUsed>> GetCompletions()
+    private IImmutableList<TaskCompletionSource<StoreProjectionResponse>> GetCompletions()
     {
         return _completions;
-    }
-
-    private static ImmutableList<T> Merge<T>(
-        IImmutableList<T> existing,
-        IImmutableList<T> newItems) where T : StorageDocument<T>
-    {
-        return existing
-            .AddRange(newItems)
-            .Aggregate(
-                ImmutableList<T>.Empty,
-                (current, item) =>
-                {
-                    var existingItem = current
-                        .FirstOrDefault(x => x.Equals(item));
-
-                    return existingItem != null
-                        ? current.Remove(existingItem).Add(item)
-                        : current.Add(item);
-                });
     }
 }

@@ -2,11 +2,12 @@ using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using Akka.Util;
-using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.InProc;
+using MJ.Akka.Projections.Setup;
+using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -41,19 +42,25 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_wi
             
             var factory = new KeepTrackOfProjectorsInProc(Sys, new MaxNumberOfProjectorsPassivation(10), instanceId);
 
-            var projection = new TestProjection<string>(ImmutableList<object>.Empty);
+            var projection = new TestProjection<string>(ImmutableList<object>.Empty, ImmutableList<StorageFailures>.Empty);
             
-            var projectionConfiguration = new ProjectionConfiguration<string, TestDocument<string>>(
+            var storageSetup = new SetupInMemoryStorage();
+            
+            var projectionConfiguration = new ProjectionConfiguration<
+                string,
+                InMemoryProjectionContext<string, TestDocument<string>>,
+                SetupInMemoryStorage>(
                 projection,
-                new InMemoryProjectionStorage(),
+                storageSetup.CreateProjectionStorage(),
+                projection.GetLoadProjectionContext(storageSetup),
                 new InMemoryPositionStorage(),
                 factory,
                 null,
                 BatchEventBatchingStrategy.Default,
                 BatchWithinEventPositionBatchingStrategy.Default,
-                projection.Configure(new SetupProjection<string, TestDocument<string>>()).Build());
+                projection.Configure(new SetupProjection<string, InMemoryProjectionContext<string, TestDocument<string>>>()).Build());
 
-            var projector = await factory.GetProjector<string, TestDocument<string>>(id, projectionConfiguration);
+            var projector = await factory.GetProjector(id, projectionConfiguration);
             
             var projectorTask = projector
                 .ProjectEvents(

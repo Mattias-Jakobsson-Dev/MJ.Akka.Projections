@@ -1,11 +1,14 @@
 using BenchmarkDotNet.Attributes;
-using MJ.Akka.Projections.Storage.RavenDb;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage.Batched;
+using MJ.Akka.Projections.Storage.RavenDb;
 using MJ.Akka.Projections.Tests;
+using Raven.Client.Documents.BulkInsert;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
-public class ProjectToRavenDbStoreWithBatchedStorageBenchmarks : BaseProjectionBenchmarks
+public class ProjectToRavenDbStoreWithBatchedStorageBenchmarks 
+    : BaseProjectionBenchmarks<string, RavenDbProjectionContext<RavenDbTestProjection.TestDocument>, SetupRavenDbStorage>
 {
     private RavenDbDockerContainerFixture _containerFixture = null!;
     
@@ -23,8 +26,13 @@ public class ProjectToRavenDbStoreWithBatchedStorageBenchmarks : BaseProjectionB
         await _containerFixture.DisposeAsync();
     }
     
-    protected override IHaveConfiguration<ProjectionInstanceConfiguration> Configure(
-        IHaveConfiguration<ProjectionInstanceConfiguration> config)
+    protected override IHaveConfiguration<ProjectionSystemConfiguration<SetupRavenDbStorage>> ConfigureSystem(
+        IHaveConfiguration<ProjectionSystemConfiguration<SetupRavenDbStorage>> config)
+    {
+        return config.WithBatchedStorage();
+    }
+    
+    protected override SetupRavenDbStorage GetStorageSetup()
     {
         var databaseName = Guid.NewGuid().ToString();
 
@@ -32,9 +40,12 @@ public class ProjectToRavenDbStoreWithBatchedStorageBenchmarks : BaseProjectionB
 
         documentStore.EnsureDatabaseExists();
 
-        return config
-            .WithRavenDbPositionStorage(documentStore)
-            .WithRavenDbDocumentStorage(documentStore)
-            .Batched();
+        return new SetupRavenDbStorage(documentStore, new BulkInsertOptions());
+    }
+
+    protected override IProjection<string, RavenDbProjectionContext<RavenDbTestProjection.TestDocument>, SetupRavenDbStorage> 
+        CreateProjection(int numberOfEvents, int numberOfDocuments)
+    {
+        return new RavenDbTestProjection(numberOfEvents, numberOfDocuments);
     }
 }

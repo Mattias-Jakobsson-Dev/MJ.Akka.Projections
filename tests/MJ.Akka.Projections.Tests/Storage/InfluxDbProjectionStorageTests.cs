@@ -1,20 +1,25 @@
 using System.Collections.Immutable;
+using Akka;
+using Akka.Streams.Dsl;
 using Akka.TestKit.Extensions;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.InfluxDb;
 using FluentAssertions;
 using InfluxDB.Client;
 using InfluxDB.Client.Api.Domain;
-using InfluxDB.Client.Core.Exceptions;
 using InfluxDB.Client.Writes;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.Setup;
+using MJ.Akka.Projections.Storage.InMemory;
+using MJ.Akka.Projections.Storage.Messages;
 using Xunit;
+using Source = Akka.Streams.Dsl.Source;
 
 namespace MJ.Akka.Projections.Tests.Storage;
 
 [PublicAPI]
 public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixture) 
-    : ProjectionStorageTests<InfluxDbTimeSeriesId, InfluxTimeSeries>, IClassFixture<InfluxDbDockerContainerFixture>
+    : ProjectionStorageTests<InfluxDbTimeSeriesId, InfluxDbTimeSeriesContext, SetupInfluxDbStorage>, IClassFixture<InfluxDbDockerContainerFixture>
 {
     private readonly IInfluxDBClient _client = fixture.CreateClient();
     private readonly string _measurementName = Guid.NewGuid().ToString();
@@ -22,29 +27,19 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
 
     public override async Task StoreAndDeleteSingleDocumentInSingleTransaction()
     {
-        var storage = GetStorage();
+        var storageSetup = GetStorage();
 
         var id = CreateRandomId();
-
-        await storage
-            .Store(
-                ImmutableList.Create(new DocumentToStore(
-                    id,
-                    CreateTestDocument(id) with
-                    {
-                        ToDelete = ImmutableList.Create(new InfluxTimeSeries.DeletePoint(
-                            _now.AddSeconds(-1),
-                            _now.AddSeconds(1),
-                            $"_measurement=\"{_measurementName}\""))
-                    })),
-                ImmutableList<DocumentToDelete>.Empty);
         
-        var document = await storage.LoadDocument<InfluxTimeSeries>(id);
 
-        document.Should().NotBeNull();
+        var projectionStorage = storageSetup.CreateProjectionStorage();
+
+        var addContext = CreateInsertRequest(id);
+        var deleteContext = CreateDeleteRequest(id);
+
+        await projectionStorage.Store(new StoreProjectionRequest(
+            addContext.Results.AddRange(deleteContext.Results)));
         
-        document!.Points.Should().BeEmpty();
-        document.ToDelete.Should().BeEmpty();
 
         var items = await _client
             .GetQueryApi()
@@ -55,41 +50,26 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
 
     public override async Task StoreAndDeleteSingleDocumentInTwoTransactions()
     {
-        var storage = GetStorage();
+        var storageSetup = GetStorage();
 
         var id = CreateRandomId();
-
-        var testDocument = CreateTestDocument(id);
-
-        await storage
-            .Store(
-                ImmutableList.Create(new DocumentToStore(id, testDocument)),
-                ImmutableList<DocumentToDelete>.Empty);
         
-        var document = await storage.LoadDocument<InfluxTimeSeries>(id);
-
-        document.Should().NotBeNull();
+        var projection = CreateProjection();
         
-        await VerifyDocument(testDocument, document!);
+        var projectionStorage = storageSetup.CreateProjectionStorage();
 
-        await storage
-            .Store(
-                ImmutableList.Create(new DocumentToStore(
-                    id,
-                    new InfluxTimeSeries(
-                        ImmutableList<PointData>.Empty, 
-                        ImmutableList.Create(new InfluxTimeSeries.DeletePoint(
-                            _now.AddSeconds(-1),
-                            _now.AddSeconds(1),
-                            $"_measurement=\"{_measurementName}\""))))),
-                ImmutableList<DocumentToDelete>.Empty);
-        
-        document = await storage.LoadDocument<InfluxTimeSeries>(id);
+        var addContext = CreateInsertRequest(id);
+        var deleteContext = CreateDeleteRequest(id);
 
-        document.Should().NotBeNull();
+        await projectionStorage.Store(addContext);
         
-        document!.Points.Should().BeEmpty();
-        document.ToDelete.Should().BeEmpty();
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var context = await loader.Load(id);
+
+        await VerifyContext(context);
+        
+        await projectionStorage.Store(deleteContext);
 
         var items = await _client
             .GetQueryApi()
@@ -100,28 +80,15 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
 
     public override async Task DeleteNonExistingDocument()
     {
-        var storage = GetStorage();
+        var storageSetup = GetStorage();
 
         var id = CreateRandomId();
 
-        await storage
-            .Store(
-                ImmutableList.Create(new DocumentToStore(
-                    id,
-                    new InfluxTimeSeries(
-                        ImmutableList<PointData>.Empty, 
-                        ImmutableList.Create(new InfluxTimeSeries.DeletePoint(
-                            _now.AddSeconds(-1),
-                            _now.AddSeconds(1),
-                            $"_measurement=\"{_measurementName}\""))))),
-                ImmutableList<DocumentToDelete>.Empty);
-        
-        var document = await storage.LoadDocument<InfluxTimeSeries>(id);
+        var projectionStorage = storageSetup.CreateProjectionStorage();
 
-        document.Should().NotBeNull();
-        
-        document!.Points.Should().BeEmpty();
-        document.ToDelete.Should().BeEmpty();
+        var deleteContext = CreateDeleteRequest(id);
+
+        await projectionStorage.Store(deleteContext);
 
         var items = await _client
             .GetQueryApi()
@@ -130,53 +97,56 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
         items.Should().HaveCount(0);
     }
     
-    [Fact]
     public override async Task WriteWithCancelledTask()
     {
-        var storage = GetStorage();
-
-        var id = CreateRandomId();
-        
         var cancellationTokenSource = new CancellationTokenSource();
 
         await cancellationTokenSource.CancelAsync();
 
-        await storage
-            .Store(
-                ImmutableList.Create(new DocumentToStore(
-                    id,
-                    new InfluxTimeSeries(
-                        ImmutableList<PointData>.Empty, 
-                        ImmutableList.Create(new InfluxTimeSeries.DeletePoint(
-                            _now.AddSeconds(-1),
-                            _now.AddSeconds(1),
-                            $"_measurement=\"{_measurementName}\""))))),
-                ImmutableList<DocumentToDelete>.Empty, 
-                cancellationTokenSource.Token)
-            .ShouldThrowWithin<HttpException>(TimeSpan.FromSeconds(1));
+        var storageSetup = GetStorage();
+
+        var id = CreateRandomId();
+
+        var original = CreateInsertRequest(id);
+
+        var projectionStorage = storageSetup.CreateProjectionStorage();
+        
+        await projectionStorage
+            .Store(original,cancellationTokenSource.Token)
+            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
     }
 
-    protected override IProjectionStorage GetStorage()
+    protected override SetupInfluxDbStorage GetStorage()
     {
-        return new InfluxDbProjectionStorage(_client);
+        return new SetupInfluxDbStorage(_client, new InMemoryPositionStorage());
     }
 
-    protected override InfluxTimeSeries CreateTestDocument(InfluxDbTimeSeriesId id)
+    protected override StoreProjectionRequest CreateInsertRequest(InfluxDbTimeSeriesId id)
     {
-        return new InfluxTimeSeries(
-            ImmutableList.Create(PointData
+        return new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
+            new InfluxDbWritePoint(id, PointData
                 .Measurement(_measurementName)
                 .Timestamp(_now, WritePrecision.S)
                 .Field("test-field", 5d)
-                .Tag("test-tag", "test")),
-            ImmutableList<InfluxTimeSeries.DeletePoint>.Empty);
+                .Tag("test-tag", "test"))));
     }
 
-    protected override async Task VerifyDocument(InfluxTimeSeries original, InfluxTimeSeries loaded)
+    protected override StoreProjectionRequest CreateDeleteRequest(InfluxDbTimeSeriesId id)
     {
-        loaded.Points.Should().BeEmpty();
-        loaded.ToDelete.Should().BeEmpty();
+        return new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(new InfluxDbDeletePoint(
+            id,
+            _now.AddSeconds(-1),
+            _now.AddSeconds(1),
+            $"_measurement=\"{_measurementName}\"")));
+    }
 
+    protected override IProjection<InfluxDbTimeSeriesId, InfluxDbTimeSeriesContext, SetupInfluxDbStorage> CreateProjection()
+    {
+        return new TestProjection();
+    }
+
+    protected override async Task VerifyContext(InfluxDbTimeSeriesContext loaded)
+    {
         var items = await _client
             .GetQueryApi()
             .QueryAsync($"from(bucket:\"{fixture.BucketName}\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{_measurementName}\")", fixture.Organization);
@@ -187,9 +157,23 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
         
         items[0].Records[0].Values["_value"].Should().Be(5d);
     }
-
+    
     protected override InfluxDbTimeSeriesId CreateRandomId()
     {
         return new InfluxDbTimeSeriesId(fixture.BucketName, fixture.Organization, Guid.NewGuid().ToString());
+    }
+    
+    private class TestProjection : InfluxDbProjection
+    {
+        public override ISetupProjection<InfluxDbTimeSeriesId, InfluxDbTimeSeriesContext> Configure(
+            ISetupProjection<InfluxDbTimeSeriesId, InfluxDbTimeSeriesContext> config)
+        {
+            return config;
+        }
+
+        public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
+        {
+            return Source.From(ImmutableList<EventWithPosition>.Empty);
+        }
     }
 }

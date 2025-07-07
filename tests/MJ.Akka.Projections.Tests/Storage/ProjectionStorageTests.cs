@@ -2,160 +2,188 @@ using System.Collections.Immutable;
 using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
-using MJ.Akka.Projections.Storage;
 using FluentAssertions;
+using MJ.Akka.Projections.Storage;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.Storage;
 
-public abstract class ProjectionStorageTests<TId, TDocument> : TestKit where TId : notnull where TDocument : notnull
+public abstract class ProjectionStorageTests<TId, TContext, TStorageSetup> 
+    : TestKit where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
     private readonly Fixture _fixture = new();
     
     [Fact]
     public virtual async Task StoreAndLoadSingleDocument()
     {
-        var storage = GetStorage();
-
+        var storageSetup = GetStorage();
+        var projection = CreateProjection();
+        
         var id = CreateRandomId();
-
-        var original = CreateTestDocument(id);
         
-        await storage
-            .Store(
-                ImmutableList.Create(new DocumentToStore(id, original)),
-                ImmutableList<DocumentToDelete>.Empty);
+        var projectionStorage = storageSetup.CreateProjectionStorage();
         
-        var document = await storage.LoadDocument<TDocument>(id);
+        await projectionStorage.Store(CreateInsertRequest(id));
 
-        document.Should().NotBeNull();
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var context = await loader.Load(id);
 
-        await VerifyDocument(original, document!);
+        context.Exists().Should().BeTrue();
+
+        await VerifyContext(context);
     }
 
     [Fact]
     public virtual async Task StoreAndLoadMultipleDocuments()
     {
-        var originalDocuments = Enumerable.Range(0, 5)
+        var originalContexts = Enumerable.Range(0, 5)
             .Select(_ => CreateRandomId())
             .Select(x => new
             {
                 Id = x,
-                Document = CreateTestDocument(x)
+                Context = CreateInsertRequest(x)
             })
             .ToImmutableList();
         
-        var storage = GetStorage();
+        var storageSetup = GetStorage();
+        
+        var projection = CreateProjection();
+        
+        var projectionStorage = storageSetup.CreateProjectionStorage();
 
-        await storage
-            .Store(
-                originalDocuments
-                    .Select(x => new DocumentToStore(x.Id, x.Document))
-                    .ToImmutableList(),
-                ImmutableList<DocumentToDelete>.Empty);
+        await projectionStorage
+            .Store(new StoreProjectionRequest(originalContexts
+                .SelectMany(x => x.Context.Results)
+                .ToImmutableList()));
 
-        foreach (var originalData in originalDocuments)
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        foreach (var originalData in originalContexts)
         {
-            var document = await storage.LoadDocument<TDocument>(originalData.Id);
+            var context = await loader.Load(originalData.Id);
 
-            document.Should().NotBeNull();
+            context.Exists().Should().BeTrue();
             
-            await VerifyDocument(originalData.Document, document!);
+            await VerifyContext(context);
         }
     }
 
     [Fact]
     public virtual async Task StoreAndDeleteSingleDocumentInSingleTransaction()
     {
-        var storage = GetStorage();
+        var storageSetup = GetStorage();
 
         var id = CreateRandomId();
-
-        await storage
-            .Store(
-                ImmutableList.Create(new DocumentToStore(id, CreateTestDocument(id))),
-                ImmutableList.Create(new DocumentToDelete(id, typeof(TDocument))));
         
-        var document = await storage.LoadDocument<TDocument>(id);
+        var projection = CreateProjection();
+        
+        var projectionStorage = storageSetup.CreateProjectionStorage();
 
-        document.Should().BeNull();
+        var addContext = CreateInsertRequest(id);
+        var deleteContext = CreateDeleteRequest(id);
+
+        await projectionStorage
+            .Store(new StoreProjectionRequest(addContext.Results.AddRange(deleteContext.Results)));
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var context = await loader.Load(id);
+
+        context.Exists().Should().BeFalse();
     }
 
     [Fact]
     public virtual async Task StoreAndDeleteSingleDocumentInTwoTransactions()
     {
-        var storage = GetStorage();
+        var storageSetup = GetStorage();
 
         var id = CreateRandomId();
-
-        var testDocument = CreateTestDocument(id);
-
-        await storage
-            .Store(
-                ImmutableList.Create(new DocumentToStore(id, testDocument)),
-                ImmutableList<DocumentToDelete>.Empty);
         
-        var document = await storage.LoadDocument<TDocument>(id);
-
-        document.Should().NotBeNull();
+        var projection = CreateProjection();
         
-        await VerifyDocument(testDocument, document!);
+        var projectionStorage = storageSetup.CreateProjectionStorage();
 
-        await storage
-            .Store(
-                ImmutableList<DocumentToStore>.Empty,
-                ImmutableList.Create(new DocumentToDelete(id, typeof(TDocument))));
+        var addContext = CreateInsertRequest(id);
+        var deleteContext = CreateDeleteRequest(id);
+
+        await projectionStorage.Store(addContext);
         
-        document = await storage.LoadDocument<TDocument>(id);
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var context = await loader.Load(id);
 
-        document.Should().BeNull();
+        context.Exists().Should().BeTrue();
+        
+        await VerifyContext(context);
+
+        await projectionStorage.Store(deleteContext);
+        
+        context = await loader.Load(id);
+
+        context.Exists().Should().BeFalse();
     }
 
     [Fact]
     public virtual async Task DeleteNonExistingDocument()
     {
-        var storage = GetStorage();
+        var storageSetup = GetStorage();
 
         var id = CreateRandomId();
-
-        await storage
-            .Store(
-                ImmutableList<DocumentToStore>.Empty,
-                ImmutableList.Create(new DocumentToDelete(id, typeof(TDocument))));
         
-        var document = await storage.LoadDocument<TDocument>(id);
+        var projection = CreateProjection();
+        
+        var projectionStorage = storageSetup.CreateProjectionStorage();
 
-        document.Should().BeNull();
+        var deleteContext = CreateDeleteRequest(id);
+
+        await projectionStorage.Store(deleteContext);
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var context = await loader.Load(id);
+
+        context.Exists().Should().BeFalse();
     }
 
     [Fact]
     public virtual async Task WriteWithCancelledTask()
     {
-        var storage = GetStorage();
-
-        var id = CreateRandomId();
-        
         var cancellationTokenSource = new CancellationTokenSource();
 
         await cancellationTokenSource.CancelAsync();
 
-        await storage
+        var storageSetup = GetStorage();
+        var projection = CreateProjection();
+        
+        var id = CreateRandomId();
+
+        var original = CreateInsertRequest(id);
+
+        var projectionStorage = storageSetup.CreateProjectionStorage();
+        
+        await projectionStorage
             .Store(
-                ImmutableList<DocumentToStore>.Empty,
-                ImmutableList.Create(new DocumentToDelete(id, typeof(TDocument))), 
+                original,
                 cancellationTokenSource.Token)
             .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
-        
-        var document = await storage.LoadDocument<TDocument>(id, CancellationToken.None);
 
-        document.Should().BeNull();
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var context = await loader.Load(id, CancellationToken.None);
+
+        context.Exists().Should().BeFalse();
     }
 
-    protected abstract IProjectionStorage GetStorage();
+    protected abstract TStorageSetup GetStorage();
     
-    protected abstract TDocument CreateTestDocument(TId id);
+    protected abstract StoreProjectionRequest CreateInsertRequest(TId id);
+
+    protected abstract StoreProjectionRequest CreateDeleteRequest(TId id);
     
-    protected abstract Task VerifyDocument(TDocument original, TDocument loaded);
+    protected abstract IProjection<TId, TContext, TStorageSetup> CreateProjection();
+    
+    protected abstract Task VerifyContext(TContext loaded);
 
     protected virtual TId CreateRandomId()
     {

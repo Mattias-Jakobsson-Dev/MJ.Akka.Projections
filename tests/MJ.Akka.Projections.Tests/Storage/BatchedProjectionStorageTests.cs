@@ -1,9 +1,14 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
+using MJ.Akka.Projections.Documents;
+using MJ.Akka.Projections.Storage.Batched;
+using MJ.Akka.Projections.Storage.InMemory;
+using MJ.Akka.Projections.Storage.Messages;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -18,21 +23,31 @@ public class BatchedProjectionStorageTests : TestKit
     {
         var innerStorage = new StorageWithDelay(TimeSpan.FromMilliseconds(100));
 
-        var batchedStorage = innerStorage
-            .Batched(Sys, 1, new BatchSizeStorageBatchingStrategy(5));
+        var batchedStorage = new BatchedProjectionStorage(
+            Sys,
+            innerStorage,
+            1,
+            new BatchSizeStorageBatchingStrategy(5));
 
         var writes = Enumerable
             .Range(0, 10)
-            .Select(_ => new TestDocument<string>
+            .Select(_ =>
             {
-                Id = _fixture.Create<string>()
+                var id = _fixture.Create<string>();
+                
+                return new DocumentResults.DocumentModified(
+                    id,
+                    new TestDocument<string>
+                    {
+                        Id = id
+                    });
             })
-            .Select(doc => ImmutableList.Create(new DocumentToStore(doc.Id, doc)))
+            .OfType<IProjectionResult>()
             .ToImmutableList();
 
         await Task.WhenAll(
             writes
-                .Select(write => batchedStorage.Store(write, ImmutableList<DocumentToDelete>.Empty)));
+                .Select(write => batchedStorage.Store(new StoreProjectionRequest(ImmutableList.Create(write)))));
 
         innerStorage.NumberOfWrites.Should().BeLessThan(4);
     }
@@ -42,21 +57,31 @@ public class BatchedProjectionStorageTests : TestKit
     {
         var innerStorage = new StorageWithDelay(TimeSpan.FromMilliseconds(100));
 
-        var batchedStorage = innerStorage
-            .Batched(Sys, 1, new BufferWithinStorageBatchingStrategy(10, TimeSpan.FromMilliseconds(200)));
+        var batchedStorage = new BatchedProjectionStorage(
+            Sys,
+            innerStorage,
+            1,
+            new BufferWithinStorageBatchingStrategy(10, TimeSpan.FromMilliseconds(200)));
 
         var writes = Enumerable
             .Range(0, 10)
-            .Select(_ => new TestDocument<string>
+            .Select(_ =>
             {
-                Id = _fixture.Create<string>()
+                var id = _fixture.Create<string>();
+                
+                return new DocumentResults.DocumentModified(
+                    id,
+                    new TestDocument<string>
+                    {
+                        Id = id
+                    });
             })
-            .Select(doc => ImmutableList.Create(new DocumentToStore(doc.Id, doc)))
+            .OfType<IProjectionResult>()
             .ToImmutableList();
 
         await Task.WhenAll(
             writes
-                .Select(write => batchedStorage.Store(write, ImmutableList<DocumentToDelete>.Empty)));
+                .Select(write => batchedStorage.Store(new StoreProjectionRequest(ImmutableList.Create(write)))));
 
         innerStorage.NumberOfWrites.Should().Be(1);
     }
@@ -66,20 +91,23 @@ public class BatchedProjectionStorageTests : TestKit
     {
         var innerStorage = new StorageWithDelay(TimeSpan.FromSeconds(10));
         
-        var batchedStorage = innerStorage
-            .Batched(Sys, 1, new NoStorageBatchingStrategy());
-        
+        var batchedStorage = new BatchedProjectionStorage(
+            Sys,
+            innerStorage,
+            1,
+            new NoStorageBatchingStrategy());
+
         var cancellationTokenSource = new CancellationTokenSource();
         
         var id = _fixture.Create<string>();
 
         var task = batchedStorage
             .Store(
-                ImmutableList.Create(new DocumentToStore(id, new TestDocument<string>
-                {
-                    Id = id
-                })),
-                ImmutableList<DocumentToDelete>.Empty,
+                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
+                    new DocumentResults.DocumentModified(id, new TestDocument<string>
+                    {
+                        Id = id
+                    }))),
                 cancellationTokenSource.Token);
         
         await cancellationTokenSource.CancelAsync();
@@ -93,8 +121,11 @@ public class BatchedProjectionStorageTests : TestKit
     {
         var innerStorage = new StorageWithDelay(TimeSpan.FromSeconds(10));
         
-        var batchedStorage = innerStorage
-            .Batched(Sys, 1, new NoStorageBatchingStrategy());
+        var batchedStorage = new BatchedProjectionStorage(
+            Sys,
+            innerStorage,
+            1,
+            new NoStorageBatchingStrategy());
         
         var cancellationTokenSource = new CancellationTokenSource();
         
@@ -105,20 +136,20 @@ public class BatchedProjectionStorageTests : TestKit
         
         var firstTask = batchedStorage
             .Store(
-                ImmutableList.Create(new DocumentToStore(firstId, new TestDocument<string>
-                {
-                    Id = firstId
-                })),
-                ImmutableList<DocumentToDelete>.Empty,
+                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
+                    new DocumentResults.DocumentModified(firstId, new TestDocument<string>
+                    {
+                        Id = firstId
+                    }))),
                 cancellationTokenSource.Token);
         
         var secondTask = batchedStorage
             .Store(
-                ImmutableList.Create(new DocumentToStore(secondId, new TestDocument<string>
-                {
-                    Id = secondId
-                })),
-                ImmutableList<DocumentToDelete>.Empty,
+                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
+                    new DocumentResults.DocumentModified(secondId, new TestDocument<string>
+                    {
+                        Id = secondId
+                    }))),
                 cancellationTokenSource.Token);
         
         await firstTask
@@ -131,10 +162,17 @@ public class BatchedProjectionStorageTests : TestKit
     [Fact]
     public async Task Ensure_cancellation_token_cancels_correct_write()
     {
-        var innerStorage = new TestInMemoryProjectionStorage();
+        var setup = new SetupInMemoryStorage();
         
-        var batchedStorage = innerStorage
-            .Batched(Sys, 1, new NoStorageBatchingStrategy());
+        var innerStorage = setup.CreateProjectionStorage();
+
+        var loader = new InMemoryProjectionLoader<string, TestDocument<string>>(id => setup.LoadDocument(id));
+        
+        var batchedStorage = new BatchedProjectionStorage(
+            Sys,
+            innerStorage,
+            1,
+            new NoStorageBatchingStrategy());
         
         var firstCancellationTokenSource = new CancellationTokenSource();
         var secondCancellationTokenSource = new CancellationTokenSource();
@@ -146,20 +184,20 @@ public class BatchedProjectionStorageTests : TestKit
         
         var firstTask = batchedStorage
             .Store(
-                ImmutableList.Create(new DocumentToStore(firstId, new TestDocument<string>
-                {
-                    Id = firstId
-                })),
-                ImmutableList<DocumentToDelete>.Empty,
+                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
+                    new DocumentResults.DocumentModified(firstId, new TestDocument<string>
+                    {
+                        Id = firstId
+                    }))),
                 firstCancellationTokenSource.Token);
         
         var secondTask = batchedStorage
             .Store(
-                ImmutableList.Create(new DocumentToStore(secondId, new TestDocument<string>
-                {
-                    Id = secondId
-                })),
-                ImmutableList<DocumentToDelete>.Empty,
+                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
+                    new DocumentResults.DocumentModified(secondId, new TestDocument<string>
+                    {
+                        Id = secondId
+                    }))),
                 secondCancellationTokenSource.Token);
         
         await firstTask
@@ -168,37 +206,33 @@ public class BatchedProjectionStorageTests : TestKit
         await secondTask
             .ShouldCompleteWithin(TimeSpan.FromSeconds(1));
         
-        var document = await innerStorage.LoadDocument<TestDocument<string>>(secondId, secondCancellationTokenSource.Token);
+        var document = await loader.Load(secondId, secondCancellationTokenSource.Token);
 
-        document.Should().NotBeNull();
-        document!.Id.Should().Be(secondId);
+        document.Exists().Should().BeTrue();
+        document.Id.Should().Be(secondId);
     }
     
     private class StorageWithDelay(TimeSpan delay) : IProjectionStorage
     {
         private readonly object _lock = new { };
         
-        private readonly InMemoryProjectionStorage _storage = new();
+        private readonly InMemoryProjectionStorage _storage = new(new ConcurrentDictionary<object, ReadOnlyMemory<byte>>());
         public int NumberOfWrites { get; private set; }
         
-        public Task<TDocument?> LoadDocument<TDocument>(object id, CancellationToken cancellationToken = default)
-        {
-            return _storage.LoadDocument<TDocument>(id, cancellationToken);
-        }
-
-        public async Task Store(
-            IImmutableList<DocumentToStore> toUpsert, 
-            IImmutableList<DocumentToDelete> toDelete,
+        public async Task<StoreProjectionResponse> Store(
+            StoreProjectionRequest request, 
             CancellationToken cancellationToken = default)
         {
             await Task.Delay(delay, cancellationToken);
 
-            await _storage.Store(toUpsert, toDelete, cancellationToken);
+            var response = await _storage.Store(request, cancellationToken);
 
             lock (_lock)
             {
                 NumberOfWrites++;
             }
+
+            return response;
         }
     }
 }

@@ -1,16 +1,19 @@
 using System.Collections.Immutable;
 using Akka.Streams;
 using AutoFixture;
-using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Documents;
+using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 
 public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem actorSystemHandler)
-    : BaseContinuousProjectionsTests<TId, TestDocument<TId>>(actorSystemHandler) where TId : notnull
+    : BaseContinuousProjectionsTests<TId, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage>(
+        actorSystemHandler) 
+    where TId : notnull
 {
     private readonly IHaveActorSystem _actorSystemHandler = actorSystemHandler;
     
@@ -31,10 +34,20 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
             GetEventThatFails(firstDocumentId, 1),
             GetTestEvent(firstDocumentId),
             GetTestEvent(secondDocumentId));
+
+        var failures = ImmutableList.Create(
+            new StorageFailures(item =>
+                (item is DocumentResults.DocumentModified store && ((TestDocument<TId>)store.Document).PreviousEventFailures.Any()) ||
+                item is DocumentResults.DocumentCreated created && ((TestDocument<TId>)created.Document).PreviousEventFailures.Any(),
+            _ => false,
+            new Exception("Failure")));
+
+        var storageSetup = new SetupInMemoryStorage();
         
-        var projection = GetProjection(events);
-        IProjectionStorage projectionStorage = null!;
-        IProjectionPositionStorage positionStorage = null!;
+        var projection = GetProjection(events, failures);
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
 
         var coordinator = await system
             .Projections(config => Configure(config
@@ -47,50 +60,38 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
                     .WithProjection(projection))
                 .WithEventBatchingStrategy(new NoEventBatchingStrategy(100))
                 .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
-                .WithModifiedConfig(conf =>
-                {
-                    projectionStorage = new FailStorage(
-                        conf.ProjectionStorage!,
-                        ImmutableList.Create(new StorageFailures(
-                            items => ((TestDocument<TId>)items
-                                    .Document)
-                                .PreviousEventFailures
-                                .Any(),
-                            _ => false,
-                            _ => false,
-                            new Exception("Failure"))));
-
-                    positionStorage = conf.PositionStorage!;
-
-                    return conf with
-                    {
-                        ProjectionStorage = projectionStorage
-                    };
-                }))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
             .Start();
 
         await coordinator.Get(projection.Name)!.WaitForCompletion(ProjectionWaitTime);
 
-        var position = await positionStorage.LoadLatestPosition(projection.Name);
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(5);
 
-        var firstDocument = await projectionStorage.LoadDocument<TestDocument<TId>>(firstDocumentId);
+        var firstContext = await loader.Load(firstDocumentId);
 
-        firstDocument.Should().NotBeNull();
+        firstContext.Exists().Should().BeTrue();
 
-        firstDocument!.HandledEvents.Should().HaveCount(3);
+        firstContext.Document!.HandledEvents.Should().HaveCount(3);
 
-        var secondDocument = await projectionStorage.LoadDocument<TestDocument<TId>>(secondDocumentId);
+        var secondContext = await loader.Load(secondDocumentId);
 
-        secondDocumentId.Should().NotBeNull();
+        secondContext.Exists().Should().BeTrue();
 
-        secondDocument!.HandledEvents.Should().HaveCount(2);
+        secondContext.Document!.HandledEvents.Should().HaveCount(2);
+    }
+    
+    protected override SetupInMemoryStorage CreateStorageSetup()
+    {
+        return new SetupInMemoryStorage();
     }
 
-    protected override IProjection<TId, TestDocument<TId>> GetProjection(IImmutableList<object> events)
+    protected override IProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage> 
+        GetProjection(IImmutableList<object> events, IImmutableList<StorageFailures> storageFailures)
     {
-        return new TestProjection<TId>(events);
+        return new TestProjection<TId>(events, storageFailures);
     }
 
     protected override object GetEventThatFails(TId id, int numberOfFailures)
@@ -117,10 +118,10 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
     {
         return new Events<TId>.UnHandledEvent(documentId);
     }
-
-    protected override Task VerifyDocument(
+    
+    protected override Task VerifyContext(
         TId documentId,
-        TestDocument<TId> document,
+        InMemoryProjectionContext<TId, TestDocument<TId>> context,
         IImmutableList<object> events,
         IProjection projection)
     {
@@ -138,14 +139,14 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
             .Where(x => x.DocId.ToString() == documentId.ToString())
             .ToImmutableList();
 
-        document.HandledEvents.Count.Should().Be(eventsToCheck.Count);
+        context.Document!.HandledEvents.Count.Should().Be(eventsToCheck.Count);
 
         var position = 1;
 
         foreach (var evnt in eventsToCheck)
         {
-            document.HandledEvents.Should().Contain(evnt.EventId);
-            document.EventHandledOrder[evnt.EventId].Should().Be(position);
+            context.Document!.HandledEvents.Should().Contain(evnt.EventId);
+            context.Document!.EventHandledOrder[evnt.EventId].Should().Be(position);
 
             position++;
         }

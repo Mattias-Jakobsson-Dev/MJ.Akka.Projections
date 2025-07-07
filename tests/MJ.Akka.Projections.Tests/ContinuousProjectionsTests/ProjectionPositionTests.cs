@@ -2,9 +2,9 @@ using System.Collections.Immutable;
 using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
-using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -30,21 +30,17 @@ public class ProjectionPositionTests : TestKit
                 new Exception("Failed")),
             new Events<string>.FirstEvent(firstDocumentId, _fixture.Create<string>()));
 
-        var projection = new TestProjection<string>(events);
+        var projection = new TestProjection<string>(events, ImmutableList<StorageFailures>.Empty);
 
-        IProjectionPositionStorage positionStorage = null!;
+        var storageWrapper = new TestStorageWrapper.Modifier();
 
         var coordinator = await Sys
             .Projections(config => config
-                .WithProjection(projection)
-                .WithEventBatchingStrategy(new NoEventBatchingStrategy(1))
-                .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
-                .WithModifiedConfig(conf =>
-                {
-                    positionStorage = conf.PositionStorage!;
-
-                    return conf;
-                }))
+                    .WithProjection(projection)
+                    .WithEventBatchingStrategy(new NoEventBatchingStrategy(1))
+                    .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
+                    .WithModifiedStorage(storageWrapper),
+                new SetupInMemoryStorage())
             .Start();
 
         await coordinator
@@ -52,7 +48,7 @@ public class ProjectionPositionTests : TestKit
             .WaitForCompletion(TimeSpan.FromSeconds(5))
             .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
 
-        var position = await positionStorage.LoadLatestPosition(projection.Name);
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         (position ?? 0).Should().BeLessThan(2);
     }
@@ -76,23 +72,21 @@ public class ProjectionPositionTests : TestKit
             new Events<string>.FirstEvent(documentId, _fixture.Create<string>()),
             new Events<string>.FirstEvent(documentId, _fixture.Create<string>()));
 
-        var projection = new TestProjection<string>(events);
+        var projection = new TestProjection<string>(events, ImmutableList<StorageFailures>.Empty);
 
-        IProjectionStorage projectionStorage = null!;
-        IProjectionPositionStorage positionStorage = null!;
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var storageSetup = new SetupInMemoryStorage();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
 
         var coordinator = await Sys
             .Projections(config => config
-                .WithProjection(projection)
-                .WithEventBatchingStrategy(new NoEventBatchingStrategy(1))
-                .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
-                .WithModifiedConfig(conf =>
-                {
-                    projectionStorage = conf.ProjectionStorage!;
-                    positionStorage = conf.PositionStorage!;
-
-                    return conf;
-                }))
+                    .WithProjection(projection)
+                    .WithEventBatchingStrategy(new NoEventBatchingStrategy(1))
+                    .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
             .Start();
 
         await coordinator
@@ -100,12 +94,12 @@ public class ProjectionPositionTests : TestKit
             .WaitForCompletion(TimeSpan.FromSeconds(5))
             .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
 
-        var position = await positionStorage.LoadLatestPosition(projection.Name);
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().BeLessThan(3);
 
-        var firstDocument = await projectionStorage.LoadDocument<TestDocument<string>>(documentId);
+        var firstContext = await loader.Load(documentId);
 
-        firstDocument.Should().NotBeNull();
+        firstContext.Exists().Should().BeTrue();
     }
 }

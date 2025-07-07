@@ -4,23 +4,23 @@ using Akka.Event;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.Storage;
+using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections;
 
 [PublicAPI]
-public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
-    where TId : notnull where TDocument : notnull
+public class DocumentProjection : ReceiveActor, IWithStash
 {
     public static class Commands
     {
         public interface IMessageWithId
         {
-            TId Id { get; }
+            object Id { get; }
         }
 
-        public record ProjectEvents(TId Id, ImmutableList<EventWithPosition> Events) : IMessageWithId;
+        public record ProjectEvents(object Id, ImmutableList<EventWithPosition> Events) : IMessageWithId;
 
-        public record StopInProcessEvents(TId Id) : IMessageWithId;
+        public record StopInProcessEvents(object Id) : IMessageWithId;
     }
     
     public static class Responses
@@ -29,12 +29,10 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
     }
 
     private readonly ProjectionConfiguration _configuration;
-    private readonly TId _id;
     private readonly ILoggingAdapter _logger;
 
-    public DocumentProjection(TId id, ISupplyProjectionConfigurations configSupplier)
+    public DocumentProjection(ISupplyProjectionConfigurations configSupplier)
     {
-        _id = id;
         _logger = Context.GetLogger();
 
         _configuration = configSupplier.GetConfiguration();
@@ -48,7 +46,7 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
     {
         Receive<Commands.ProjectEvents>(cmd =>
         {
-            ProjectEvents(cmd.Events, () => _configuration.DocumentStorage.LoadDocument<TDocument>(_id));
+            ProjectEvents(cmd.Id, cmd.Events, () => _configuration.Load(cmd.Id));
         });
 
         Receive<Commands.StopInProcessEvents>(_ =>
@@ -66,11 +64,11 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
         });
     }
 
-    private void Loaded(TDocument? document)
+    private void Loaded(IProjectionContext context)
     {
         Receive<Commands.ProjectEvents>(cmd =>
         {
-            ProjectEvents(cmd.Events, () => Task.FromResult(document));
+            ProjectEvents(cmd.Id, cmd.Events, () => Task.FromResult(context));
         });
 
         Receive<Commands.StopInProcessEvents>(_ =>
@@ -100,8 +98,8 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
 
             Stash.UnstashAll();
 
-            if (cmd.Response is Messages.Acknowledge)
-                Become(() => Loaded(cmd.Document));
+            if (cmd is { IsSuccess: true, ProjectedContext: not null })
+                Become(() => Loaded(cmd.ProjectedContext));
             else
                 Become(NotLoaded);
         });
@@ -130,13 +128,15 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
     }
 
     private void ProjectEvents(
+        object id,
         ImmutableList<EventWithPosition> events,
-        Func<Task<TDocument?>> loadDocument)
+        Func<Task<IProjectionContext>> loadContext)
     {
         var cancellation = new CancellationTokenSource();
 
         StartProjectingEvents(
-                loadDocument,
+                id,
+                loadContext,
                 events,
                 cancellation.Token)
             .PipeTo(Self);
@@ -145,88 +145,81 @@ public class DocumentProjection<TId, TDocument> : ReceiveActor, IWithStash
     }
 
     private async Task<ProjectionResponse> StartProjectingEvents(
-        Func<Task<TDocument?>> loadDocument,
+        object id,
+        Func<Task<IProjectionContext>> loadContext,
         ImmutableList<EventWithPosition> events,
         CancellationToken cancellationToken)
     {
-        TDocument? document;
+        IProjectionContext? context;
 
         try
         {
-            document = await loadDocument();
+            context = await loadContext();
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed loading document for {0}.{1}", _configuration.Name, _id);
+            _logger.Error(e, "Failed loading context for {0}.{1}", _configuration.Name, id);
 
-            return new ProjectionResponse(default, new Messages.Reject(e));
+            return new ProjectionResponse(null, new Messages.Reject(e));
         }
-
-        var documentToProject = document is IResetDocument<TDocument> reset ? reset.Reset() : document;
 
         try
         {
-            var result = await RunProjections();
+            var (projectedContext, result) = await RunProjections();
 
-            return new ProjectionResponse(result.document, new Messages.Acknowledge(result.position));
+            return new ProjectionResponse(projectedContext, new Messages.Acknowledge(result));
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, _id);
+            _logger.Error(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, id);
 
-            return new ProjectionResponse(document, new Messages.Reject(e));
+            return new ProjectionResponse(null, new Messages.Reject(e));
         }
 
-        async Task<(TDocument? document, long? position)> RunProjections()
+        async Task<(IProjectionContext context, long? position)> RunProjections()
         {
-            var exists = documentToProject != null;
+            var existsBefore = context.Exists();
 
             if (events.IsEmpty)
-                return (documentToProject, null);
+                return (context, null);
 
             var wasHandled = false;
 
+            var results = new List<IProjectionResult>();
+
             foreach (var evnt in events.OrderBy(x => x.Position ?? 0))
             {
-                var (projectionResult, hasHandler) =
-                    await _configuration.HandleEvent(documentToProject, evnt.Event, evnt.Position ?? 0, cancellationToken);
+                var (hasHandler, handlerResults) = await _configuration.HandleEvent(
+                    context,
+                    evnt.Event,
+                    evnt.Position ?? 0,
+                    cancellationToken);
 
-                documentToProject = (TDocument?)projectionResult;
+                results.AddRange(handlerResults);
 
                 wasHandled = wasHandled || hasHandler;
             }
 
-            if (!wasHandled)
-                return (documentToProject, events.GetHighestEventNumber());
+            if (!wasHandled || !existsBefore && !context.Exists())
+                return (context, events.GetHighestEventNumber());
+            
+            await _configuration
+                .Store(new StoreProjectionRequest(results.ToImmutableList()), cancellationToken);
 
-            if (documentToProject != null)
-            {
-                await _configuration
-                    .DocumentStorage
-                    .Store(
-                        ImmutableList.Create(
-                            new DocumentToStore(_id, documentToProject)),
-                        ImmutableList<DocumentToDelete>.Empty,
-                        cancellationToken);
-            }
-            else if (exists)
-            {
-                await _configuration
-                    .DocumentStorage
-                    .Store(
-                        ImmutableList<DocumentToStore>.Empty,
-                        ImmutableList.Create(new DocumentToDelete(_id, typeof(TDocument))),
-                        cancellationToken);
-            }
+            if (context is IResettableProjectionContext resettable)
+                context = resettable.Reset();
 
-            return (documentToProject, events.GetHighestEventNumber());
+            return (context, events.GetHighestEventNumber());
         }
     }
 
-    public static Props Init(TId id, ISupplyProjectionConfigurations configSupplier)
+    public static Props Init(ISupplyProjectionConfigurations configSupplier)
     {
-        return Props.Create(() => new DocumentProjection<TId, TDocument>(id, configSupplier));
+        return Props.Create(() => new DocumentProjection(configSupplier));
     }
 
-    private record ProjectionResponse(TDocument? Document, Messages.IProjectEventsResponse Response);
+    private record ProjectionResponse(IProjectionContext? ProjectedContext, Messages.IProjectEventsResponse Response)
+    {
+        public bool IsSuccess => Response is Messages.Acknowledge && ProjectedContext != null;
+    }
 }

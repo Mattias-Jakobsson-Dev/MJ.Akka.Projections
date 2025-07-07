@@ -1,8 +1,7 @@
 using System.Collections.Immutable;
 using AutoFixture;
-using MJ.Akka.Projections;
-using MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 using FluentAssertions;
+using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 
 namespace MJ.Akka.Projections.Tests.OnTimeProjectionsTests;
@@ -10,14 +9,19 @@ namespace MJ.Akka.Projections.Tests.OnTimeProjectionsTests;
 public abstract class TestProjectionBaseOneTimeTests<TId>(IHaveActorSystem actorSystemHandler) 
     : BaseOneTimeProjectionsTest<TId, TestDocument<TId>>(actorSystemHandler) where TId : notnull
 {
-    protected override IProjection<TId, TestDocument<TId>> GetProjection(IImmutableList<object> events)
+    protected override IProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage> 
+        GetProjection(IImmutableList<object> events)
     {
-        return new TestProjection<TId>(events);
+        return new TestProjection<TId>(events, ImmutableList<StorageFailures>.Empty);
     }
 
-    protected override IProjection<TId, TestDocument<TId>> GetSecondaryProjection(IImmutableList<object> events)
+    protected override IProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage> 
+        GetSecondaryProjection(IImmutableList<object> events)
     {
-        return new TestProjection<TId>(events, $"SecondaryTestProjectionOf{typeof(TId).Name}");
+        return new TestProjection<TId>(
+            events,
+            ImmutableList<StorageFailures>.Empty,
+            $"SecondaryTestProjectionOf{typeof(TId).Name}");
     }
 
     protected override object GetEventThatFails(TId id, int numberOfFailures)

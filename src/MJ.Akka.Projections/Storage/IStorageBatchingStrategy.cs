@@ -6,6 +6,6 @@ namespace MJ.Akka.Projections.Storage;
 
 public interface IStorageBatchingStrategy
 {
-    Source<IImmutableList<IPendingWrite>, ISourceQueueWithComplete<IPendingWrite>> GetStrategy(
-        Source<IPendingWrite, ISourceQueueWithComplete<IPendingWrite>> source);
+    Source<IImmutableList<PendingWrite>, ISourceQueueWithComplete<PendingWrite>> GetStrategy(
+        Source<PendingWrite, ISourceQueueWithComplete<PendingWrite>> source);
 }

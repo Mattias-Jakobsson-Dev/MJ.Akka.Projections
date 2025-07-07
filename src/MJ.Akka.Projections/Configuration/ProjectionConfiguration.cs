@@ -3,35 +3,51 @@ using Akka;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Storage;
+using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections.Configuration;
 
-public class ProjectionConfiguration<TId, TDocument>(
-    IProjection<TId, TDocument> projection,
-    IProjectionStorage documentStorage,
+public class ProjectionConfiguration<TId, TContext, TStorageSetup>(
+    IProjection<TId, TContext, TStorageSetup> projection,
+    IProjectionStorage storage,
+    ILoadProjectionContext<TId, TContext> loadStorage,
     IProjectionPositionStorage positionStorage,
     IKeepTrackOfProjectors projectorFactory,
     RestartSettings? restartSettings,
     IEventBatchingStrategy projectionEventBatchingStrategy,
     IEventPositionBatchingStrategy positionBatchingStrategy,
-    IHandleEventInProjection<TDocument> eventsHandler) 
+    IHandleEventInProjection<TId, TContext> eventsHandler) 
     : ProjectionConfiguration(
         projection,
-        documentStorage,
         positionStorage,
         projectorFactory,
         restartSettings,
         projectionEventBatchingStrategy,
-        positionBatchingStrategy) where TId : notnull where TDocument : notnull
+        positionBatchingStrategy) 
+    where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
-    public override string IdToString(object id)
+    public override async Task<IProjectionContext> Load(object id, CancellationToken cancellationToken = default)
     {
-        return projection.IdToString((TId)id);
+        if (id is not TId typedId)
+        {
+            throw new InvalidProjectionTypeException(
+                typeof(TId), 
+                id.GetType(), 
+                projection.GetType(), 
+                "id");
+        }
+
+        return await loadStorage.Load(typedId, cancellationToken);
     }
 
-    public override object IdFromString(string id)
+    public override async Task Store(
+        StoreProjectionRequest request,
+        CancellationToken cancellationToken = default)
     {
-        return projection.IdFromString(id);
+        var response = await storage.Store(request, cancellationToken);
+
+        if (!response.Completed)
+            throw new StoreProjectionException();
     }
 
     public override IImmutableList<object> TransformEvent(object evnt)
@@ -44,14 +60,14 @@ public class ProjectionConfiguration<TId, TDocument>(
         return eventsHandler.GetDocumentIdFrom(evnt);
     }
 
-    public override async Task<(object? document, bool hasHandler)> HandleEvent(
-        object? document,
+    public override async Task<(bool handled, IImmutableList<IProjectionResult> results)> HandleEvent(
+        object context,
         object evnt,
         long position,
         CancellationToken cancellationToken)
     {
         var response = await eventsHandler.Handle(
-            (TDocument?)document,
+            (TContext)context,
             evnt, 
             position,
             cancellationToken);
@@ -60,43 +76,57 @@ public class ProjectionConfiguration<TId, TDocument>(
     }
 }
 
-public abstract class ProjectionConfiguration(
-    IProjection projection,
-    IProjectionStorage documentStorage,
-    IProjectionPositionStorage positionStorage,
-    IKeepTrackOfProjectors projectorFactory,
-    RestartSettings? restartSettings,
-    IEventBatchingStrategy projectionEventBatchingStrategy,
-    IEventPositionBatchingStrategy positionBatchingStrategy)
+public abstract class ProjectionConfiguration
 {
-    public string Name { get; } = projection.Name;
-    public IProjectionStorage DocumentStorage { get; } = documentStorage;
-    public IProjectionPositionStorage PositionStorage { get; } = positionStorage;
-    public IKeepTrackOfProjectors ProjectorFactory { get; } = projectorFactory;
-    public RestartSettings? RestartSettings { get; } = restartSettings;
-    public IEventBatchingStrategy ProjectionEventBatchingStrategy { get; } = projectionEventBatchingStrategy;
-    public IEventPositionBatchingStrategy PositionBatchingStrategy { get; } = positionBatchingStrategy;
+    private readonly IProjection _projection;
+    
+    internal ProjectionConfiguration(
+        IProjection projection,
+        IProjectionPositionStorage positionStorage,
+        IKeepTrackOfProjectors projectorFactory,
+        RestartSettings? restartSettings,
+        IEventBatchingStrategy projectionEventBatchingStrategy,
+        IEventPositionBatchingStrategy positionBatchingStrategy)
+    {
+        _projection = projection;
+        PositionStorage = positionStorage;
+        ProjectorFactory = projectorFactory;
+        RestartSettings = restartSettings;
+        ProjectionEventBatchingStrategy = projectionEventBatchingStrategy;
+        PositionBatchingStrategy = positionBatchingStrategy;
+    }
+    
+    public string Name => _projection.Name;
+    public IProjectionPositionStorage PositionStorage { get; }
+    public IKeepTrackOfProjectors ProjectorFactory { get; }
+    public RestartSettings? RestartSettings { get; }
+    public IEventBatchingStrategy ProjectionEventBatchingStrategy { get; }
+    public IEventPositionBatchingStrategy PositionBatchingStrategy { get; }
 
     public IProjection GetProjection()
     {
-        return projection;
+        return _projection;
     }
     
-    public abstract string IdToString(object id);
-
-    public abstract object IdFromString(string id);
+    public abstract Task<IProjectionContext> Load(
+        object id,
+        CancellationToken cancellationToken = default);
+    
+    public abstract Task Store(
+        StoreProjectionRequest request,
+        CancellationToken cancellationToken = default);
     
     public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
     {
-        return projection.StartSource(fromPosition);
+        return _projection.StartSource(fromPosition);
     }
     
     public abstract IImmutableList<object> TransformEvent(object evnt);
     
     public abstract DocumentId GetDocumentIdFrom(object evnt);
     
-    public abstract Task<(object? document, bool hasHandler)> HandleEvent(
-        object? document,
+    public abstract Task<(bool handled, IImmutableList<IProjectionResult> results)> HandleEvent(
+        object context,
         object evnt,
         long position,
         CancellationToken cancellationToken);

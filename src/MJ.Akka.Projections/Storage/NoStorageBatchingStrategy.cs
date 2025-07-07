@@ -6,10 +6,11 @@ namespace MJ.Akka.Projections.Storage;
 
 public class NoStorageBatchingStrategy : IStorageBatchingStrategy
 {
-    public Source<IImmutableList<IPendingWrite>, ISourceQueueWithComplete<IPendingWrite>> GetStrategy(
-        Source<IPendingWrite, ISourceQueueWithComplete<IPendingWrite>> source)
+    public Source<IImmutableList<PendingWrite>, ISourceQueueWithComplete<PendingWrite>>
+        GetStrategy(
+            Source<PendingWrite, ISourceQueueWithComplete<PendingWrite>> source)
     {
         return source
-            .Select(x => (IImmutableList<IPendingWrite>)ImmutableList.Create(x));
+            .Select(IImmutableList<PendingWrite> (x) => ImmutableList.Create(x));
     }
 }

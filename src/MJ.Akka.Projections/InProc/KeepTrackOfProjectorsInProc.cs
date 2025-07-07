@@ -31,17 +31,16 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
         _instanceId = instanceId;
     }
 
-    public Task<IProjectorProxy> GetProjector<TId, TDocument>(TId id, ProjectionConfiguration configuration)
-        where TId : notnull where TDocument : notnull
+    public Task<IProjectorProxy> GetProjector(object id, ProjectionConfiguration configuration)
     {
         var coordinator = _coordinators
             .GetOrAdd(
                 configuration.Name,
                 _ => _actorSystem.ActorOf(Props.Create(() =>
-                        new InProcDocumentProjectionCoordinator<TId, TDocument>(_passivationHandler, configuration)),
+                        new InProcDocumentProjectionCoordinator(_passivationHandler, configuration)),
                     $"in-proc-projector-{_instanceId}-{configuration.Name}"));
 
-        return Task.FromResult<IProjectorProxy>(new InProcDocumentProjectorProxy<TId, TDocument>(id, coordinator));
+        return Task.FromResult<IProjectorProxy>(new InProcDocumentProjectorProxy(id, coordinator));
     }
 
     public IKeepTrackOfProjectors Reset()
@@ -52,8 +51,7 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
         return new KeepTrackOfProjectorsInProc(_actorSystem, _passivationHandler);
     }
 
-    private class InProcDocumentProjectorProxy<TId, TDocument>(TId id, IActorRef coordinator) : IProjectorProxy
-        where TId : notnull where TDocument : notnull
+    private class InProcDocumentProjectorProxy(object id, IActorRef coordinator) : IProjectorProxy
     {
         public Task<Messages.IProjectEventsResponse> ProjectEvents(
             ImmutableList<EventWithPosition> events,
@@ -61,7 +59,7 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
             CancellationToken cancellationToken)
         {
             return coordinator
-                .Ask<Messages.IProjectEventsResponse>(new InProcDocumentProjectionCoordinator<TId, TDocument>.Commands.Project(
+                .Ask<Messages.IProjectEventsResponse>(new InProcDocumentProjectionCoordinator.Commands.Project(
                         id,
                         events,
                         timeout), 
@@ -71,8 +69,8 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
 
         public async Task StopAllInProgress(TimeSpan timeout)
         {
-            var response = await coordinator.Ask<DocumentProjection<TId, TDocument>.Responses.StopInProcessEventsResponse>(
-                    new InProcDocumentProjectionCoordinator<TId, TDocument>.Commands.StopInProcessEvents(id),
+            var response = await coordinator.Ask<DocumentProjection.Responses.StopInProcessEventsResponse>(
+                    new InProcDocumentProjectionCoordinator.Commands.StopInProcessEvents(id),
                     timeout);
 
             if (response.Error is not null)
@@ -80,17 +78,16 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
         }
     }
 
-    private class InProcDocumentProjectionCoordinator<TId, TDocument> : ReceiveActor
-        where TId : notnull where TDocument : notnull
+    private class InProcDocumentProjectionCoordinator : ReceiveActor
     {
         public static class Commands
         {
             public record Project(
-                TId Id,
+                object Id,
                 ImmutableList<EventWithPosition> Events,
                 TimeSpan Timeout);
             
-            public record StopInProcessEvents(TId Id);
+            public record StopInProcessEvents(object Id);
         }
 
         private static class InternalCommands
@@ -100,8 +97,6 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
             public record FinishedProjectingToChild(Guid ProjectionId);
         }
 
-        private readonly ProjectionConfiguration _projectionConfiguration;
-        
         private readonly Dictionary<Guid, string> _inProcessHandler = new();
         private readonly List<string> _waitingToBeRemoved = [];
 
@@ -109,8 +104,6 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
             IHandleProjectionPassivation passivationHandler,
             ProjectionConfiguration projectionConfiguration)
         {
-            _projectionConfiguration = projectionConfiguration;
-            
             var handlePassivation = passivationHandler.StartNew();
 
             Receive<Commands.Project>(cmd =>
@@ -126,7 +119,6 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
                     .GetOrElse(() => Context.ActorOf(
                         projectionConfiguration.GetProjection()
                             .CreateProjectionProps(
-                                cmd.Id,
                                 new InProcessProjectionConfigurationsSupplier(projectionConfiguration)),
                         id));
 
@@ -135,7 +127,7 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
 
                 projectionRef
                     .Ask<Messages.IProjectEventsResponse>(
-                        new DocumentProjection<TId, TDocument>.Commands.ProjectEvents(
+                        new DocumentProjection.Commands.ProjectEvents(
                             cmd.Id,
                             cmd.Events),
                         cmd.Timeout)
@@ -199,15 +191,15 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
                 var projectionRef = Context.Child(id);
 
                 if (!projectionRef.IsNobody())
-                    projectionRef.Tell(new DocumentProjection<TId, TDocument>.Commands.StopInProcessEvents(cmd.Id), Sender);
+                    projectionRef.Tell(new DocumentProjection.Commands.StopInProcessEvents(cmd.Id), Sender);
                 else
-                    Sender.Tell(new DocumentProjection<TId, TDocument>.Responses.StopInProcessEventsResponse());
+                    Sender.Tell(new DocumentProjection.Responses.StopInProcessEventsResponse());
             });
         }
         
-        private string GetProjectionId(TId id)
+        private string GetProjectionId(object id)
         {
-            return MurmurHash.StringHash(_projectionConfiguration.IdToString(id)).ToString();
+            return MurmurHash.StringHash(id.ToString()).ToString();
         }
     }
 }

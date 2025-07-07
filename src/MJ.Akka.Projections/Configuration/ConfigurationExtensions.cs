@@ -5,33 +5,6 @@ namespace MJ.Akka.Projections.Configuration;
 
 public static class ConfigurationExtensions
 {
-    public static IConfigurePart<T, TStorage> WithProjectionStorage<T, TStorage>(
-        this IHaveConfiguration<T> source,
-        TStorage storage) where TStorage : IProjectionStorage
-        where T : ContinuousProjectionConfig
-    {
-        var config = source.WithModifiedConfig(conf => conf with
-        {
-            ProjectionStorage = storage
-        });
-
-        return new ConfigurePart<T, TStorage>(config, storage);
-    }
-
-    public static IConfigurePart<T, TStorage> WithPositionStorage<T, TStorage>(
-        this IHaveConfiguration<T> source,
-        TStorage storage)
-        where TStorage : IProjectionPositionStorage
-        where T : ContinuousProjectionConfig
-    {
-        var config = source.WithModifiedConfig(conf => conf with
-        {
-            PositionStorage = storage
-        });
-
-        return new ConfigurePart<T, TStorage>(config, storage);
-    }
-
     public static IConfigurePart<T, RestartSettings?> WithRestartSettings<T>(
         this IHaveConfiguration<T> source,
         RestartSettings? restartSettings)
@@ -44,20 +17,21 @@ public static class ConfigurationExtensions
 
         return new ConfigurePart<T, RestartSettings?>(config, restartSettings);
     }
-    
-    public static IConfigurePart<ProjectionSystemConfiguration, TFactory> WithProjectionFactory<TFactory>(
-        this IHaveConfiguration<ProjectionSystemConfiguration> source,
-        TFactory factory) 
-        where TFactory : IKeepTrackOfProjectors
+
+    public static IConfigurePart<ProjectionSystemConfiguration<TStorageSetup>, TFactory> WithProjectionFactory<TFactory,
+        TStorageSetup>(
+        this IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> source,
+        TFactory factory)
+        where TFactory : IKeepTrackOfProjectors where TStorageSetup : IStorageSetup
     {
         var config = source.WithModifiedConfig(conf => conf with
         {
             ProjectorFactory = factory
         });
 
-        return new ConfigurePart<ProjectionSystemConfiguration, TFactory>(config, factory);
+        return new ConfigurePart<ProjectionSystemConfiguration<TStorageSetup>, TFactory>(config, factory);
     }
-    
+
     public static IConfigurePart<T, TStrategy> WithEventBatchingStrategy<T, TStrategy>(
         this IHaveConfiguration<T> source,
         TStrategy strategy)
@@ -71,7 +45,7 @@ public static class ConfigurationExtensions
 
         return new ConfigurePart<T, TStrategy>(config, strategy);
     }
-    
+
     public static IConfigurePart<T, TStrategy> WithPositionStorageBatchingStrategy<T, TStrategy>(
         this IHaveConfiguration<T> source,
         TStrategy strategy)
@@ -85,22 +59,24 @@ public static class ConfigurationExtensions
 
         return new ConfigurePart<T, TStrategy>(config, strategy);
     }
-    
-    public static IConfigurePart<ProjectionSystemConfiguration, TCoordinator> WithCoordinator<TCoordinator>(
-        this IHaveConfiguration<ProjectionSystemConfiguration> source,
-        TCoordinator coordinator) 
-        where TCoordinator : IConfigureProjectionCoordinator
+
+    public static IConfigurePart<ProjectionSystemConfiguration<TStorageSetup>, TCoordinator> WithCoordinator<
+        TCoordinator, TStorageSetup>(
+        this IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> source,
+        TCoordinator coordinator)
+        where TCoordinator : IConfigureProjectionCoordinator where TStorageSetup : IStorageSetup
     {
         var config = source.WithModifiedConfig(conf => conf with
         {
             Coordinator = coordinator
         });
 
-        return new ConfigurePart<ProjectionSystemConfiguration, TCoordinator>(config, coordinator);
+        return new ConfigurePart<ProjectionSystemConfiguration<TStorageSetup>, TCoordinator>(config, coordinator);
     }
 
-    internal static IConfigureProjectionCoordinator Build(
-        this IHaveConfiguration<ProjectionSystemConfiguration> conf)
+    internal static IConfigureProjectionCoordinator Build<TStorageSetup>(
+        this IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> conf)
+        where TStorageSetup : IStorageSetup
     {
         foreach (var projection in conf.Config.Projections)
         {

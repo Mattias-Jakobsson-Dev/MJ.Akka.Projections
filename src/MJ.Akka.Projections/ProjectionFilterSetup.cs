@@ -1,60 +1,60 @@
 namespace MJ.Akka.Projections;
 
-internal class ProjectionFilterSetup<TDocument, TEvent> : IProjectionFilterSetup<TDocument, TEvent>
-    where TDocument : notnull
+internal class ProjectionFilterSetup<TId, TContext, TEvent> : IProjectionFilterSetup<TId, TContext, TEvent>
+    where TId : notnull where TContext : IProjectionContext
 {
     private readonly Func<TEvent, bool> _eventFilter;
-    private readonly Func<TDocument?, bool> _documentFilter;
+    private readonly Func<TContext, bool> _resultFilter;
 
     private ProjectionFilterSetup(
         Func<TEvent, bool> eventFilter,
-        Func<TDocument?, bool> documentFilter)
+        Func<TContext, bool> resultFilter)
     {
         _eventFilter = eventFilter;
-        _documentFilter = documentFilter;
+        _resultFilter = resultFilter;
     }
 
-    public static ProjectionFilterSetup<TDocument, TEvent> Create()
+    public static ProjectionFilterSetup<TId, TContext, TEvent> Create()
     {
-        return new ProjectionFilterSetup<TDocument, TEvent>(
+        return new ProjectionFilterSetup<TId, TContext, TEvent>(
             _ => true,
             _ => true);
     }
 
-    public IProjectionFilterSetup<TDocument, TEvent> WithEventFilter(Func<TEvent, bool> filter)
+    public IProjectionFilterSetup<TId, TContext, TEvent> WithEventFilter(Func<TEvent, bool> filter)
     {
         var previousFilter = _eventFilter;
         
-        return new ProjectionFilterSetup<TDocument, TEvent>(
+        return new ProjectionFilterSetup<TId, TContext, TEvent>(
             evnt => filter(evnt) && previousFilter(evnt),
-            _documentFilter);
+            _resultFilter);
     }
 
-    public IProjectionFilterSetup<TDocument, TEvent> WithDocumentFilter(Func<TDocument?, bool> filter)
+    public IProjectionFilterSetup<TId, TContext, TEvent> WithDocumentFilter(Func<TContext, bool> filter)
     {
-        var previousFilter = _documentFilter;
+        var previousFilter = _resultFilter;
 
-        return new ProjectionFilterSetup<TDocument, TEvent>(
+        return new ProjectionFilterSetup<TId, TContext, TEvent>(
             _eventFilter,
             document => filter(document) && previousFilter(document));
     }
 
-    public IProjectionFilter<TDocument> Build()
+    public IProjectionFilter<TContext> Build()
     {
-        return new ProjectionFilter(_eventFilter, _documentFilter);
+        return new ProjectionFilter(_eventFilter, _resultFilter);
     }
     
-    private class ProjectionFilter(Func<TEvent, bool> eventFilter, Func<TDocument?, bool> documentFilter)
-        : IProjectionFilter<TDocument>
+    private class ProjectionFilter(Func<TEvent, bool> eventFilter, Func<TContext, bool> resultFilter)
+        : IProjectionFilter<TContext>
     {
         public bool FilterEvent(object evnt)
         {
             return eventFilter((TEvent)evnt);
         }
 
-        public bool FilterDocument(TDocument? document)
+        public bool FilterResult(TContext context)
         {
-            return documentFilter(document);
+            return resultFilter(context);
         }
     }
 }

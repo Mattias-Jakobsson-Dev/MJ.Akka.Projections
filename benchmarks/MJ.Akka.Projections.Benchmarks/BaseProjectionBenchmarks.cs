@@ -4,43 +4,64 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Loggers;
-using MJ.Akka.Projections.Benchmarks.Columns;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.Benchmarks.Columns;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
-[Config(typeof(Config))]
-public abstract class BaseProjectionBenchmarks
+public class BenchmarkConfig : ManualConfig
 {
-    private class Config : ManualConfig
+    public BenchmarkConfig()
     {
-        public Config()
-        {
-            AddDiagnoser(MemoryDiagnoser.Default);
-            AddLogger(ConsoleLogger.Default);
-            AddColumn(new TotalEventsPerSecondColumn());
-            AddColumn(new EventsPerDocumentPerSecondColumn());
-        }
+        AddDiagnoser(MemoryDiagnoser.Default);
+        AddLogger(ConsoleLogger.Default);
+        AddColumn(new TotalEventsPerSecondColumn());
+        AddColumn(new EventsPerDocumentPerSecondColumn());
     }
+}
 
+public record ProjectEventsConfiguration(int NumberOfEvents, int NumberOfDocuments)
+{
+    public override string ToString()
+    {
+        return $"e: {NumberOfEvents}, d: {NumberOfDocuments}";
+    }
+}
+
+public record BatchingStrategyConfiguration(string Name, IEventBatchingStrategy Strategy)
+{
+    public override string ToString()
+    {
+        return Name;
+    }
+}
+
+[Config(typeof(BenchmarkConfig))]
+public abstract class BaseProjectionBenchmarks<TId, TContext, TStorageSetup>
+    where TId : notnull
+    where TContext : IProjectionContext
+    where TStorageSetup : IStorageSetup
+{
     private ActorSystem ActorSystem { get; set; } = null!;
-    private TestProjection _projection = null!;
+    private IProjection<TId, TContext, TStorageSetup> _projection = null!;
     private IConfigureProjectionCoordinator _coordinator = null!;
-    
+
     [IterationSetup]
     public virtual void Setup()
     {
         ActorSystem = ActorSystem.Create(
-            "projections", 
+            "projections",
             "akka.loglevel = ERROR");
 
-        _projection = new TestProjection(Configuration.NumberOfEvents, Configuration.NumberOfDocuments);
+        _projection = CreateProjection(Configuration.NumberOfEvents, Configuration.NumberOfDocuments);
 
         _coordinator = ActorSystem
-            .Projections(conf => conf
-                .WithEventBatchingStrategy(BatchingStrategy.Strategy)
-                .WithProjection(_projection, Configure));
+            .Projections(conf => ConfigureSystem(conf)
+                    .WithEventBatchingStrategy(BatchingStrategy.Strategy)
+                    .WithProjection(_projection, ConfigureProjection),
+                GetStorageSetup());
     }
 
     [PublicAPI]
@@ -59,8 +80,17 @@ public abstract class BaseProjectionBenchmarks
         await coordinator.Get(_projection.Name)!.WaitForCompletion();
     }
 
-    protected abstract IHaveConfiguration<ProjectionInstanceConfiguration> Configure(
-        IHaveConfiguration<ProjectionInstanceConfiguration> config);
+    protected virtual IHaveConfiguration<ProjectionInstanceConfiguration> ConfigureProjection(
+        IHaveConfiguration<ProjectionInstanceConfiguration> config) => config;
+
+    protected virtual IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> ConfigureSystem(
+        IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> config) => config;
+
+    protected abstract TStorageSetup GetStorageSetup();
+
+    protected abstract IProjection<TId, TContext, TStorageSetup> CreateProjection(
+        int numberOfEvents,
+        int numberOfDocuments);
 
     public static IImmutableList<ProjectEventsConfiguration> GetAvailableConfigurations()
     {
@@ -74,26 +104,10 @@ public abstract class BaseProjectionBenchmarks
     {
         return ImmutableList.Create(
             new BatchingStrategyConfiguration("default", BatchEventBatchingStrategy.Default),
-            new BatchingStrategyConfiguration("100 within 50ms", 
+            new BatchingStrategyConfiguration("100 within 50ms",
                 new BatchWithinEventBatchingStrategy(100, TimeSpan.FromMilliseconds(50))),
-            new BatchingStrategyConfiguration("1 000 within 50ms", 
+            new BatchingStrategyConfiguration("1 000 within 50ms",
                 new BatchWithinEventBatchingStrategy(1_000, TimeSpan.FromMilliseconds(50))),
             new BatchingStrategyConfiguration("no batching", new NoEventBatchingStrategy(100)));
-    }
-    
-    public record ProjectEventsConfiguration(int NumberOfEvents, int NumberOfDocuments)
-    {
-        public override string ToString()
-        {
-            return $"e: {NumberOfEvents}, d: {NumberOfDocuments}";
-        }
-    }
-
-    public record BatchingStrategyConfiguration(string Name, IEventBatchingStrategy Strategy)
-    {
-        public override string ToString()
-        {
-            return Name;
-        }
     }
 }

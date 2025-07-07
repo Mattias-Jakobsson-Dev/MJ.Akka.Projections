@@ -2,6 +2,8 @@ using Akka;
 using Akka.Actor;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.Setup;
+using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections;
 
@@ -11,12 +13,12 @@ public interface IProjection
     TimeSpan ProjectionTimeout { get; }
     Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
     Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier);
-    Props CreateProjectionProps(object id, ISupplyProjectionConfigurations configSupplier);
+    Props CreateProjectionProps(ISupplyProjectionConfigurations configSupplier);
 }
 
-public interface IProjection<TId, TDocument> : IProjection where TId : notnull where TDocument : notnull
+public interface IProjection<TId, TContext, in TStorageSetup> : IProjection 
+    where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
-    TId IdFromString(string id);
-    string IdToString(TId id);
-    ISetupProjection<TId, TDocument> Configure(ISetupProjection<TId, TDocument> config);
+    ISetupProjectionHandlers<TId, TContext> Configure(ISetupProjection<TId, TContext> config);
+    ILoadProjectionContext<TId, TContext> GetLoadProjectionContext(TStorageSetup storageSetup);
 }

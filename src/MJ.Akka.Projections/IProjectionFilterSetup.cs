@@ -1,10 +1,13 @@
+using JetBrains.Annotations;
+
 namespace MJ.Akka.Projections;
 
-public interface IProjectionFilterSetup<TDocument, out TEvent> 
-    where TDocument : notnull
+[PublicAPI]
+public interface IProjectionFilterSetup<TId, TContext, out TEvent> 
+    where TId : notnull where TContext : IProjectionContext
 {
-    IProjectionFilterSetup<TDocument, TEvent> WithEventFilter(Func<TEvent, bool> filter);
-    IProjectionFilterSetup<TDocument, TEvent> WithDocumentFilter(Func<TDocument?, bool> filter);
+    IProjectionFilterSetup<TId, TContext, TEvent> WithEventFilter(Func<TEvent, bool> filter);
+    IProjectionFilterSetup<TId, TContext, TEvent> WithDocumentFilter(Func<TContext, bool> filter);
 
-    internal IProjectionFilter<TDocument> Build();
+    internal IProjectionFilter<TContext> Build();
 }
