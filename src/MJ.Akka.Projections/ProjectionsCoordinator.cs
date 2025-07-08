@@ -69,6 +69,8 @@ public class ProjectionsCoordinator : ReceiveActor
 
             var latestPosition = await _configuration.PositionStorage.LoadLatestPosition(_configuration.Name);
 
+            var self = Self;
+
             _killSwitch = MaybeCreateRestartSource(() =>
                 {
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Name, latestPosition);
@@ -144,10 +146,9 @@ public class ProjectionsCoordinator : ReceiveActor
                         });
                 }, _configuration.RestartSettings)
                 .ViaMaterialized(KillSwitches.Single<NotUsed>(), Keep.Right)
-                .ToMaterialized(Sink.ActorRef<NotUsed>(
-                    Self,
-                    new InternalCommands.Complete(),
-                    ex => new InternalCommands.Fail(ex)), Keep.Left)
+                .ToMaterialized(Sink.OnComplete<NotUsed>(
+                    () => self.Tell(new InternalCommands.Complete()),
+                    exception => self.Tell(new InternalCommands.Fail(exception))), Keep.Left)
                 .Run(Context.System.Materializer());
 
             Become(Started);
