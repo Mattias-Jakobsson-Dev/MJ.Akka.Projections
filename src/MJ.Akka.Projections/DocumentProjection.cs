@@ -158,7 +158,7 @@ public class DocumentProjection : ReceiveActor, IWithStash
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed loading context for {0}.{1}", _configuration.Name, id);
+            _logger.Warning(e, "Failed loading context for {0}.{1}", _configuration.Name, id);
 
             return new ProjectionResponse(null, new Messages.Reject(e));
         }
@@ -171,7 +171,7 @@ public class DocumentProjection : ReceiveActor, IWithStash
         }
         catch (Exception e)
         {
-            _logger.Error(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, id);
+            _logger.Warning(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, id);
 
             return new ProjectionResponse(null, new Messages.Reject(e));
         }
