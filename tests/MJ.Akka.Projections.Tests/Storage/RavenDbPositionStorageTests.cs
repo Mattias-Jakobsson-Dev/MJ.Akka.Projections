@@ -8,8 +8,9 @@ namespace MJ.Akka.Projections.Tests.Storage;
 [PublicAPI]
 public class RavenDbPositionStorageTests(RavenDbFixture fixture) : PositionStorageTests, IClassFixture<RavenDbFixture>
 {
-    protected override IProjectionPositionStorage GetStorage()
+    protected override Task<IProjectionPositionStorage> GetStorage()
     {
-        return new RavenDbProjectionPositionStorage(fixture.OpenDocumentStore());
+        return Task.FromResult<IProjectionPositionStorage>(
+            new RavenDbProjectionPositionStorage(fixture.OpenDocumentStore()));
     }
 }

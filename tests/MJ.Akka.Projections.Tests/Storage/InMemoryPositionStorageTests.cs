@@ -7,8 +7,8 @@ namespace MJ.Akka.Projections.Tests.Storage;
 [PublicAPI]
 public class InMemoryPositionStorageTests : PositionStorageTests
 {
-    protected override IProjectionPositionStorage GetStorage()
+    protected override Task<IProjectionPositionStorage> GetStorage()
     {
-        return new InMemoryPositionStorage();
+        return Task.FromResult<IProjectionPositionStorage>(new InMemoryPositionStorage());
     }
 }

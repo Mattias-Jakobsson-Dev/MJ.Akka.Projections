@@ -11,7 +11,7 @@ public abstract class PositionStorageTests : TestKit
     [Fact]
     public async Task LoadingNonExistingPosition()
     {
-        var storage = GetStorage();
+        var storage = await GetStorage();
 
         var position = await storage.LoadLatestPosition(Guid.NewGuid().ToString());
 
@@ -21,7 +21,7 @@ public abstract class PositionStorageTests : TestKit
     [Fact]
     public async Task LoadingRecentlyStoredPosition()
     {
-        var storage = GetStorage();
+        var storage = await GetStorage();
         var projectionName = Guid.NewGuid().ToString();
 
         await storage.StoreLatestPosition(projectionName, 10);
@@ -34,7 +34,7 @@ public abstract class PositionStorageTests : TestKit
     [Fact]
     public async Task StoringNewHighPosition()
     {
-        var storage = GetStorage();
+        var storage = await GetStorage();
 
         var position = await storage.StoreLatestPosition(Guid.NewGuid().ToString(), 10);
 
@@ -44,7 +44,7 @@ public abstract class PositionStorageTests : TestKit
     [Fact]
     public async Task StoringLowPosition()
     {
-        var storage = GetStorage();
+        var storage = await GetStorage();
         var projectionName = Guid.NewGuid().ToString();
 
         await storage.StoreLatestPosition(projectionName, 10);
@@ -60,7 +60,7 @@ public abstract class PositionStorageTests : TestKit
     [Fact]
     public async Task StoringPositionWithCancelledToken()
     {
-        var storage = GetStorage();
+        var storage = await GetStorage();
         var projectionName = Guid.NewGuid().ToString();
         var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
@@ -77,7 +77,7 @@ public abstract class PositionStorageTests : TestKit
     [Fact]
     public async Task LoadingPositionWithCancelledToken()
     {
-        var storage = GetStorage();
+        var storage = await GetStorage();
         var projectionName = Guid.NewGuid().ToString();
         var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
@@ -92,5 +92,5 @@ public abstract class PositionStorageTests : TestKit
         return await action();
     }
 
-    protected abstract IProjectionPositionStorage GetStorage();
+    protected abstract Task<IProjectionPositionStorage> GetStorage();
 }
