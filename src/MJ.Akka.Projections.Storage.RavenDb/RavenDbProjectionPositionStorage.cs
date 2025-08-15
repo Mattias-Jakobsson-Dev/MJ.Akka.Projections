@@ -42,4 +42,24 @@ public class RavenDbProjectionPositionStorage(IDocumentStore documentStore) : IP
 
         return projectionPosition.Position;
     }
+
+    public async Task Reset(string projectionName, long? position = null, CancellationToken cancellationToken = default)
+    {
+        using var session = documentStore.OpenAsyncSession();
+        
+        var projectionPosition = await session.LoadAsync<ProjectionPosition>(
+            ProjectionPosition.BuildId(projectionName), 
+            cancellationToken);
+        
+        if (projectionPosition == null)
+        {
+            projectionPosition = new ProjectionPosition(projectionName);
+
+            await session.StoreAsync(projectionPosition, cancellationToken);
+        }
+        
+        projectionPosition.Position = position ?? 0;
+        
+        await session.SaveChangesAsync(cancellationToken);
+    }
 }

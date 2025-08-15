@@ -30,4 +30,14 @@ public class InMemoryPositionStorage : IProjectionPositionStorage
 
         return LoadLatestPosition(projectionName, cancellationToken);
     }
+
+    public Task Reset(string projectionName, long? position = null, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        _positions.AddOrUpdate(projectionName, _ => position ?? 0,
+            (_, _) => position ?? 0);
+
+        return Task.CompletedTask;
+    }
 }
