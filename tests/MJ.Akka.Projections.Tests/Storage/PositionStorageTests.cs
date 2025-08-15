@@ -87,6 +87,49 @@ public abstract class PositionStorageTests : TestKit
             .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
     }
 
+    [Fact]
+    public async Task ResetNonExistingPosition()
+    {
+        var storage = GetStorage();
+        var projectionName = Guid.NewGuid().ToString();
+
+        await storage.Reset(projectionName, 1);
+        
+        var position = await storage.LoadLatestPosition(projectionName);
+
+        position.Should().Be(1);
+    }
+    
+    [Fact]
+    public async Task ResetExistingPosition()
+    {
+        var storage = GetStorage();
+        var projectionName = Guid.NewGuid().ToString();
+
+        await storage.StoreLatestPosition(projectionName, 2);
+
+        await storage.Reset(projectionName, 1);
+        
+        var position = await storage.LoadLatestPosition(projectionName);
+
+        position.Should().Be(1);
+    }
+    
+    [Fact]
+    public async Task ResetExistingPositionToNull()
+    {
+        var storage = GetStorage();
+        var projectionName = Guid.NewGuid().ToString();
+
+        await storage.StoreLatestPosition(projectionName, 2);
+
+        await storage.Reset(projectionName);
+        
+        var position = await storage.LoadLatestPosition(projectionName);
+
+        position.Should().Be(0);
+    }
+
     private static async Task<T> ConvertToAsync<T>(Func<Task<T>> action)
     {
         return await action();

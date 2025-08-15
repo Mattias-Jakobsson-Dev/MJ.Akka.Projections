@@ -97,5 +97,10 @@ public static class ActorSystemExtensions
         {
             return Task.FromResult(position);
         }
+
+        public Task Reset(string projectionName, long? position = null, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

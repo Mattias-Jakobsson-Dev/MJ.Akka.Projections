@@ -10,4 +10,9 @@ public interface IProjectionPositionStorage
         string projectionName,
         long? position, 
         CancellationToken cancellationToken = default);
+    
+    Task Reset(
+        string projectionName, 
+        long? position = null,
+        CancellationToken cancellationToken = default);
 }
