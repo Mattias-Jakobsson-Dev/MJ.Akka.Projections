@@ -10,7 +10,7 @@
     <PropertyGroup>
         <Copyright>Copyright © 2025 Mattias Jakobsson</Copyright>
         <Authors>Mattias Jakobsson</Authors>
-        <Version>0.5.0</Version>
+        <Version>0.6.0</Version>
         <PackageProjectUrl>
             https://github.com/Mattias-Jakobsson-Dev/MJ.Akka.Projections
         </PackageProjectUrl>
@@ -23,7 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Akka.Cluster.Sharding" Version="1.5.46" />
+      <PackageReference Include="Akka.Cluster.Sharding" Version="1.5.47" />
         <PackageReference Include="JetBrains.Annotations" Version="2025.2.0">
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
