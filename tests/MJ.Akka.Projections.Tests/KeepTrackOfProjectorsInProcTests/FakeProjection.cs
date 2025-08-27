@@ -30,7 +30,12 @@ public class FakeProjection(TimeSpan delay)
     {
         return Props.Create(() => new FakeProjector(delay));
     }
-    
+
+    public long? GetInitialPosition()
+    {
+        return null;
+    }
+
     public ISetupProjectionHandlers<object, InMemoryProjectionContext<object, object>> Configure(
         ISetupProjection<object, InMemoryProjectionContext<object, object>> config)
     {

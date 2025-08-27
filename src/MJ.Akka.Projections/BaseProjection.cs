@@ -28,5 +28,7 @@ public abstract class BaseProjection<TId, TContext, TStorageSetup> : IProjection
         return DocumentProjection.Init(configSupplier);
     }
 
+    public virtual long? GetInitialPosition() => null;
+
     public virtual string Name => GetType().Name;
 }

@@ -32,9 +32,10 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
     protected override IProjection<string, RavenDbProjectionContext<TestDocument<string>>, SetupRavenDbStorage>
         GetProjection(
             IImmutableList<object> events,
-            IImmutableList<StorageFailures> storageFailures)
+            IImmutableList<StorageFailures> storageFailures,
+            long? initialPosition = null)
     {
-        return new TestProjection(events, storageFailures);
+        return new TestProjection(events, storageFailures, initialPosition);
     }
 
     protected override object GetEventThatFails(string id, int numberOfFailures)
@@ -104,7 +105,8 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 
     private class TestProjection(
         IImmutableList<object> events,
-        IImmutableList<StorageFailures> storageFailures) : RavenDbProjection<TestDocument<string>>
+        IImmutableList<StorageFailures> storageFailures,
+        long? initialPosition) : RavenDbProjection<TestDocument<string>>
     {
         public ConcurrentDictionary<string, Events<string>.IEvent> HandledEvents { get; } = new();
         
@@ -203,6 +205,11 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 .Select((x, i) => new EventWithPosition(x, i + 1))
                 .Where(x => fromPosition == null || x.Position > fromPosition)
                 .ToImmutableList());
+        }
+
+        public override long? GetInitialPosition()
+        {
+            return initialPosition;
         }
     }
 }

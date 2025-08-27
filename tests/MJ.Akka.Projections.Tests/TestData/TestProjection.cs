@@ -11,7 +11,8 @@ namespace MJ.Akka.Projections.Tests.TestData;
 public class TestProjection<TId>(
     IImmutableList<object> events,
     IImmutableList<StorageFailures> failures,
-    string? overrideName = null)
+    string? overrideName = null,
+    long? initialPosition = null)
     : InMemoryProjection<TId, TestDocument<TId>>
     where TId : notnull
 {
@@ -25,7 +26,12 @@ public class TestProjection<TId>(
     }
 
     public override string Name => !string.IsNullOrEmpty(overrideName) ? overrideName : GetName();
-    
+
+    public override long? GetInitialPosition()
+    {
+        return initialPosition;
+    }
+
     public override ILoadProjectionContext<TId, InMemoryProjectionContext<TId, TestDocument<TId>>> 
         GetLoadProjectionContext(SetupInMemoryStorage storageSetup)
     {

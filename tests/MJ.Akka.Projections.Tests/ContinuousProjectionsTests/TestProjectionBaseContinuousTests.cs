@@ -89,9 +89,12 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
     }
 
     protected override IProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage> 
-        GetProjection(IImmutableList<object> events, IImmutableList<StorageFailures> storageFailures)
+        GetProjection(
+            IImmutableList<object> events,
+            IImmutableList<StorageFailures> storageFailures,
+            long? initialPosition = null)
     {
-        return new TestProjection<TId>(events, storageFailures);
+        return new TestProjection<TId>(events, storageFailures, initialPosition: initialPosition);
     }
 
     protected override object GetEventThatFails(TId id, int numberOfFailures)

@@ -598,6 +598,45 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     }
 
     [Fact]
+    public async Task Projecting_from_initial_position_after_first_event()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TId>();
+
+        var firstEvent = GetTestEvent(id);
+        var secondEvent = GetTestEvent(id);
+
+        var events = ImmutableList.Create(firstEvent, secondEvent);
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty, 1);
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var projectionsSetup = system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup);
+        
+        var coordinator = await projectionsSetup.Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(2);
+
+        var context = await loader.Load(id);
+
+        context.Exists().Should().BeTrue();
+
+        await VerifyContext(id, context, ImmutableList.Create(secondEvent), projection);
+    }
+
+    [Fact]
     public async Task Projecting_three_events_in_same_group()
     {
         using var system = actorSystemHandler.StartNewActorSystem();
@@ -649,7 +688,8 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     
     protected abstract IProjection<TId, TContext, TStorageSetup> GetProjection(
         IImmutableList<object> events,
-        IImmutableList<StorageFailures> storageFailures);
+        IImmutableList<StorageFailures> storageFailures,
+        long? initialPosition = null);
 
     protected abstract object GetEventThatFails(TId id, int numberOfFailures);
 

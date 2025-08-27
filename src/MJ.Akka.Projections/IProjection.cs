@@ -14,6 +14,7 @@ public interface IProjection
     Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
     Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier);
     Props CreateProjectionProps(ISupplyProjectionConfigurations configSupplier);
+    long? GetInitialPosition();
 }
 
 public interface IProjection<TId, TContext, in TStorageSetup> : IProjection 
