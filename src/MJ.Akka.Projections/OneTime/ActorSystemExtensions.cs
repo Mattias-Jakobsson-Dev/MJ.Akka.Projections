@@ -31,13 +31,13 @@ public static class ActorSystemExtensions
 
         return new OneTimeProjection<TId, TDocument>(
             projectionCoordinator,
-            projection.Name,
+            projection,
             storage);
     }
 
     private class OneTimeProjection<TId, TDocument>(
         IConfigureProjectionCoordinator coordinator,
-        string projectionName,
+        IProjection<TId, InMemoryProjectionContext<TId, TDocument>, SetupInMemoryStorage> projection,
         SetupInMemoryStorage storageSetup)
         : IOneTimeProjection<TId, TDocument>
         where TId : notnull
@@ -49,12 +49,11 @@ public static class ActorSystemExtensions
 
             await using var result = await coordinator.Start();
 
-            var projectionProxy = result.Get(projectionName)!;
+            var projectionProxy = result.Get(projection.Name)!;
 
             await projectionProxy.WaitForCompletion(timeout);
 
-            return new Result(new InMemoryProjectionLoader<TId, TDocument>(
-                id => storageSetup.LoadDocument(id)));
+            return new Result(projection.GetLoadProjectionContext(storageSetup));
         }
 
         private class Result(ILoadProjectionContext<TId, InMemoryProjectionContext<TId, TDocument>> loader)

@@ -166,7 +166,9 @@ public class BatchedProjectionStorageTests : TestKit
         
         var innerStorage = setup.CreateProjectionStorage();
 
-        var loader = new InMemoryProjectionLoader<string, TestDocument<string>>(id => setup.LoadDocument(id));
+        var loader = new InMemoryProjectionLoader<string, TestDocument<string>>(
+            id => setup.LoadDocument(id),
+            _ => null);
         
         var batchedStorage = new BatchedProjectionStorage(
             Sys,

@@ -3,7 +3,9 @@ using Raven.Client.Documents;
 
 namespace MJ.Akka.Projections.Storage.RavenDb;
 
-public class LoadProjectionDataFromRavenDb<TDocument>(IDocumentStore documentStore)
+public class LoadProjectionDataFromRavenDb<TDocument>(
+    IDocumentStore documentStore, 
+    Func<string, TDocument?> getDefaultDocument)
     : ILoadProjectionContext<string, RavenDbProjectionContext<TDocument>>
     where TDocument : class
 {
@@ -13,7 +15,7 @@ public class LoadProjectionDataFromRavenDb<TDocument>(IDocumentStore documentSto
     {
         using var session = documentStore.OpenAsyncSession();
 
-        var document = await session.LoadAsync<TDocument>(id, cancellationToken);
+        var document = await session.LoadAsync<TDocument>(id, cancellationToken) ?? getDefaultDocument(id);
         
         var metadata = document != null 
             ? session.Advanced.GetMetadataFor(document).ToImmutableDictionary() 

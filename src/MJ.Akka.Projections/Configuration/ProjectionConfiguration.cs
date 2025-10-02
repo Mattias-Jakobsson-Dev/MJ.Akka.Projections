@@ -118,7 +118,6 @@ public abstract class ProjectionConfiguration
     
     public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
     {
-        var test = _projection.GetInitialPosition();
         return _projection.StartSource(fromPosition ?? _projection.GetInitialPosition());
     }
     

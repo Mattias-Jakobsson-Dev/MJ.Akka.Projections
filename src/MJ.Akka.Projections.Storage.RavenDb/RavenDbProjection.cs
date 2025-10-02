@@ -10,6 +10,8 @@ public abstract class RavenDbProjection<TDocument>
     public override ILoadProjectionContext<string, RavenDbProjectionContext<TDocument>> GetLoadProjectionContext(
         SetupRavenDbStorage storageSetup)
     {
-        return new LoadProjectionDataFromRavenDb<TDocument>(storageSetup.GetDocumentStore());
+        return new LoadProjectionDataFromRavenDb<TDocument>(storageSetup.GetDocumentStore(), GetDefaultDocument);
     }
+    
+    protected virtual TDocument? GetDefaultDocument(string id) => null;
 }

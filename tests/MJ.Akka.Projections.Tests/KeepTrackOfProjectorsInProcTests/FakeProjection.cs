@@ -45,7 +45,7 @@ public class FakeProjection(TimeSpan delay)
     public ILoadProjectionContext<object, InMemoryProjectionContext<object, object>> GetLoadProjectionContext(
         SetupInMemoryStorage storageSetup)
     {
-        return new InMemoryProjectionLoader<object, object>(storageSetup.LoadDocument);
+        return new InMemoryProjectionLoader<object, object>(storageSetup.LoadDocument, _ => null);
     }
     
     private class FakeProjector : ReceiveActor
