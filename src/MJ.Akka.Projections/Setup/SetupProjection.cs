@@ -71,8 +71,7 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
         public IImmutableList<object> Transform(object evnt)
         {
             var typesToCheck = evnt.GetType().GetInheritedTypes();
-            var results = ImmutableList<object>.Empty;
-            var hasTransformed = false;
+            var results = ImmutableList.Create(evnt);
 
             foreach (var type in typesToCheck)
             {
@@ -80,11 +79,9 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
                     continue;
 
                 results = results.AddRange(transformers[type](evnt));
-
-                hasTransformed = true;
             }
 
-            return hasTransformed ? results : ImmutableList.Create(evnt);
+            return results;
         }
 
         public DocumentId GetDocumentIdFrom(object evnt)
