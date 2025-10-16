@@ -121,7 +121,12 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
     {
         return new Events<TId>.UnHandledEvent(documentId);
     }
-    
+
+    protected override object GetEventThatIsFilteredOut(TId documentId)
+    {
+        return new Events<TId>.EventWithFilter(documentId, Fixture.Create<string>(), () => false);
+    }
+
     protected override Task VerifyContext(
         TId documentId,
         InMemoryProjectionContext<TId, TestDocument<TId>> context,

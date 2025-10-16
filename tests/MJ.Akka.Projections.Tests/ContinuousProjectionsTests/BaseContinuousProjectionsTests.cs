@@ -678,6 +678,42 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
         await VerifyContext(documentId, context, events, projection);
     }
 
+    [Fact]
+    public async Task Projecting_ten_events_that_are_filtered_out()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TId>();
+
+        var events = Enumerable.Range(1, 10)
+            .Select(_ => GetEventThatIsFilteredOut(id))
+            .ToImmutableList();
+        
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(10);
+
+        var context = await loader.Load(id);
+
+        context.Exists().Should().BeFalse();
+    }
+
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> Configure(
         IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> config)
     {
@@ -698,6 +734,8 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     protected abstract object GetTransformationEvent(TId documentId, IImmutableList<object> transformTo);
 
     protected abstract object GetUnMatchedEvent(TId documentId);
+    
+    protected abstract object GetEventThatIsFilteredOut(TId documentId);
 
     protected abstract Task VerifyContext(
         TId documentId,

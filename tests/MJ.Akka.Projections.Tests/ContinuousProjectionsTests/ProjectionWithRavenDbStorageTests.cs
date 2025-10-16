@@ -64,6 +64,11 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
         return new Events<string>.UnHandledEvent(documentId);
     }
 
+    protected override object GetEventThatIsFilteredOut(string documentId)
+    {
+        return new Events<string>.EventWithFilter(documentId, Fixture.Create<string>(), () => false);
+    }
+
     protected override Task VerifyContext(
         string documentId,
         RavenDbProjectionContext<TestDocument<string>> context,
@@ -119,6 +124,22 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 .TransformUsing<Events<string>.TransformToMultipleEvents>(evnt =>
                     evnt.Events.OfType<object>().ToImmutableList())
                 .On<Events<string>.FirstEvent>(x => x.DocId)
+                .ModifyDocument((evnt, doc) =>
+                {
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+
+                    doc ??= new TestDocument<string>
+                    {
+                        Id = evnt.DocId
+                    };
+
+                    doc.AddHandledEvent(evnt.EventId);
+
+                    return doc;
+                })
+                .On<Events<string>.EventWithFilter>(
+                    x => x.DocId,
+                    filter => filter.WithEventFilter(evnt => evnt.Filter()))
                 .ModifyDocument((evnt, doc) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);

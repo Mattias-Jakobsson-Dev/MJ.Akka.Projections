@@ -8,6 +8,8 @@ public static class Events<TId>
     
     public record UnHandledEvent(TId DocId);
 
+    public record EventWithFilter(TId DocId, string EventId, Func<bool> Filter) : IEvent;
+
     public record DelayHandlingWithoutCancellationToken(TId DocId, string EventId, TimeSpan Delay) : IEvent;
 
     public record DelayHandlingWithCancellationToken(TId DocId, string EventId, TimeSpan Delay) : IEvent;

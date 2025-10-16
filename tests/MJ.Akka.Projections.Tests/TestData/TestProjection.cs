@@ -62,6 +62,22 @@ public class TestProjection<TId>(
 
                 return doc;
             })
+            .On<Events<TId>.EventWithFilter>(
+                x => x.DocId,
+                filter => filter.WithEventFilter(evnt => evnt.Filter()))
+            .ModifyDocument((evnt, doc) =>
+            {
+                HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+
+                doc ??= new TestDocument<TId>
+                {
+                    Id = evnt.DocId
+                };
+
+                doc.AddHandledEvent(evnt.EventId);
+
+                return doc;
+            })
             .On<Events<TId>.DelayHandlingWithoutCancellationToken>(x => x.DocId)
             .ModifyDocument(async (evnt, doc) =>
             {
