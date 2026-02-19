@@ -78,7 +78,7 @@ public class ProjectionSequencer : ReceiveActor
 
     private void Started(Guid instanceId, CancellationToken cancellationToken)
     {
-        Receive<Commands.StartProjecting>(cmd =>
+        ReceiveAsync<Commands.StartProjecting>(async cmd =>
         {
             var self = Self;
             
@@ -88,7 +88,7 @@ public class ProjectionSequencer : ReceiveActor
                 object? documentId,
                 Task<Messages.IProjectEventsResponse> task)>();
 
-            var groupedEvents = cmd
+            var eventsWithIds = await Task.WhenAll(cmd
                 .Events
                 .SelectMany(x => _configuration
                     .TransformEvent(x.Event)
@@ -96,12 +96,14 @@ public class ProjectionSequencer : ReceiveActor
                     {
                         Event = y
                     }))
-                .Select(x => new
+                .Select(async x => new
                 {
                     Event = x,
-                    Id = _configuration.GetDocumentIdFrom(x.Event),
+                    Id = await _configuration.GetDocumentIdFrom(x.Event),
                     x.Position
-                })
+                }));
+
+            var groupedEvents = eventsWithIds
                 .GroupBy(x => x.Id)
                 .Select(x => (
                     Events: x.Select(y => y.Event).ToImmutableList(),
@@ -167,9 +169,11 @@ public class ProjectionSequencer : ReceiveActor
 
                 foreach (var task in tasks)
                 {
+#pragma warning disable CS4014 // This is intentional, we want the continuations to run without awaiting the tasks here
                     task
                         .task
                         .ContinueWith(result =>
+#pragma warning restore CS4014
                         {
                             InternalCommands.TaskFinished response;
 

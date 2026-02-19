@@ -55,7 +55,7 @@ public class ProjectionConfiguration<TId, TContext, TStorageSetup>(
         return eventsHandler.Transform(evnt);
     }
 
-    public override DocumentId GetDocumentIdFrom(object evnt)
+    public override Task<DocumentId> GetDocumentIdFrom(object evnt)
     {
         return eventsHandler.GetDocumentIdFrom(evnt);
     }
@@ -123,7 +123,7 @@ public abstract class ProjectionConfiguration
     
     public abstract IImmutableList<object> TransformEvent(object evnt);
     
-    public abstract DocumentId GetDocumentIdFrom(object evnt);
+    public abstract Task<DocumentId> GetDocumentIdFrom(object evnt);
     
     public abstract Task<(bool handled, IImmutableList<IProjectionResult> results)> HandleEvent(
         object context,

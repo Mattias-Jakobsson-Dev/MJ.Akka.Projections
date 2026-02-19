@@ -9,7 +9,7 @@ public interface IHandleEventInProjection<TId, in TContext> where TId : notnull 
 {
     IImmutableList<object> Transform(object evnt);
     
-    DocumentId GetDocumentIdFrom(object evnt);
+    Task<DocumentId> GetDocumentIdFrom(object evnt);
     
     Task<(bool handled, IImmutableList<IProjectionResult> results)> Handle(
         TContext context,

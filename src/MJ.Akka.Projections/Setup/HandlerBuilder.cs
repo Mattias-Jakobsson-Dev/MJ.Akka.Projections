@@ -8,13 +8,13 @@ internal abstract class HandlerBuilder<TId, TContext>
     public abstract Handler Build();
     
     public record Handler(
-        Func<object, TId> GetId,
+        Func<object, Task<TId>> GetId,
         Func<object, TContext, long, CancellationToken, Task<IEnumerable<IProjectionResult>>> Handle,
         IProjectionFilter<TContext> Filter);
 }
 
 internal class HandlerBuilder<TId, TContext, TEvent>(
-    Func<TEvent, TId> getIdForCurrent,
+    Func<TEvent, Task<TId>> getIdForCurrent,
     IProjectionFilter<TContext> filterForCurrent,
     ISetupProjection<TId, TContext> parent)
     : HandlerBuilder<TId, TContext>, ISetupEventHandlerForProjection<TId, TContext, TEvent>

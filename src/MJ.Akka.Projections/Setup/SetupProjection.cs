@@ -39,6 +39,15 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
             IProjectionFilterSetup<TId, TContext, TEvent>,
             IProjectionFilterSetup<TId, TContext, TEvent>>? filter = null)
     {
+        return On(evnt => Task.FromResult(getId(evnt)), filter);
+    }
+    
+    public ISetupEventHandlerForProjection<TId, TContext, TEvent> On<TEvent>(
+        Func<TEvent, Task<TId>> getId,
+        Func<
+            IProjectionFilterSetup<TId, TContext, TEvent>,
+            IProjectionFilterSetup<TId, TContext, TEvent>>? filter = null)
+    {
         IProjectionFilterSetup<TId, TContext, TEvent> projectionFilterSetup
             = ProjectionFilterSetup<TId, TContext, TEvent>.Create();
 
@@ -84,15 +93,15 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
             return results;
         }
 
-        public DocumentId GetDocumentIdFrom(object evnt)
+        public async Task<DocumentId> GetDocumentIdFrom(object evnt)
         {
             var typesToCheck = evnt.GetType().GetInheritedTypes();
 
-            var ids = (from type in typesToCheck
+            var ids = (await Task.WhenAll(from type in typesToCheck
                     where handlers.ContainsKey(type)
                     let handler = handlers[type]
                     where handler.Filter.FilterEvent(evnt)
-                    select handler.GetId(evnt))
+                    select handler.GetId(evnt)))
                 .ToImmutableList();
 
             return new DocumentId(

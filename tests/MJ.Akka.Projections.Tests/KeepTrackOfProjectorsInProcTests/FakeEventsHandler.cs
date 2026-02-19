@@ -11,9 +11,9 @@ public class FakeEventsHandler : IHandleEventInProjection<object, InMemoryProjec
         return ImmutableList<object>.Empty;
     }
 
-    public DocumentId GetDocumentIdFrom(object evnt)
+    public Task<DocumentId> GetDocumentIdFrom(object evnt)
     {
-        return new DocumentId(null, false);
+        return Task.FromResult(new DocumentId(null, false));
     }
 
     public Task<(bool handled, IImmutableList<IProjectionResult> results)> Handle(

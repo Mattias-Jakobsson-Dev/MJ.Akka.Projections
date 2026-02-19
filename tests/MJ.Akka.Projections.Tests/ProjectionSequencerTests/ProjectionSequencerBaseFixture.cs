@@ -151,12 +151,12 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
             return ImmutableList.Create(evnt);
         }
 
-        public DocumentId GetDocumentIdFrom(object evnt)
+        public Task<DocumentId> GetDocumentIdFrom(object evnt)
         {
             if (evnt is Events.DelayProcessingEvent delayEvent)
-                return new DocumentId(delayEvent.DocumentId, true);
+                return Task.FromResult(new DocumentId(delayEvent.DocumentId, true));
 
-            return new DocumentId(null, false);
+            return Task.FromResult(new DocumentId(null, false));
         }
 
         public Task<(bool handled, IImmutableList<IProjectionResult> results)> Handle(
