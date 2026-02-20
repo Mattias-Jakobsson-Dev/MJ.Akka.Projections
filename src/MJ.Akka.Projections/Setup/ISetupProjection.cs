@@ -26,5 +26,9 @@ public interface ISetupProjectionHandlers<TId, TContext> where TId : notnull whe
         Func<TEvent, TId> getId,
         Func<IProjectionFilterSetup<TId, TContext, TEvent>, IProjectionFilterSetup<TId, TContext, TEvent>>? filter = null);
     
+    ISetupEventHandlerForProjection<TId, TContext, TEvent> On<TEvent>(
+        Func<TEvent, Task<TId>> getId,
+        Func<IProjectionFilterSetup<TId, TContext, TEvent>, IProjectionFilterSetup<TId, TContext, TEvent>>? filter = null);
+    
     IHandleEventInProjection<TId, TContext> Build();
 }

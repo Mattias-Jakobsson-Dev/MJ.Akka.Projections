@@ -38,6 +38,15 @@ internal class HandlerBuilder<TId, TContext, TEvent>(
         return parent.On(getId, filter);
     }
 
+    public ISetupEventHandlerForProjection<TId, TContext, TNewEvent> On<TNewEvent>(
+        Func<TNewEvent, Task<TId>> getId, 
+        Func<
+            IProjectionFilterSetup<TId, TContext, TNewEvent>, 
+            IProjectionFilterSetup<TId, TContext, TNewEvent>>? filter = null)
+    {
+        return parent.On(getId, filter);
+    }
+
     IHandleEventInProjection<TId, TContext> ISetupProjectionHandlers<TId, TContext>.Build()
     {
         return parent.Build();
