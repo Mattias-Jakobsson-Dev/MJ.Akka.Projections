@@ -59,12 +59,12 @@ public abstract class ProjectionTestKit<TId, TContext, TStorageSetup>
         return Task.CompletedTask;
     }
 
-    protected async Task<TContext> LoadContext(TId id)
+    public async Task<TContext> LoadContext(TId id)
     {
         return await _contextLoader.Load(id, _projection.GetDefaultContext);
     }
 
-    protected IImmutableDictionary<TId, TContext> GetStoredContexts()
+    public IImmutableDictionary<TId, TContext> GetStoredContexts()
     {
         return _storage
             .ToImmutableDictionary(
