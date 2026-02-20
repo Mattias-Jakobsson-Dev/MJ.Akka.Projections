@@ -56,7 +56,7 @@ public class BatchedStorageTests : TestKit
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 

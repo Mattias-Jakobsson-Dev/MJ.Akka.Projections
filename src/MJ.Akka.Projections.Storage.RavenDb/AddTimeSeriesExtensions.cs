@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Setup;
 
@@ -62,16 +61,7 @@ public static class AddTimeSeriesExtensions
         {
             var timeSeriesInput = await getTimeSeries(evnt, context, position, cancellationToken);
 
-            return
-            [
-                new StoreTimeSeries(
-                    context.Id,
-                    timeSeriesInput.Name,
-                    ImmutableList.Create(new TimeSeriesRecord(
-                        timeSeriesInput.Timestamp,
-                        timeSeriesInput.Values,
-                        timeSeriesInput.Tag)))
-            ];
+            context.AddTimeSeries(timeSeriesInput);
         });
     }
 }

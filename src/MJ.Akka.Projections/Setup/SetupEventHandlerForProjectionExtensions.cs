@@ -1,5 +1,4 @@
 using JetBrains.Annotations;
-using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections.Setup;
 
@@ -8,26 +7,35 @@ public static class SetupEventHandlerForProjectionExtensions
 {
     public static ISetupEventHandlerForProjection<TId, TContext, TEvent> HandleWith<TId, TContext, TEvent>(
         this ISetupEventHandlerForProjection<TId, TContext, TEvent> setup,
-        Func<TEvent, TContext, IEnumerable<IProjectionResult>> handler)
+        Action<TEvent, TContext> handler)
         where TId : notnull
         where TContext : IProjectionContext
     {
-        return setup.HandleWith((evnt, context, _, _) => Task.FromResult(handler(evnt, context)));
+        return setup.HandleWith((evnt, context, _, _) =>
+        {
+            handler(evnt, context);
+
+            return Task.CompletedTask;
+        });
     }
     
     public static ISetupEventHandlerForProjection<TId, TContext, TEvent> HandleWith<TId, TContext, TEvent>(
         this ISetupEventHandlerForProjection<TId, TContext, TEvent> setup,
-        Func<TEvent, TContext, long?, IEnumerable<IProjectionResult>> handler)
+        Action<TEvent, TContext, long?> handler)
         where TId : notnull
         where TContext : IProjectionContext
     {
-        return setup.HandleWith((evnt, context, position, _) => 
-            Task.FromResult(handler(evnt, context, position)));
+        return setup.HandleWith((evnt, context, position, _) =>
+        {
+            handler(evnt, context, position);
+
+            return Task.CompletedTask;
+        });
     }
     
     public static ISetupEventHandlerForProjection<TId, TContext, TEvent> HandleWith<TId, TContext, TEvent>(
         this ISetupEventHandlerForProjection<TId, TContext, TEvent> setup,
-        Func<TEvent, TContext, Task<IEnumerable<IProjectionResult>>> handler)
+        Func<TEvent, TContext, Task> handler)
         where TId : notnull
         where TContext : IProjectionContext
     {
@@ -36,7 +44,7 @@ public static class SetupEventHandlerForProjectionExtensions
     
     public static ISetupEventHandlerForProjection<TId, TContext, TEvent> HandleWith<TId, TContext, TEvent>(
         this ISetupEventHandlerForProjection<TId, TContext, TEvent> setup,
-        Func<TEvent, TContext, long?, Task<IEnumerable<IProjectionResult>>> handler)
+        Func<TEvent, TContext, long?, Task> handler)
         where TId : notnull
         where TContext : IProjectionContext
     {
@@ -45,7 +53,7 @@ public static class SetupEventHandlerForProjectionExtensions
     
     public static ISetupEventHandlerForProjection<TId, TContext, TEvent> HandleWith<TId, TContext, TEvent>(
         this ISetupEventHandlerForProjection<TId, TContext, TEvent> setup,
-        Func<TEvent, TContext, CancellationToken, Task<IEnumerable<IProjectionResult>>> handler)
+        Func<TEvent, TContext, CancellationToken, Task> handler)
         where TId : notnull
         where TContext : IProjectionContext
     {

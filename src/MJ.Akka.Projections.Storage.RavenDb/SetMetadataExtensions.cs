@@ -60,11 +60,8 @@ public static class SetMetadataExtensions
         return setup.HandleWith(async (evnt, context, position, cancellationToken) =>
         {
             var metadataInput = await getMetadata(evnt, context, position, cancellationToken);
-
-            return
-            [
-                new StoreMetadata(context.Id, metadataInput.Key, metadataInput.Value)
-            ];
+            
+            context.SetMetadata(metadataInput.Key, metadataInput.Value);
         });
     }
 }

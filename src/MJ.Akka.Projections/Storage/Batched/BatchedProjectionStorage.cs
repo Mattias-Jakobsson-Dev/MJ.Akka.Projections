@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Akka;
 using Akka.Actor;
 using Akka.Streams;
@@ -46,9 +47,9 @@ internal class BatchedProjectionStorage : IProjectionStorage
                     
                     try
                     {
-                        var response = await innerStorage.Store(write.Request);
+                        await innerStorage.Store(write.Contexts);
 
-                        write.Completed(response);
+                        write.Completed();
                     }
                     catch (Exception e)
                     {
@@ -61,13 +62,13 @@ internal class BatchedProjectionStorage : IProjectionStorage
             .Run(actorSystem.Materializer());
     }
     
-    public Task<StoreProjectionResponse> Store(
-        StoreProjectionRequest request, 
+    public Task Store(
+        IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts, 
         CancellationToken cancellationToken = default)
     {
-        var promise = new TaskCompletionSource<StoreProjectionResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var promise = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        _writeQueue.OfferAsync(new PendingWrite(request, promise, cancellationToken))
+        _writeQueue.OfferAsync(new PendingWrite(contexts, promise, cancellationToken))
             .ContinueWith(
                 result =>
                 {

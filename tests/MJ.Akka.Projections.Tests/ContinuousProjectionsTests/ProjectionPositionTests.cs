@@ -98,7 +98,7 @@ public class ProjectionPositionTests : TestKit
 
         position.Should().BeLessThan(3);
 
-        var firstContext = await loader.Load(documentId);
+        var firstContext = await loader.Load(documentId, projection.GetDefaultContext);
 
         firstContext.Exists().Should().BeTrue();
     }

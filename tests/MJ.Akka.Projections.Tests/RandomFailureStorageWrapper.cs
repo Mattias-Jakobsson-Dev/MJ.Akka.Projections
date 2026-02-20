@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.Tests;
@@ -18,14 +19,14 @@ public class RandomFailureStorageWrapper(int failurePercentage, IStorageSetup in
     {
         private readonly Random _random = new();
     
-        public Task<StoreProjectionResponse> Store(
-            StoreProjectionRequest request, 
+        public Task Store(
+            IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts, 
             CancellationToken cancellationToken = default)
         {
             if (_random.Next(100) <= failurePercentage)
                 throw new Exception("Random failure");
 
-            return innerStorage.Store(request, cancellationToken);
+            return innerStorage.Store(contexts, cancellationToken);
         }
     }
     

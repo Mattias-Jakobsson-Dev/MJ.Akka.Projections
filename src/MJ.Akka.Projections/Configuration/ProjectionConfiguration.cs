@@ -3,7 +3,6 @@ using Akka;
 using Akka.Streams;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Storage;
-using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections.Configuration;
 
@@ -37,19 +36,16 @@ public class ProjectionConfiguration<TId, TContext, TStorageSetup>(
                 "id");
         }
 
-        return await loadStorage.Load(typedId, cancellationToken);
+        return await loadStorage.Load(typedId, projection.GetDefaultContext, cancellationToken);
     }
 
-    public override async Task Store(
-        StoreProjectionRequest request,
+    public override Task Store(
+        IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts,
         CancellationToken cancellationToken = default)
     {
-        var response = await storage.Store(request, cancellationToken);
-
-        if (!response.Completed)
-            throw new StoreProjectionException();
+        return storage.Store(contexts, cancellationToken);
     }
-
+    
     public override IImmutableList<object> TransformEvent(object evnt)
     {
         return eventsHandler.Transform(evnt);
@@ -60,19 +56,17 @@ public class ProjectionConfiguration<TId, TContext, TStorageSetup>(
         return eventsHandler.GetDocumentIdFrom(evnt);
     }
 
-    public override async Task<(bool handled, IImmutableList<IProjectionResult> results)> HandleEvent(
-        object context,
+    public override Task<bool> HandleEvent(
+        IProjectionContext context,
         object evnt,
         long position,
         CancellationToken cancellationToken)
     {
-        var response = await eventsHandler.Handle(
+        return eventsHandler.Handle(
             (TContext)context,
             evnt, 
             position,
             cancellationToken);
-
-        return response;
     }
 }
 
@@ -113,7 +107,7 @@ public abstract class ProjectionConfiguration
         CancellationToken cancellationToken = default);
     
     public abstract Task Store(
-        StoreProjectionRequest request,
+        IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts,
         CancellationToken cancellationToken = default);
     
     public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
@@ -125,8 +119,8 @@ public abstract class ProjectionConfiguration
     
     public abstract Task<DocumentId> GetDocumentIdFrom(object evnt);
     
-    public abstract Task<(bool handled, IImmutableList<IProjectionResult> results)> HandleEvent(
-        object context,
+    public abstract Task<bool> HandleEvent(
+        IProjectionContext context,
         object evnt,
         long position,
         CancellationToken cancellationToken);

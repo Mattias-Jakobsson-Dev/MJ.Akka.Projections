@@ -1,5 +1,3 @@
-using MJ.Akka.Projections.Storage.Messages;
-
 namespace MJ.Akka.Projections.Setup;
 
 internal abstract class HandlerBuilder<TId, TContext>
@@ -9,7 +7,7 @@ internal abstract class HandlerBuilder<TId, TContext>
     
     public record Handler(
         Func<object, Task<TId>> GetId,
-        Func<object, TContext, long, CancellationToken, Task<IEnumerable<IProjectionResult>>> Handle,
+        Func<object, TContext, long, CancellationToken, Task> Handle,
         IProjectionFilter<TContext> Filter);
 }
 
@@ -20,11 +18,11 @@ internal class HandlerBuilder<TId, TContext, TEvent>(
     : HandlerBuilder<TId, TContext>, ISetupEventHandlerForProjection<TId, TContext, TEvent>
     where TId : notnull where TContext : IProjectionContext
 {
-    private readonly List<Func<TEvent, TContext, long?, CancellationToken, Task<IEnumerable<IProjectionResult>>>>
+    private readonly List<Func<TEvent, TContext, long?, CancellationToken, Task>>
         _handlers = [];
 
     public ISetupEventHandlerForProjection<TId, TContext, TEvent> HandleWith(
-        Func<TEvent, TContext, long?, CancellationToken, Task<IEnumerable<IProjectionResult>>> handler)
+        Func<TEvent, TContext, long?, CancellationToken, Task> handler)
     {
         _handlers.Add(handler);
 
@@ -51,19 +49,14 @@ internal class HandlerBuilder<TId, TContext, TEvent>(
             evnt => getIdForCurrent((TEvent)evnt),
             async (evnt, context, position, cancellationToken) =>
             {
-                var results = new List<IProjectionResult>();
-                
                 foreach (var handler in _handlers)
                 {
-                    var handlerResults = await handler(
+                    await handler(
                         (TEvent)evnt,
                         context, 
                         position,
                         cancellationToken);
-                    
-                    results.AddRange(handlerResults);
                 }
-                return results;
             },
             filterForCurrent);
     }

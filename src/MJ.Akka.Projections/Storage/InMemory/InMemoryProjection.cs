@@ -8,9 +8,15 @@ public abstract class InMemoryProjection<TId, TDocument>
         SetupInMemoryStorage storageSetup)
     {
         return new InMemoryProjectionLoader<TId, TDocument>(
-            id => storageSetup.LoadDocument(id),
-            GetDefaultDocument);
+            id => storageSetup.LoadDocument(new ProjectionContextId(Name, id)));
     }
     
     protected virtual TDocument? GetDefaultDocument(TId id) => null;
+
+    public override InMemoryProjectionContext<TId, TDocument> GetDefaultContext(TId id)
+    {
+        return new InMemoryProjectionContext<TId, TDocument>(
+            id,
+            GetDefaultDocument(id));
+    }
 }

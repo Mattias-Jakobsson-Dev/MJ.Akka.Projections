@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using JetBrains.Annotations;
-using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections;
 
@@ -11,7 +10,7 @@ public interface IHandleEventInProjection<TId, in TContext> where TId : notnull 
     
     Task<DocumentId> GetDocumentIdFrom(object evnt);
     
-    Task<(bool handled, IImmutableList<IProjectionResult> results)> Handle(
+    Task<bool> Handle(
         TContext context,
         object evnt,
         long position,

@@ -16,6 +16,8 @@ public abstract class BaseProjection<TId, TContext, TStorageSetup> : IProjection
     
     public abstract ILoadProjectionContext<TId, TContext> GetLoadProjectionContext(TStorageSetup storageSetup);
 
+    public abstract TContext GetDefaultContext(TId id);
+
     public abstract Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
     
     public virtual Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier)

@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using JetBrains.Annotations;
-using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections.Setup;
 
@@ -10,7 +9,7 @@ public interface ISetupEventHandlerForProjection<TId, TContext, out TEvent>
     where TContext : IProjectionContext
 {
     ISetupEventHandlerForProjection<TId, TContext, TEvent> HandleWith(
-        Func<TEvent, TContext, long?, CancellationToken, Task<IEnumerable<IProjectionResult>>> handler);
+        Func<TEvent, TContext, long?, CancellationToken, Task> handler);
 }
 
 [PublicAPI]

@@ -10,4 +10,9 @@ public abstract class InfluxDbProjection : BaseProjection<InfluxDbTimeSeriesId, 
     {
         return new InfluxDbProjectionContextLoader();
     }
+
+    public override InfluxDbTimeSeriesContext GetDefaultContext(InfluxDbTimeSeriesId id)
+    {
+        return new InfluxDbTimeSeriesContext(id);
+    }
 }

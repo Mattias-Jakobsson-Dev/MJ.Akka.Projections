@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using MJ.Akka.Projections.Storage.InMemory;
-using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
 
@@ -16,13 +15,12 @@ public class FakeEventsHandler : IHandleEventInProjection<object, InMemoryProjec
         return Task.FromResult(new DocumentId(null, false));
     }
 
-    public Task<(bool handled, IImmutableList<IProjectionResult> results)> Handle(
+    public Task<bool> Handle(
         InMemoryProjectionContext<object, object> context, 
         object evnt, 
         long position, 
         CancellationToken cancellationToken)
     {
-        return Task.FromResult<(bool handled, IImmutableList<IProjectionResult> results)>(
-            (false, ImmutableList<IProjectionResult>.Empty));
+        return Task.FromResult(false);
     }
 }

@@ -242,7 +242,7 @@ public class LargeNumberOfEventsTests : TestKit
 
         foreach (var documentId in documentIds)
         {
-            var context = await loader.Load(documentId);
+            var context = await loader.Load(documentId, projection.GetDefaultContext);
 
             context.Exists().Should().BeTrue();
 

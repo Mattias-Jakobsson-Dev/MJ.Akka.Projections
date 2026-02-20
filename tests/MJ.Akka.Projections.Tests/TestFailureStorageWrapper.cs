@@ -20,14 +20,14 @@ public class TestFailureStorageWrapper(IStorageSetup innerSetup, IImmutableList<
         IProjectionStorage innerStorage,
         IImmutableList<StorageFailures> failures) : IProjectionStorage
     {
-        public Task<StoreProjectionResponse> Store(
-            StoreProjectionRequest request,
+        public Task Store(
+            IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts,
             CancellationToken cancellationToken = default)
         {
             foreach (var failure in failures)
-                failure.MaybeFail(request.Results);
+                failure.MaybeFail(contexts.Values.ToImmutableList());
             
-            return innerStorage.Store(request, cancellationToken);
+            return innerStorage.Store(contexts, cancellationToken);
         }
     }
     

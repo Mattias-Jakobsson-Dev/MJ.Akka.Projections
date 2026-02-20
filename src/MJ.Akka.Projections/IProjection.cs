@@ -22,4 +22,5 @@ public interface IProjection<TId, TContext, in TStorageSetup> : IProjection
 {
     ISetupProjectionHandlers<TId, TContext> Configure(ISetupProjection<TId, TContext> config);
     ILoadProjectionContext<TId, TContext> GetLoadProjectionContext(TStorageSetup storageSetup);
+    TContext GetDefaultContext(TId id);
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using JetBrains.Annotations;
 
 namespace MJ.Akka.Projections.Storage.RavenDb;
@@ -10,8 +11,16 @@ public abstract class RavenDbProjection<TDocument>
     public override ILoadProjectionContext<string, RavenDbProjectionContext<TDocument>> GetLoadProjectionContext(
         SetupRavenDbStorage storageSetup)
     {
-        return new LoadProjectionDataFromRavenDb<TDocument>(storageSetup.GetDocumentStore(), GetDefaultDocument);
+        return new LoadProjectionDataFromRavenDb<TDocument>(storageSetup.GetDocumentStore());
     }
     
     protected virtual TDocument? GetDefaultDocument(string id) => null;
+
+    public override RavenDbProjectionContext<TDocument> GetDefaultContext(string id)
+    {
+        return new RavenDbProjectionContext<TDocument>(
+            id,
+            GetDefaultDocument(id),
+            ImmutableDictionary<string, object>.Empty);
+    }
 }

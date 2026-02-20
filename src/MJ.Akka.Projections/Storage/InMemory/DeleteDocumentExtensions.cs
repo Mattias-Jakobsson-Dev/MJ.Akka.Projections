@@ -62,6 +62,9 @@ public static class DeleteDocumentExtensions
         where TDocument : class
     {
         return setup.HandleWith(async (evnt, context, position, cancellationToken) =>
-            await condition(evnt, context, position, cancellationToken) ? context.DeleteDocument() : []);
+        {
+            if (await condition(evnt, context, position, cancellationToken))
+                context.DeleteDocument();
+        });
     }
 }

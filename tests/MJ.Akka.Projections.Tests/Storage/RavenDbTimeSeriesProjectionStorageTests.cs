@@ -4,10 +4,7 @@ using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Storage.RavenDb;
 using FluentAssertions;
 using JetBrains.Annotations;
-using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.Setup;
-using MJ.Akka.Projections.Storage;
-using MJ.Akka.Projections.Storage.Messages;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;
 using Xunit;
@@ -30,24 +27,34 @@ public class RavenDbTimeSeriesProjectionStorageTests(RavenDbFixture fixture)
         return new SetupRavenDbStorage(_documentStore, new BulkInsertOptions());
     }
 
-    protected override StoreProjectionRequest CreateInsertRequest(string id)
+    protected override RavenDbProjectionContext<TestDocument> CreateInsertRequest(string id)
     {
-        return new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-            new DocumentResults.DocumentCreated(id, new TestDocument
+        var context = new RavenDbProjectionContext<TestDocument>(
+            id,
+            new TestDocument
             {
                 Id = id,
                 HandledEvents = ImmutableList.Create(_eventId)
-            }),
-            new StoreTimeSeries(id, "test-series", ImmutableList.Create(
-                new TimeSeriesRecord(_now, ImmutableList.Create(5d), "tag")))));
+            },
+            ImmutableDictionary<string, object>.Empty);
+        
+        context.AddTimeSeries(new TimeSeriesInput(
+            "test-series",
+            _now,
+            5,
+            "tag"));
+
+        return context;
     }
 
-    protected override StoreProjectionRequest CreateDeleteRequest(string id)
+    protected override RavenDbProjectionContext<TestDocument> CreateDeleteRequest(string id)
     {
-        return new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-            new DocumentResults.DocumentDeleted(id)));
+        return new RavenDbProjectionContext<TestDocument>(
+            id,
+            null,
+            ImmutableDictionary<string, object>.Empty);
     }
-    
+
     protected override IProjection<string, RavenDbProjectionContext<TestDocument>, SetupRavenDbStorage> 
         CreateProjection()
     {

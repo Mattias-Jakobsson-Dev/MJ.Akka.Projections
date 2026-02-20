@@ -8,18 +8,36 @@ public class InfluxDbProjectionStorage(IInfluxDBClient client) : IProjectionStor
     private readonly InProcessProjector<InfluxDbStorageProjectorResult> _storageProjector = InfluxDbStorageProjector
         .Setup();
     
-    public async Task<StoreProjectionResponse> Store(
-        StoreProjectionRequest request, 
+    public async Task Store(
+        IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts, 
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         
+        var invalidContexts = contexts
+            .Where(x => x.Value is not InfluxDbTimeSeriesContext)
+            .Select(x => x.Key)
+            .ToImmutableList();
+
+        if (!invalidContexts.IsEmpty)
+            throw new InvalidContextStorageException(invalidContexts);
+
+        var validContexts = contexts
+            .Values
+            .Select(x => x as InfluxDbTimeSeriesContext)
+            .Where(x => x != null)
+            .Select(x => x!)
+            .ToImmutableList();
+        
         var writeApi = client.GetWriteApiAsync();
         var deleteApi = client.GetDeleteApi();
         
-        var (unhandledEvents, results) = _storageProjector
+        var (_, results) = _storageProjector
             .RunFor(
-                request.Results.OfType<object>().ToImmutableList(),
+                validContexts
+                    .SelectMany(x => x.Operations)
+                    .OfType<object>()
+                    .ToImmutableList(),
                 InfluxDbStorageProjectorResult.Empty);
 
         foreach (var item in results.PointsToWrite)
@@ -45,7 +63,5 @@ public class InfluxDbProjectionStorage(IInfluxDBClient client) : IProjectionStor
                 deletePoint.Id.Organization,
                 cancellationToken);
         }
-
-        return StoreProjectionResponse.From(unhandledEvents);
     }
 }

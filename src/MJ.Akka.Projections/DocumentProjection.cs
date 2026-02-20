@@ -4,7 +4,6 @@ using Akka.Event;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.Storage;
-using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections;
 
@@ -175,7 +174,7 @@ public class DocumentProjection : ReceiveActor, IWithStash
 
             return new ProjectionResponse(null, new Messages.Reject(e));
         }
-
+        
         async Task<(IProjectionContext context, long? position)> RunProjections()
         {
             var existsBefore = context.Exists();
@@ -184,27 +183,24 @@ public class DocumentProjection : ReceiveActor, IWithStash
                 return (context, null);
 
             var wasHandled = false;
-
-            var results = new List<IProjectionResult>();
-
+            
             foreach (var evnt in events.OrderBy(x => x.Position ?? 0))
             {
-                var (hasHandler, handlerResults) = await _configuration.HandleEvent(
+                wasHandled = await _configuration.HandleEvent(
                     context,
                     evnt.Event,
                     evnt.Position ?? 0,
-                    cancellationToken);
-
-                results.AddRange(handlerResults);
-
-                wasHandled = wasHandled || hasHandler;
+                    cancellationToken) || wasHandled;
             }
 
             if (!wasHandled || !existsBefore && !context.Exists())
                 return (context, events.GetHighestEventNumber());
             
             await _configuration
-                .Store(new StoreProjectionRequest(results.ToImmutableList()), cancellationToken);
+                .Store(new Dictionary<ProjectionContextId, IProjectionContext>
+                {
+                    [new ProjectionContextId(_configuration.Name, id)] = context.Freeze()
+                }.ToImmutableDictionary(), cancellationToken);
 
             if (context is IResettableProjectionContext resettable)
                 context = resettable.Reset();

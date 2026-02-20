@@ -1,17 +1,16 @@
 using System.Collections.Immutable;
-using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections.Tests;
 
 public class StorageFailures(
-    Func<IProjectionResult, bool> checkStorageFailure,
+    Func<IProjectionContext, bool> checkStorageFailure,
     Func<object, bool> checkLoadFailure,
     Exception failWith)
 {
     private readonly object _lock = new { };
     private bool _hasFailed;
 
-    public void MaybeFail(IImmutableList<IProjectionResult> items)
+    public void MaybeFail(IImmutableList<IProjectionContext> items)
     {
         if (_hasFailed)
             return;

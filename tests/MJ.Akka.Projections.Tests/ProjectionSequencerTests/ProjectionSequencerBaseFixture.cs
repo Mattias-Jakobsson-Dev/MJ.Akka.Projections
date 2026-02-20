@@ -4,7 +4,6 @@ using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.Storage.InMemory;
-using MJ.Akka.Projections.Storage.Messages;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -159,14 +158,13 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
             return Task.FromResult(new DocumentId(null, false));
         }
 
-        public Task<(bool handled, IImmutableList<IProjectionResult> results)> Handle(
+        public Task<bool> Handle(
             InMemoryProjectionContext<string, TestDocument<string>> context, 
             object evnt,
             long position, 
             CancellationToken cancellationToken)
         {
-            return Task.FromResult<(bool handled, IImmutableList<IProjectionResult> results)>(
-                (false, ImmutableList<IProjectionResult>.Empty));
+            return Task.FromResult(false);
         }
     }
 }

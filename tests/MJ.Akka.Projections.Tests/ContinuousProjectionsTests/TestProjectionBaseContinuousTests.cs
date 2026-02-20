@@ -37,8 +37,7 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
 
         var failures = ImmutableList.Create(
             new StorageFailures(item =>
-                (item is DocumentResults.DocumentModified store && ((TestDocument<TId>)store.Document).PreviousEventFailures.Any()) ||
-                item is DocumentResults.DocumentCreated created && ((TestDocument<TId>)created.Document).PreviousEventFailures.Any(),
+                item is ContextWithDocument<TId, TestDocument<TId>> { Document: not null } store && store.Document.PreviousEventFailures.Any(),
             _ => false,
             new Exception("Failure")));
 
@@ -70,13 +69,13 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
 
         position.Should().Be(5);
 
-        var firstContext = await loader.Load(firstDocumentId);
+        var firstContext = await loader.Load(firstDocumentId, projection.GetDefaultContext);
 
         firstContext.Exists().Should().BeTrue();
 
         firstContext.Document!.HandledEvents.Should().HaveCount(3);
 
-        var secondContext = await loader.Load(secondDocumentId);
+        var secondContext = await loader.Load(secondDocumentId, projection.GetDefaultContext);
 
         secondContext.Exists().Should().BeTrue();
 

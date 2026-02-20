@@ -1,10 +1,7 @@
 using System.Collections.Immutable;
 using FluentAssertions;
 using JetBrains.Annotations;
-using MJ.Akka.Projections.Documents;
-using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.InMemory;
-using MJ.Akka.Projections.Storage.Messages;
 using MJ.Akka.Projections.Tests.TestData;
 
 namespace MJ.Akka.Projections.Tests.Storage;
@@ -20,22 +17,24 @@ public class InMemoryIntIdProjectionStorageTests
         return new SetupInMemoryStorage();
     }
 
-    protected override StoreProjectionRequest CreateInsertRequest(int id)
+    protected override InMemoryProjectionContext<int, TestDocument<int>> CreateInsertRequest(int id)
     {
-        return new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-            new DocumentResults.DocumentCreated(id, new TestDocument<int>
+        return new InMemoryProjectionContext<int, TestDocument<int>>(
+            id,
+            new TestDocument<int>
             {
                 Id = id,
                 HandledEvents = ImmutableList.Create(_eventId)
-            })));
+            });
     }
 
-    protected override StoreProjectionRequest CreateDeleteRequest(int id)
+    protected override InMemoryProjectionContext<int, TestDocument<int>> CreateDeleteRequest(int id)
     {
-        return new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-            new DocumentResults.DocumentDeleted(id)));
+        return new InMemoryProjectionContext<int, TestDocument<int>>(
+            id,
+            null);
     }
-
+    
     protected override IProjection<int, InMemoryProjectionContext<int, TestDocument<int>>, SetupInMemoryStorage> 
         CreateProjection()
     {

@@ -9,11 +9,11 @@ public class LoaderWithStorageFailures<TId, TContext>(
     where TId : notnull
     where TContext : IProjectionContext
 {
-    public Task<TContext> Load(TId id, CancellationToken cancellationToken = default)
+    public Task<TContext> Load(TId id, Func<TId, TContext> getDefaultContext, CancellationToken cancellationToken = default)
     {
         foreach (var failure in failures)
             failure.MaybeFail(id);
 
-        return innerLoader.Load(id, cancellationToken);
+        return innerLoader.Load(id, getDefaultContext, cancellationToken);
     }
 }

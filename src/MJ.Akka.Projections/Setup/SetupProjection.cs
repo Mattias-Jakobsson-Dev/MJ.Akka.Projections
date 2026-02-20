@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections.Setup;
 
@@ -109,7 +108,7 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
                 !ids.IsEmpty);
         }
 
-        public async Task<(bool handled, IImmutableList<IProjectionResult> results)> Handle(
+        public async Task<bool> Handle(
             TContext context,
             object evnt,
             long position,
@@ -119,22 +118,20 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
 
             var handled = false;
 
-            var results = new List<IProjectionResult>();
-
             foreach (var type in typesToCheck)
             {
                 if (!handlers.TryGetValue(type, out var handler))
                     continue;
 
                 if (!handler.Filter.FilterResult(context))
-                    return (handled, results.ToImmutableList());
+                    return handled;
 
-                results.AddRange(await handler.Handle(evnt, context, position, cancellationToken));
+                await handler.Handle(evnt, context, position, cancellationToken);
 
                 handled = true;
             }
 
-            return (handled, results.ToImmutableList());
+            return handled;
         }
     }
 }

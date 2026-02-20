@@ -4,7 +4,7 @@ namespace MJ.Akka.Projections.Storage.InMemory;
 
 public class SetupInMemoryStorage : IStorageSetup
 {
-    private readonly ConcurrentDictionary<object, ReadOnlyMemory<byte>> _documents = new();
+    private readonly ConcurrentDictionary<ProjectionContextId, ReadOnlyMemory<byte>> _documents = new();
     
     public IProjectionStorage CreateProjectionStorage()
     {
@@ -16,7 +16,7 @@ public class SetupInMemoryStorage : IStorageSetup
         return new InMemoryPositionStorage();
     }
 
-    internal ReadOnlyMemory<byte>? LoadDocument(object id)
+    internal ReadOnlyMemory<byte>? LoadDocument(ProjectionContextId id)
     {
         if (!_documents.TryGetValue(id, out var value))
             return null;

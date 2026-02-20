@@ -48,7 +48,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
     }
@@ -84,7 +84,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().BeNull();
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeFalse();
     }
@@ -130,7 +130,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
     }
@@ -173,7 +173,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().BeNull();
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeFalse();
     }
@@ -219,7 +219,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
     }
@@ -265,7 +265,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
     }
@@ -308,7 +308,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().BeNull();
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeFalse();
     }
@@ -345,7 +345,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -387,13 +387,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(1);
 
-        var firstContext = await loader.Load(firstId);
+        var firstContext = await loader.Load(firstId, projection.GetDefaultContext);
 
         firstContext.Exists().Should().BeTrue();
 
         await VerifyContext(firstId, firstContext, events, projection);
 
-        var secondContext = await loader.Load(secondId);
+        var secondContext = await loader.Load(secondId, projection.GetDefaultContext);
 
         secondContext.Exists().Should().BeTrue();
 
@@ -431,7 +431,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(2);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeFalse();
     }
@@ -466,7 +466,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -504,7 +504,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(2);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -543,13 +543,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(2);
 
-        var firstContext = await loader.Load(firstId);
+        var firstContext = await loader.Load(firstId, projection.GetDefaultContext);
 
         firstContext.Exists().Should().BeTrue();
 
         await VerifyContext(firstId, firstContext, events, projection);
 
-        var secondContext = await loader.Load(secondId);
+        var secondContext = await loader.Load(secondId, projection.GetDefaultContext);
 
         secondContext.Exists().Should().BeTrue();
 
@@ -590,7 +590,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(2);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -629,7 +629,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(2);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -671,7 +671,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(3);
 
-        var context = await loader.Load(documentId);
+        var context = await loader.Load(documentId, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -709,7 +709,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         position.Should().Be(10);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeFalse();
     }

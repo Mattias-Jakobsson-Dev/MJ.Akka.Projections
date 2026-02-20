@@ -53,15 +53,17 @@ public static class ActorSystemExtensions
 
             await projectionProxy.WaitForCompletion(timeout);
 
-            return new Result(projection.GetLoadProjectionContext(storageSetup));
+            return new Result(projection.GetLoadProjectionContext(storageSetup), projection);
         }
 
-        private class Result(ILoadProjectionContext<TId, InMemoryProjectionContext<TId, TDocument>> loader)
+        private class Result(
+            ILoadProjectionContext<TId, InMemoryProjectionContext<TId, TDocument>> loader,
+            IProjection<TId, InMemoryProjectionContext<TId, TDocument>, SetupInMemoryStorage> projection)
             : IOneTimeProjection<TId, TDocument>.IResult
         {
             public async Task<TDocument?> Load(TId id)
             {
-                var result = await loader.Load(id);
+                var result = await loader.Load(id, projection.GetDefaultContext);
 
                 return result.Document;
             }
