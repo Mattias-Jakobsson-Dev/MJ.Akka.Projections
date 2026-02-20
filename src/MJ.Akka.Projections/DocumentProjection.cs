@@ -166,11 +166,21 @@ public class DocumentProjection : ReceiveActor, IWithStash
         {
             var (projectedContext, result) = await RunProjections();
 
+            await Task.WhenAll(events
+                .Select(x => x.Event)
+                .OfType<IEventWithAck>()
+                .Select(x => x.Ack()));
+
             return new ProjectionResponse(projectedContext, new Messages.Acknowledge(result));
         }
         catch (Exception e)
         {
             _logger.Warning(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, id);
+            
+            await Task.WhenAll(events
+                .Select(x => x.Event)
+                .OfType<IEventWithAck>()
+                .Select(x => x.Nack(e)));
 
             return new ProjectionResponse(null, new Messages.Reject(e));
         }

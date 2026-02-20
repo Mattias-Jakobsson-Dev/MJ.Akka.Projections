@@ -39,11 +39,15 @@ public class RavenDbProjectionContext<TDocument>(
 
     public override IProjectionContext Freeze()
     {
-        var timeSeries = _addedTimeSeries;
-        
-        _addedTimeSeries = ImmutableDictionary<string, IImmutableList<TimeSeriesRecord>>.Empty;
+        return new RavenDbProjectionContext<TDocument>(Id, Document, _metadata, _addedTimeSeries);
+    }
 
-        return new RavenDbProjectionContext<TDocument>(Id, Document, _metadata, timeSeries);
+    public IProjectionContext Reset()
+    {
+        return new RavenDbProjectionContext<TDocument>(
+            Id,
+            Document,
+            _metadata);
     }
 
     public override IProjectionContext MergeWith(IProjectionContext later)
@@ -84,7 +88,7 @@ public class RavenDbProjectionContext<TDocument>(
     IImmutableDictionary<string, IImmutableList<TimeSeriesRecord>> IRavenDbProjectionContext.AddedTimeSeries => _addedTimeSeries;
 }
 
-internal interface IRavenDbProjectionContext
+internal interface IRavenDbProjectionContext : IResettableProjectionContext
 {
     string Id { get; }
     object? Document { get; }

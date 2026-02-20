@@ -5,7 +5,7 @@ using JetBrains.Annotations;
 namespace MJ.Akka.Projections.Storage.InfluxDb;
 
 [PublicAPI]
-public class InfluxDbTimeSeriesContext : IProjectionContext
+public class InfluxDbTimeSeriesContext : IResettableProjectionContext
 {
     public InfluxDbTimeSeriesContext(InfluxDbTimeSeriesId id) : this(id, ImmutableList<IInfluxDbOperation>.Empty)
     {
@@ -50,10 +50,11 @@ public class InfluxDbTimeSeriesContext : IProjectionContext
 
     public IProjectionContext Freeze()
     {
-        var currentOperations = Operations;
-        
-        Operations = ImmutableList<IInfluxDbOperation>.Empty;
-        
-        return new InfluxDbTimeSeriesContext(Id, currentOperations);
+        return new InfluxDbTimeSeriesContext(Id, Operations);
+    }
+
+    public IProjectionContext Reset()
+    {
+        return new InfluxDbTimeSeriesContext(Id);
     }
 }
