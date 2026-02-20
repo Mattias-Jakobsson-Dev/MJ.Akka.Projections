@@ -11,7 +11,7 @@
     <PropertyGroup>
         <Copyright>Copyright © 2025 Mattias Jakobsson</Copyright>
         <Authors>Mattias Jakobsson</Authors>
-        <Version>0.21.0</Version>
+        <Version>0.22.0</Version>
         <PackageProjectUrl>
             https://github.com/Mattias-Jakobsson-Dev/MJ.Akka.Projections
         </PackageProjectUrl>
@@ -20,8 +20,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Akka" Version="1.5.47" />
-      <PackageReference Include="Akka.Streams" Version="1.5.47" />
+      <PackageReference Include="Akka" Version="1.5.60" />
+      <PackageReference Include="Akka.Streams" Version="1.5.60" />
       <PackageReference Include="JetBrains.Annotations" Version="2025.2.0">
           <PrivateAssets>all</PrivateAssets>
       </PackageReference>
