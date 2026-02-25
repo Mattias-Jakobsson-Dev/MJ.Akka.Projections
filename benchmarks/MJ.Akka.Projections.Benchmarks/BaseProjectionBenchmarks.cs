@@ -7,6 +7,7 @@ using BenchmarkDotNet.Loggers;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Benchmarks.Columns;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.Benchmarks;
@@ -39,13 +40,13 @@ public record BatchingStrategyConfiguration(string Name, IEventBatchingStrategy 
 }
 
 [Config(typeof(BenchmarkConfig))]
-public abstract class BaseProjectionBenchmarks<TId, TContext, TStorageSetup>
-    where TId : notnull
+public abstract class BaseProjectionBenchmarks<TIdContext, TContext, TStorageSetup>
+    where TIdContext : IProjectionIdContext
     where TContext : IProjectionContext
     where TStorageSetup : IStorageSetup
 {
     private ActorSystem ActorSystem { get; set; } = null!;
-    private IProjection<TId, TContext, TStorageSetup> _projection = null!;
+    private IProjection<TIdContext, TContext, TStorageSetup> _projection = null!;
     private IConfigureProjectionCoordinator _coordinator = null!;
 
     [IterationSetup]
@@ -88,7 +89,7 @@ public abstract class BaseProjectionBenchmarks<TId, TContext, TStorageSetup>
 
     protected abstract TStorageSetup GetStorageSetup();
 
-    protected abstract IProjection<TId, TContext, TStorageSetup> CreateProjection(
+    protected abstract IProjection<TIdContext, TContext, TStorageSetup> CreateProjection(
         int numberOfEvents,
         int numberOfDocuments);
 

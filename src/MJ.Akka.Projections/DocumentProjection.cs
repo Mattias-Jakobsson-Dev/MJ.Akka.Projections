@@ -3,6 +3,7 @@ using Akka.Actor;
 using Akka.Event;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections;
@@ -14,12 +15,12 @@ public class DocumentProjection : ReceiveActor, IWithStash
     {
         public interface IMessageWithId
         {
-            object Id { get; }
+            IProjectionIdContext Id { get; }
         }
 
-        public record ProjectEvents(object Id, ImmutableList<EventWithPosition> Events) : IMessageWithId;
+        public record ProjectEvents(IProjectionIdContext Id, ImmutableList<EventWithPosition> Events) : IMessageWithId;
 
-        public record StopInProcessEvents(object Id) : IMessageWithId;
+        public record StopInProcessEvents(IProjectionIdContext Id) : IMessageWithId;
     }
     
     public static class Responses
@@ -127,7 +128,7 @@ public class DocumentProjection : ReceiveActor, IWithStash
     }
 
     private void ProjectEvents(
-        object id,
+        IProjectionIdContext id,
         ImmutableList<EventWithPosition> events,
         Func<Task<IProjectionContext>> loadContext)
     {
@@ -144,7 +145,7 @@ public class DocumentProjection : ReceiveActor, IWithStash
     }
 
     private async Task<ProjectionResponse> StartProjectingEvents(
-        object id,
+        IProjectionIdContext id,
         Func<Task<IProjectionContext>> loadContext,
         ImmutableList<EventWithPosition> events,
         CancellationToken cancellationToken)

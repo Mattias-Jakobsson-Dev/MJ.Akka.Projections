@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
@@ -22,8 +23,8 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
         var sequencer = ProjectionSequencer.Create(
             Sys,
             new ProjectionConfiguration<
-                string, 
-                InMemoryProjectionContext<string, TestDocument<string>>, 
+                SimpleIdContext<string>, 
+                InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>, 
                 SetupInMemoryStorage>(
                 projection,
                 storageSetup.CreateProjectionStorage(),
@@ -94,9 +95,7 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
 
     public class TestProjectionFactory : IKeepTrackOfProjectors
     {
-        public Task<IProjectorProxy> GetProjector(
-            object id,
-            ProjectionConfiguration configuration)
+        public Task<IProjectorProxy> GetProjector(IProjectionIdContext id, ProjectionConfiguration configuration)
         {
             return Task.FromResult<IProjectorProxy>(new TestProjectionProxy());
         }
@@ -143,23 +142,24 @@ public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
         public record DelayProcessingEvent(string DocumentId, TimeSpan Delay, Stopwatch SinceCreated);
     }
     
-    public class FakeEventHandler : IHandleEventInProjection<string, InMemoryProjectionContext<string, TestDocument<string>>>
+    public class FakeEventHandler 
+        : IHandleEventInProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>>
     {
         public IImmutableList<object> Transform(object evnt)
         {
             return ImmutableList.Create(evnt);
         }
 
-        public Task<DocumentId> GetDocumentIdFrom(object evnt)
+        public Task<SimpleIdContext<string>?> GetIdContextFor(object evnt)
         {
             if (evnt is Events.DelayProcessingEvent delayEvent)
-                return Task.FromResult(new DocumentId(delayEvent.DocumentId, true));
+                return Task.FromResult<SimpleIdContext<string>?>(new SimpleIdContext<string>(delayEvent.DocumentId));
 
-            return Task.FromResult(new DocumentId(null, false));
+            return Task.FromResult<SimpleIdContext<string>?>(null);
         }
 
         public Task<bool> Handle(
-            InMemoryProjectionContext<string, TestDocument<string>> context, 
+            InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>> context, 
             object evnt,
             long position, 
             CancellationToken cancellationToken)

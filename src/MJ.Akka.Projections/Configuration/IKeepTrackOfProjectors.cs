@@ -1,9 +1,11 @@
+using MJ.Akka.Projections.ProjectionIds;
+
 namespace MJ.Akka.Projections.Configuration;
 
 public interface IKeepTrackOfProjectors
 {
     Task<IProjectorProxy> GetProjector(
-        object id,
+        IProjectionIdContext id,
         ProjectionConfiguration configuration);
 
     IKeepTrackOfProjectors Reset();

@@ -3,6 +3,7 @@ using Akka.Actor;
 using Akka.Event;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections;
 
@@ -18,7 +19,11 @@ public class ProjectionSequencer : ReceiveActor
     
     private static class InternalCommands
     {
-        public record TaskFinished(Guid GroupId, Guid TaskId, object? Id, Messages.IProjectEventsResponse Response);
+        public record TaskFinished(
+            Guid GroupId,
+            Guid TaskId,
+            IProjectionIdContext? Id,
+            Messages.IProjectEventsResponse Response);
         
         public record Reset(CancellationToken CancellationToken);
 
@@ -31,13 +36,13 @@ public class ProjectionSequencer : ReceiveActor
             ImmutableList<(
                 Guid groupId,
                 Guid taskId,
-                object? documentId,
+                IProjectionIdContext? idContext,
                 Task<Messages.IProjectEventsResponse> task)> Tasks);
 
         public record WaitForGroupToFinishResponse(PositionData PositionData);
     }
 
-    private readonly List<object> _inprogressIds = [];
+    private readonly List<IProjectionIdContext> _inprogressIds = [];
     private readonly Dictionary<Guid, WaitingGroup> _inProcessGroups = new();
 
     private readonly ProjectionConfiguration _configuration;
@@ -85,7 +90,7 @@ public class ProjectionSequencer : ReceiveActor
             var tasks = new List<(
                 Guid groupId,
                 Guid taskId,
-                object? documentId,
+                IProjectionIdContext? idContext,
                 Task<Messages.IProjectEventsResponse> task)>();
 
             var eventsWithIds = await Task.WhenAll(cmd
@@ -99,7 +104,7 @@ public class ProjectionSequencer : ReceiveActor
                 .Select(async x => new
                 {
                     Event = x,
-                    Id = await _configuration.GetDocumentIdFrom(x.Event),
+                    Id = await _configuration.GetIdContextFor(x.Event),
                     x.Position
                 }));
 
@@ -124,43 +129,45 @@ public class ProjectionSequencer : ReceiveActor
 
                 foreach (var groupedEvent in chunk)
                 {
-                    if (!groupedEvent.Id.IsUsable)
+                    if (groupedEvent.Id == null)
                     {
                         tasks.Add((
                             groupId,
                             groupedEvent.TaskId,
-                            groupedEvent.Id.Id,
+                            groupedEvent.Id,
                             Task.FromResult<Messages.IProjectEventsResponse>(
                                 new Messages.Acknowledge(groupedEvent.Events.GetHighestEventNumber()))));
 
                         continue;
                     }
 
-                    var id = groupedEvent.Id.Id;
-
-                    if (!_inprogressIds.Contains(id))
+                    if (!_inprogressIds.Contains(groupedEvent.Id))
                     {
-                        _inprogressIds.Add(id);
+                        _inprogressIds.Add(groupedEvent.Id);
 
-                        tasks.Add((groupId, groupedEvent.TaskId, id, Run(id, groupedEvent.Events, cancellationToken)));
+                        tasks.Add((
+                            groupId, 
+                            groupedEvent.TaskId, 
+                            groupedEvent.Id, 
+                            Run(groupedEvent.Id, groupedEvent.Events, cancellationToken)));
                     }
                     else
                     {
                         var promise = new TaskCompletionSource<Messages.IProjectEventsResponse>(
                             TaskCreationOptions.RunContinuationsAsynchronously);
 
-                        if (!_queues.TryGetValue(id, out var queue))
+                        if (!_queues.TryGetValue(groupedEvent.Id, out var queue))
                         {
                             queue = new Queue<(
                                 ImmutableList<EventWithPosition>,
                                 TaskCompletionSource<Messages.IProjectEventsResponse>)>();
 
-                            _queues[id] = queue;
+                            _queues[groupedEvent.Id] = queue;
                         }
 
                         queue.Enqueue((groupedEvent.Events, promise));
 
-                        tasks.Add((groupId, groupedEvent.TaskId, id, promise.Task));
+                        tasks.Add((groupId, groupedEvent.TaskId, groupedEvent.Id, promise.Task));
                     }
                 }
 
@@ -182,7 +189,7 @@ public class ProjectionSequencer : ReceiveActor
                                 response = new InternalCommands.TaskFinished(
                                     groupId,
                                     task.taskId,
-                                    task.documentId,
+                                    task.idContext,
                                     result.Result);
                             }
                             else
@@ -190,7 +197,7 @@ public class ProjectionSequencer : ReceiveActor
                                 response = new InternalCommands.TaskFinished(
                                     groupId,
                                     task.taskId,
-                                    task.documentId,
+                                    task.idContext,
                                     new Messages.Reject(result.Exception));
                             }
 
@@ -287,7 +294,7 @@ public class ProjectionSequencer : ReceiveActor
     }
 
     private void HandleWaitingTasks(
-        object? id,
+        IProjectionIdContext? id,
         Messages.IProjectEventsResponse response,
         CancellationToken cancellationToken)
     {
@@ -329,7 +336,7 @@ public class ProjectionSequencer : ReceiveActor
     }
 
     private async Task<Messages.IProjectEventsResponse> Run(
-        object id,
+        IProjectionIdContext id,
         ImmutableList<EventWithPosition> events,
         CancellationToken cancellationToken)
     {

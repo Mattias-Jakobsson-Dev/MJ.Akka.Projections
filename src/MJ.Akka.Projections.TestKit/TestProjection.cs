@@ -3,16 +3,17 @@ using Akka;
 using Akka.Actor;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.TestKit;
 
-public class TestProjection<TId, TContext, TStorageSetup>(
-    IProjection<TId, TContext, TStorageSetup> projectionToTest,
+public class TestProjection<TIdContext, TContext, TStorageSetup>(
+    IProjection<TIdContext, TContext, TStorageSetup> projectionToTest,
     params object[] events)
-    : IProjection<TId, TContext, ProjectionTestStorageSetup>
-    where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
+    : IProjection<TIdContext, TContext, ProjectionTestStorageSetup>
+    where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
     public string Name => projectionToTest.Name;
     public TimeSpan ProjectionTimeout => projectionToTest.ProjectionTimeout;
@@ -39,17 +40,17 @@ public class TestProjection<TId, TContext, TStorageSetup>(
         return null;
     }
 
-    public ISetupProjectionHandlers<TId, TContext> Configure(ISetupProjection<TId, TContext> config)
+    public ISetupProjectionHandlers<TIdContext, TContext> Configure(ISetupProjection<TIdContext, TContext> config)
     {
         return projectionToTest.Configure(config);
     }
 
-    public ILoadProjectionContext<TId, TContext> GetLoadProjectionContext(ProjectionTestStorageSetup storageSetup)
+    public ILoadProjectionContext<TIdContext, TContext> GetLoadProjectionContext(ProjectionTestStorageSetup storageSetup)
     {
         return new ContextLoader(storageSetup.Storage, Name);
     }
 
-    public TContext GetDefaultContext(TId id)
+    public TContext GetDefaultContext(TIdContext id)
     {
         return projectionToTest.GetDefaultContext(id);
     }
@@ -57,11 +58,11 @@ public class TestProjection<TId, TContext, TStorageSetup>(
     private class ContextLoader(
         ConcurrentDictionary<ProjectionContextId, IProjectionContext> storage,
         string projectionName) 
-        : ILoadProjectionContext<TId, TContext>
+        : ILoadProjectionContext<TIdContext, TContext>
     {
         public Task<TContext> Load(
-            TId id, 
-            Func<TId, TContext> getDefaultContext, 
+            TIdContext id, 
+            Func<TIdContext, TContext> getDefaultContext, 
             CancellationToken cancellationToken = default)
         {
             return storage.TryGetValue(new ProjectionContextId(projectionName, id), out var context) 

@@ -247,7 +247,7 @@ public class LargeNumberOfEventsTests : TestKit
             context.Exists().Should().BeTrue();
 
             var documentEvents = events
-                .Where(x => x.DocId == context.Id)
+                .Where(x => x.DocId.ToString() == context.Id.ToString())
                 .ToImmutableList();
 
             context.Document!.HandledEvents.Should().HaveCount(documentEvents.Count);

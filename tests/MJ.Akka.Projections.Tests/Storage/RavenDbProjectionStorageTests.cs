@@ -4,6 +4,7 @@ using Akka.Streams.Dsl;
 using FluentAssertions;
 using MJ.Akka.Projections.Storage.RavenDb;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;
@@ -14,8 +15,8 @@ namespace MJ.Akka.Projections.Tests.Storage;
 [PublicAPI]
 public class RavenDbProjectionStorageTests(RavenDbFixture fixture) 
     : ProjectionStorageTests<
-        string, 
-        RavenDbProjectionContext<RavenDbProjectionStorageTests.TestDocument>, 
+        SimpleIdContext<string>, 
+        RavenDbProjectionContext<RavenDbProjectionStorageTests.TestDocument, SimpleIdContext<string>>, 
         SetupRavenDbStorage>, IClassFixture<RavenDbFixture>
 {
     private readonly IDocumentStore _documentStore = fixture.OpenDocumentStore();
@@ -26,9 +27,10 @@ public class RavenDbProjectionStorageTests(RavenDbFixture fixture)
         return new SetupRavenDbStorage(_documentStore, new BulkInsertOptions());
     }
 
-    protected override RavenDbProjectionContext<TestDocument> CreateInsertRequest(string id)
+    protected override RavenDbProjectionContext<TestDocument, SimpleIdContext<string>> CreateInsertRequest(
+        SimpleIdContext<string> id)
     {
-        return new RavenDbProjectionContext<TestDocument>(
+        return new RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>(
             id,
             new TestDocument
             {
@@ -38,21 +40,22 @@ public class RavenDbProjectionStorageTests(RavenDbFixture fixture)
             ImmutableDictionary<string, object>.Empty);
     }
 
-    protected override RavenDbProjectionContext<TestDocument> CreateDeleteRequest(string id)
+    protected override RavenDbProjectionContext<TestDocument, SimpleIdContext<string>> CreateDeleteRequest(
+        SimpleIdContext<string> id)
     {
-        return new RavenDbProjectionContext<TestDocument>(
+        return new RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>(
             id,
             null,
             ImmutableDictionary<string, object>.Empty);
     }
     
-    protected override IProjection<string, RavenDbProjectionContext<TestDocument>, SetupRavenDbStorage> 
+    protected override IProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>, SetupRavenDbStorage> 
         CreateProjection()
     {
         return new TestProjection();
     }
 
-    protected override async Task VerifyContext(RavenDbProjectionContext<TestDocument> loaded)
+    protected override async Task VerifyContext(RavenDbProjectionContext<TestDocument, SimpleIdContext<string>> loaded)
     {
         loaded.Document!.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(_eventId));
         
@@ -71,10 +74,10 @@ public class RavenDbProjectionStorageTests(RavenDbFixture fixture)
         public required IImmutableList<Guid> HandledEvents { get; set; }
     }
     
-    private class TestProjection : RavenDbProjection<TestDocument>
+    private class TestProjection : RavenDbProjection<TestDocument, SimpleIdContext<string>>
     {
-        public override ISetupProjection<string, RavenDbProjectionContext<TestDocument>> Configure(
-            ISetupProjection<string, RavenDbProjectionContext<TestDocument>> config)
+        public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> Configure(
+            ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> config)
         {
             return config;
         }

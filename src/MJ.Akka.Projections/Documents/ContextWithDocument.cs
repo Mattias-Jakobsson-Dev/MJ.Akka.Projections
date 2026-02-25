@@ -1,13 +1,14 @@
 using System.Diagnostics.CodeAnalysis;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.Documents;
 
 [PublicAPI]
-public abstract class ContextWithDocument<TId, TDocument>(TId id, TDocument? document) : IProjectionContext
-    where TId : notnull where TDocument : class
+public abstract class ContextWithDocument<TIdContext, TDocument>(TIdContext id, TDocument? document) : IProjectionContext
+    where TIdContext : IProjectionIdContext where TDocument : class
 {
-    public TId Id { get; } = id;
+    public TIdContext Id { get; } = id;
     public TDocument? Document { get; protected set; } = document;
     
     [MemberNotNullWhen(true, nameof(Document))]
@@ -18,7 +19,7 @@ public abstract class ContextWithDocument<TId, TDocument>(TId id, TDocument? doc
 
     public virtual IProjectionContext MergeWith(IProjectionContext later)
     {
-        if (later is ContextWithDocument<TId, TDocument> parsedLater)
+        if (later is ContextWithDocument<TIdContext, TDocument> parsedLater)
             Document = parsedLater.Document;
 
         return later.Freeze();

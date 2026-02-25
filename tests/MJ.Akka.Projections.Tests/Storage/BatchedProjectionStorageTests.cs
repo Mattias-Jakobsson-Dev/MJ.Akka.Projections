@@ -5,6 +5,7 @@ using Akka.TestKit.Xunit2;
 using AutoFixture;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.Batched;
 using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
@@ -35,7 +36,7 @@ public class BatchedProjectionStorageTests : TestKit
             {
                 var id = _fixture.Create<string>();
                 
-                return new InMemoryProjectionContext<string, TestDocument<string>>(
+                return new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
                     id,
                     new TestDocument<string>
                     {
@@ -74,7 +75,7 @@ public class BatchedProjectionStorageTests : TestKit
             {
                 var id = _fixture.Create<string>();
                 
-                return new InMemoryProjectionContext<string, TestDocument<string>>(
+                return new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
                     id,
                     new TestDocument<string>
                     {
@@ -107,7 +108,7 @@ public class BatchedProjectionStorageTests : TestKit
 
         var cancellationTokenSource = new CancellationTokenSource();
         
-        var id = _fixture.Create<string>();
+        SimpleIdContext<string> id = _fixture.Create<string>();
         var projectionName = _fixture.Create<string>();
 
         var task = batchedStorage
@@ -115,7 +116,7 @@ public class BatchedProjectionStorageTests : TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, id)] =
-                        new InMemoryProjectionContext<string, TestDocument<string>>(
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
                             id,
                             new TestDocument<string>
                             {
@@ -143,8 +144,8 @@ public class BatchedProjectionStorageTests : TestKit
         
         var cancellationTokenSource = new CancellationTokenSource();
         
-        var firstId = _fixture.Create<string>();
-        var secondId = _fixture.Create<string>();
+        SimpleIdContext<string> firstId = _fixture.Create<string>();
+        SimpleIdContext<string> secondId = _fixture.Create<string>();
         var projectionName = _fixture.Create<string>();
 
         await cancellationTokenSource.CancelAsync();
@@ -154,7 +155,7 @@ public class BatchedProjectionStorageTests : TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, firstId)] =
-                        new InMemoryProjectionContext<string, TestDocument<string>>(
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
                             firstId,
                             new TestDocument<string>
                             {
@@ -168,7 +169,7 @@ public class BatchedProjectionStorageTests : TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, secondId)] =
-                        new InMemoryProjectionContext<string, TestDocument<string>>(
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
                             secondId,
                             new TestDocument<string>
                             {
@@ -193,7 +194,7 @@ public class BatchedProjectionStorageTests : TestKit
         
         var projectionName = _fixture.Create<string>();
 
-        var loader = new InMemoryProjectionLoader<string, TestDocument<string>>(
+        var loader = new InMemoryProjectionLoader<SimpleIdContext<string>, TestDocument<string>>(
             id => setup.LoadDocument(new ProjectionContextId(projectionName, id)));
         
         var batchedStorage = new BatchedProjectionStorage(
@@ -205,8 +206,8 @@ public class BatchedProjectionStorageTests : TestKit
         var firstCancellationTokenSource = new CancellationTokenSource();
         var secondCancellationTokenSource = new CancellationTokenSource();
         
-        var firstId = _fixture.Create<string>();
-        var secondId = _fixture.Create<string>();
+        SimpleIdContext<string> firstId = _fixture.Create<string>();
+        SimpleIdContext<string> secondId = _fixture.Create<string>();
 
         await firstCancellationTokenSource.CancelAsync();
         
@@ -215,7 +216,7 @@ public class BatchedProjectionStorageTests : TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, firstId)] =
-                        new InMemoryProjectionContext<string, TestDocument<string>>(
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
                             firstId,
                             new TestDocument<string>
                             {
@@ -229,7 +230,7 @@ public class BatchedProjectionStorageTests : TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, secondId)] =
-                        new InMemoryProjectionContext<string, TestDocument<string>>(
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
                             secondId,
                             new TestDocument<string>
                             {
@@ -246,7 +247,7 @@ public class BatchedProjectionStorageTests : TestKit
         
         var document = await loader.Load(
             secondId,
-            id => new InMemoryProjectionContext<string, TestDocument<string>>(id, null),
+            id => new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(id, null),
             secondCancellationTokenSource.Token);
 
         document.Exists().Should().BeTrue();

@@ -2,25 +2,26 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
 using Xunit;
 
 namespace MJ.Akka.Projections.TestKit;
 
 [PublicAPI]
-public abstract class ProjectionTestKit<TId, TContext, TStorageSetup> 
+public abstract class ProjectionTestKit<TIdContext, TContext, TStorageSetup> 
     : global::Akka.TestKit.Xunit2.TestKit, IAsyncLifetime
-    where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
+    where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
-    private ILoadProjectionContext<TId, TContext> _contextLoader = null!;
-    private TestProjection<TId, TContext, TStorageSetup> _projection = null!;
+    private ILoadProjectionContext<TIdContext, TContext> _contextLoader = null!;
+    private TestProjection<TIdContext, TContext, TStorageSetup> _projection = null!;
 
     private readonly ConcurrentDictionary<ProjectionContextId, IProjectionContext> _storage = new();
     
     protected virtual TimeSpan Timeout => TimeSpan.FromSeconds(10);
-    protected abstract IProjection<TId, TContext, TStorageSetup> GetProjectionToTest();
+    protected abstract IProjection<TIdContext, TContext, TStorageSetup> GetProjectionToTest();
     protected virtual Task Setup() => Task.CompletedTask;
-    protected virtual IImmutableDictionary<TId, TContext> Given() => ImmutableDictionary<TId, TContext>.Empty;
+    protected virtual IImmutableDictionary<TIdContext, TContext> Given() => ImmutableDictionary<TIdContext, TContext>.Empty;
     protected abstract IEnumerable<object> When();
     protected virtual Task Then() => Task.CompletedTask;
 
@@ -28,7 +29,7 @@ public abstract class ProjectionTestKit<TId, TContext, TStorageSetup>
     {
         await Setup();
         
-        _projection = new TestProjection<TId, TContext, TStorageSetup>(GetProjectionToTest(), When().ToArray());
+        _projection = new TestProjection<TIdContext, TContext, TStorageSetup>(GetProjectionToTest(), When().ToArray());
 
         foreach (var context in Given())
         {
@@ -59,16 +60,16 @@ public abstract class ProjectionTestKit<TId, TContext, TStorageSetup>
         return Task.CompletedTask;
     }
 
-    public async Task<TContext> LoadContext(TId id)
+    public async Task<TContext> LoadContext(TIdContext id)
     {
         return await _contextLoader.Load(id, _projection.GetDefaultContext);
     }
 
-    public IImmutableDictionary<TId, TContext> GetStoredContexts()
+    public IImmutableDictionary<TIdContext, TContext> GetStoredContexts()
     {
         return _storage
             .ToImmutableDictionary(
-                x => (TId)x.Key.ItemId,
+                x => (TIdContext)x.Key.ItemId,
                 x => (TContext)x.Value);
     }
 }

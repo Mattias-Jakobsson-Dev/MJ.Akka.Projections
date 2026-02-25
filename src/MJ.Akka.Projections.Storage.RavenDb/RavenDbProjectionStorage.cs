@@ -43,7 +43,7 @@ public class RavenDbDocumentProjectionStorage(IDocumentStore documentStore, Bulk
 
             foreach (var item in documentsToUpsert)
             {
-                await bulkInsert.StoreAsync(item.Document, item.Id,
+                await bulkInsert.StoreAsync(item.Document, item.GetDocumentId(),
                     new MetadataAsDictionary(item.Metadata.ToDictionary()));
             }
 
@@ -52,7 +52,7 @@ public class RavenDbDocumentProjectionStorage(IDocumentStore documentStore, Bulk
                 foreach (var timeSeries in timeSeriesDocument.AddedTimeSeries)
                 {
                     using var timeSeriesBatch = bulkInsert.TimeSeriesFor(
-                        timeSeriesDocument.Id,
+                        timeSeriesDocument.GetDocumentId(),
                         timeSeries.Key);
 
                     foreach (var timeSeriesRecord in timeSeries.Value)
@@ -69,7 +69,7 @@ public class RavenDbDocumentProjectionStorage(IDocumentStore documentStore, Bulk
         
         var documentsToDelete = validContexts
             .Where(x => x.Document == null)
-            .Select(x => x.Id)
+            .Select(x => x.GetDocumentId())
             .ToImmutableList();
 
         if (documentsToDelete.IsEmpty)

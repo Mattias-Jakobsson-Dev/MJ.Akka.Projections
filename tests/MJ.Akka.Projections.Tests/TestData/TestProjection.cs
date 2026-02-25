@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.InMemory;
@@ -13,7 +14,7 @@ public class TestProjection<TId>(
     IImmutableList<StorageFailures> failures,
     string? overrideName = null,
     long? initialPosition = null)
-    : InMemoryProjection<TId, TestDocument<TId>>
+    : InMemoryProjection<SimpleIdContext<TId>, TestDocument<TId>>
     where TId : notnull
 {
     public override TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(5);
@@ -31,17 +32,17 @@ public class TestProjection<TId>(
     {
         return initialPosition;
     }
-
-    public override ILoadProjectionContext<TId, InMemoryProjectionContext<TId, TestDocument<TId>>> 
+    
+    public override ILoadProjectionContext<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>> 
         GetLoadProjectionContext(SetupInMemoryStorage storageSetup)
     {
-        return new LoaderWithStorageFailures<TId, InMemoryProjectionContext<TId, TestDocument<TId>>>(
+        return new LoaderWithStorageFailures<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>>(
             base.GetLoadProjectionContext(storageSetup),
             failures);
     }
 
-    public override ISetupProjectionHandlers<TId, InMemoryProjectionContext<TId, TestDocument<TId>>> Configure(
-        ISetupProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>> config)
+    public override ISetupProjectionHandlers<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>> Configure(
+        ISetupProjection<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>> config)
     {
         var runFailures = new ConcurrentDictionary<TId, Dictionary<string, int>>();
 

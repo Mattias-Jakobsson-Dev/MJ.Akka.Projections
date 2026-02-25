@@ -2,20 +2,21 @@ using System.Collections.Immutable;
 using Akka;
 using Akka.Streams;
 using Akka.Streams.Dsl;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
 
 namespace MJ.Akka.Projections.Configuration;
 
-public class ProjectionConfiguration<TId, TContext, TStorageSetup>(
-    IProjection<TId, TContext, TStorageSetup> projection,
+public class ProjectionConfiguration<TIdContext, TContext, TStorageSetup>(
+    IProjection<TIdContext, TContext, TStorageSetup> projection,
     IProjectionStorage storage,
-    ILoadProjectionContext<TId, TContext> loadStorage,
+    ILoadProjectionContext<TIdContext, TContext> loadStorage,
     IProjectionPositionStorage positionStorage,
     IKeepTrackOfProjectors projectorFactory,
     RestartSettings? restartSettings,
     IEventBatchingStrategy projectionEventBatchingStrategy,
     IEventPositionBatchingStrategy positionBatchingStrategy,
-    IHandleEventInProjection<TId, TContext> eventsHandler) 
+    IHandleEventInProjection<TIdContext, TContext> eventsHandler) 
     : ProjectionConfiguration(
         projection,
         positionStorage,
@@ -23,14 +24,14 @@ public class ProjectionConfiguration<TId, TContext, TStorageSetup>(
         restartSettings,
         projectionEventBatchingStrategy,
         positionBatchingStrategy) 
-    where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
+    where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
     public override async Task<IProjectionContext> Load(object id, CancellationToken cancellationToken = default)
     {
-        if (id is not TId typedId)
+        if (id is not TIdContext typedId)
         {
             throw new InvalidProjectionTypeException(
-                typeof(TId), 
+                typeof(TIdContext), 
                 id.GetType(), 
                 projection.GetType(), 
                 "id");
@@ -51,9 +52,9 @@ public class ProjectionConfiguration<TId, TContext, TStorageSetup>(
         return eventsHandler.Transform(evnt);
     }
 
-    public override Task<DocumentId> GetDocumentIdFrom(object evnt)
+    public override async Task<IProjectionIdContext?> GetIdContextFor(object evnt)
     {
-        return eventsHandler.GetDocumentIdFrom(evnt);
+        return await eventsHandler.GetIdContextFor(evnt);
     }
 
     public override Task<bool> HandleEvent(
@@ -117,7 +118,7 @@ public abstract class ProjectionConfiguration
     
     public abstract IImmutableList<object> TransformEvent(object evnt);
     
-    public abstract Task<DocumentId> GetDocumentIdFrom(object evnt);
+    public abstract Task<IProjectionIdContext?> GetIdContextFor(object evnt);
     
     public abstract Task<bool> HandleEvent(
         IProjectionContext context,

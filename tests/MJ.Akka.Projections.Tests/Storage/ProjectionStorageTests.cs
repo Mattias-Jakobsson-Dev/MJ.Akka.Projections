@@ -3,13 +3,14 @@ using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
 using FluentAssertions;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.Storage;
 
-public abstract class ProjectionStorageTests<TId, TContext, TStorageSetup> 
-    : TestKit where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
+public abstract class ProjectionStorageTests<TIdContext, TContext, TStorageSetup> 
+    : TestKit where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
     private readonly Fixture _fixture = new();
     
@@ -64,7 +65,7 @@ public abstract class ProjectionStorageTests<TId, TContext, TStorageSetup>
         
         foreach (var originalData in originalContexts)
         {
-            var context = await loader.Load((TId)originalData.Key.ItemId, projection.GetDefaultContext);
+            var context = await loader.Load((TIdContext)originalData.Key.ItemId, projection.GetDefaultContext);
 
             context.Exists().Should().BeTrue();
             
@@ -195,16 +196,16 @@ public abstract class ProjectionStorageTests<TId, TContext, TStorageSetup>
 
     protected abstract TStorageSetup GetStorage();
     
-    protected abstract TContext CreateInsertRequest(TId id);
+    protected abstract TContext CreateInsertRequest(TIdContext id);
 
-    protected abstract TContext CreateDeleteRequest(TId id);
+    protected abstract TContext CreateDeleteRequest(TIdContext id);
     
-    protected abstract IProjection<TId, TContext, TStorageSetup> CreateProjection();
+    protected abstract IProjection<TIdContext, TContext, TStorageSetup> CreateProjection();
     
     protected abstract Task VerifyContext(TContext loaded);
 
-    protected virtual TId CreateRandomId()
+    protected virtual TIdContext CreateRandomId()
     {
-        return _fixture.Create<TId>();
+        return _fixture.Create<TIdContext>();
     }
 }

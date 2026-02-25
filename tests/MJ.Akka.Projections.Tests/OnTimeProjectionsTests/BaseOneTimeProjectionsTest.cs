@@ -5,6 +5,7 @@ using AutoFixture;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.OneTime;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.InMemory;
 using Xunit;
 
@@ -302,10 +303,10 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
         return config;
     }
 
-    protected abstract IProjection<TId, InMemoryProjectionContext<TId, TDocument>, SetupInMemoryStorage> GetProjection(
+    protected abstract IProjection<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TDocument>, SetupInMemoryStorage> GetProjection(
         IImmutableList<object> events);
     
-    protected abstract IProjection<TId, InMemoryProjectionContext<TId, TDocument>, SetupInMemoryStorage> GetSecondaryProjection(
+    protected abstract IProjection<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TDocument>, SetupInMemoryStorage> GetSecondaryProjection(
         IImmutableList<object> events);
 
     protected abstract object GetEventThatFails(TId id, int numberOfFailures);

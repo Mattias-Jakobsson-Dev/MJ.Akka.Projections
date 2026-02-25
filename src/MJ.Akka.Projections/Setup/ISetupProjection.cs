@@ -1,34 +1,39 @@
 using System.Collections.Immutable;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.Setup;
 
-public interface ISetupEventHandlerForProjection<TId, TContext, out TEvent> 
-    : ISetupProjectionHandlers<TId, TContext>
-    where TId : notnull
+public interface ISetupEventHandlerForProjection<TIdContext, TContext, out TEvent> 
+    : ISetupProjectionHandlers<TIdContext, TContext>
+    where TIdContext : IProjectionIdContext
     where TContext : IProjectionContext
 {
-    ISetupEventHandlerForProjection<TId, TContext, TEvent> HandleWith(
+    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> HandleWith(
         Func<TEvent, TContext, long?, CancellationToken, Task> handler);
 }
 
 [PublicAPI]
-public interface ISetupProjection<TId, TContext> : ISetupProjectionHandlers<TId, TContext> 
-    where TId : notnull where TContext : IProjectionContext
+public interface ISetupProjection<TIdContext, TContext> : ISetupProjectionHandlers<TIdContext, TContext> 
+    where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    ISetupProjection<TId, TContext> TransformUsing<TEvent>(
+    ISetupProjection<TIdContext, TContext> TransformUsing<TEvent>(
         Func<TEvent, IImmutableList<object>> transform);
 }
 
-public interface ISetupProjectionHandlers<TId, TContext> where TId : notnull where TContext : IProjectionContext
+public interface ISetupProjectionHandlers<TIdContext, TContext> 
+    where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    ISetupEventHandlerForProjection<TId, TContext, TEvent> On<TEvent>(
-        Func<TEvent, TId> getId,
-        Func<IProjectionFilterSetup<TId, TContext, TEvent>, IProjectionFilterSetup<TId, TContext, TEvent>>? filter = null);
+    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> On<TEvent>(
+        Func<TEvent, TIdContext?> getId,
+        Func<IProjectionFilterSetup<TIdContext, TContext, TEvent>, IProjectionFilterSetup<TIdContext, TContext, TEvent>>? filter =
+            null)
+        => On(evnt => Task.FromResult(getId(evnt)),
+            filter);
     
-    ISetupEventHandlerForProjection<TId, TContext, TEvent> On<TEvent>(
-        Func<TEvent, Task<TId>> getId,
-        Func<IProjectionFilterSetup<TId, TContext, TEvent>, IProjectionFilterSetup<TId, TContext, TEvent>>? filter = null);
+    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> On<TEvent>(
+        Func<TEvent, Task<TIdContext?>> getId,
+        Func<IProjectionFilterSetup<TIdContext, TContext, TEvent>, IProjectionFilterSetup<TIdContext, TContext, TEvent>>? filter = null);
     
-    IHandleEventInProjection<TId, TContext> Build();
+    IHandleEventInProjection<TIdContext, TContext> Build();
 }

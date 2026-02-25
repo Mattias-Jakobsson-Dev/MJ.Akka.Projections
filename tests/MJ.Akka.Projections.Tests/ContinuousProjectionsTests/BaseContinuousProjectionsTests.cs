@@ -5,12 +5,13 @@ using AutoFixture;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 
-public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetup>(IHaveActorSystem actorSystemHandler)
-    where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
+public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStorageSetup>(IHaveActorSystem actorSystemHandler)
+    where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
     protected readonly Fixture Fixture = new();
 
@@ -19,7 +20,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetEventThatFails(id, 1));
         var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
@@ -58,7 +59,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetEventThatFails(id, 1));
         var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
@@ -94,7 +95,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetTestEvent(id));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -140,7 +141,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetTestEvent(id));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -183,7 +184,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetEventThatFails(id, 1));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -229,7 +230,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetTestEvent(id));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -275,7 +276,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetTestEvent(id));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -318,7 +319,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(id);
         var secondEvent = GetTestEvent(id);
@@ -357,13 +358,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var firstId = Fixture.Create<TId>();
-        var secondId = Fixture.Create<TId>();
+        var firstId = Fixture.Create<TIdContext>();
+        var secondId = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(firstId);
         var secondEvent = GetTestEvent(secondId);
         var transformEvent = GetTransformationEvent(
-            Fixture.Create<TId>(),
+            Fixture.Create<TIdContext>(),
             ImmutableList.Create(firstEvent, secondEvent));
 
         var events = ImmutableList.Create(transformEvent);
@@ -405,7 +406,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(
             GetUnMatchedEvent(id),
@@ -441,7 +442,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(id);
 
@@ -478,7 +479,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(id);
         var secondEvent = GetTestEvent(id);
@@ -516,8 +517,8 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var firstId = Fixture.Create<TId>();
-        var secondId = Fixture.Create<TId>();
+        var firstId = Fixture.Create<TIdContext>();
+        var secondId = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(firstId);
         var secondEvent = GetTestEvent(secondId);
@@ -561,7 +562,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(id);
         var secondEvent = GetTestEvent(id);
@@ -602,7 +603,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(id);
         var secondEvent = GetTestEvent(id);
@@ -641,7 +642,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var documentId = Fixture.Create<TId>();
+        var documentId = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(
             GetTestEvent(documentId),
@@ -683,7 +684,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = Enumerable.Range(1, 10)
             .Select(_ => GetEventThatIsFilteredOut(id))
@@ -722,23 +723,23 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
     protected abstract TStorageSetup CreateStorageSetup();
     
-    protected abstract IProjection<TId, TContext, TStorageSetup> GetProjection(
+    protected abstract IProjection<TIdContext, TContext, TStorageSetup> GetProjection(
         IImmutableList<object> events,
         IImmutableList<StorageFailures> storageFailures,
         long? initialPosition = null);
 
-    protected abstract object GetEventThatFails(TId id, int numberOfFailures);
+    protected abstract object GetEventThatFails(TIdContext id, int numberOfFailures);
 
-    protected abstract object GetTestEvent(TId documentId);
+    protected abstract object GetTestEvent(TIdContext documentId);
 
-    protected abstract object GetTransformationEvent(TId documentId, IImmutableList<object> transformTo);
+    protected abstract object GetTransformationEvent(TIdContext documentId, IImmutableList<object> transformTo);
 
-    protected abstract object GetUnMatchedEvent(TId documentId);
+    protected abstract object GetUnMatchedEvent(TIdContext documentId);
     
-    protected abstract object GetEventThatIsFilteredOut(TId documentId);
+    protected abstract object GetEventThatIsFilteredOut(TIdContext documentId);
 
     protected abstract Task VerifyContext(
-        TId documentId,
+        TIdContext documentId,
         TContext context,
         IImmutableList<object> events,
         IProjection projection);

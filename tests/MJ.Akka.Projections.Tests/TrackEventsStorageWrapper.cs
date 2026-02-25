@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using MJ.Akka.Projections.Documents;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Tests.TestData;
 
@@ -28,7 +29,7 @@ public class TrackEventsStorageWrapper(ConcurrentBag<string> storedEvents, IStor
                 .Values
                 .SelectMany(x => x switch
                 {
-                    ContextWithDocument<string, TestDocument<string>> { Document: { } testDoc } => testDoc.HandledEvents,
+                    ContextWithDocument<SimpleIdContext<string>, TestDocument<string>> { Document: { } testDoc } => testDoc.HandledEvents,
                     _ => ImmutableList<string>.Empty
                 })
                 .ToImmutableList();

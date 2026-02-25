@@ -4,6 +4,7 @@ using AutoFixture;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.Documents;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
@@ -11,7 +12,7 @@ using Xunit;
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 
 public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem actorSystemHandler)
-    : BaseContinuousProjectionsTests<TId, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage>(
+    : BaseContinuousProjectionsTests<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>, SetupInMemoryStorage>(
         actorSystemHandler) 
     where TId : notnull
 {
@@ -37,7 +38,7 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
 
         var failures = ImmutableList.Create(
             new StorageFailures(item =>
-                item is ContextWithDocument<TId, TestDocument<TId>> { Document: not null } store && store.Document.PreviousEventFailures.Any(),
+                item is ContextWithDocument<SimpleIdContext<TId>, TestDocument<TId>> { Document: not null } store && store.Document.PreviousEventFailures.Any(),
             _ => false,
             new Exception("Failure")));
 
@@ -87,7 +88,7 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
         return new SetupInMemoryStorage();
     }
 
-    protected override IProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage> 
+    protected override IProjection<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>, SetupInMemoryStorage> 
         GetProjection(
             IImmutableList<object> events,
             IImmutableList<StorageFailures> storageFailures,
@@ -96,7 +97,7 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
         return new TestProjection<TId>(events, storageFailures, initialPosition: initialPosition);
     }
 
-    protected override object GetEventThatFails(TId id, int numberOfFailures)
+    protected override object GetEventThatFails(SimpleIdContext<TId> id, int numberOfFailures)
     {
         return new Events<TId>.FailProjection(
             id,
@@ -106,29 +107,29 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
             new Exception("Projection failed"));
     }
 
-    protected override object GetTestEvent(TId documentId)
+    protected override object GetTestEvent(SimpleIdContext<TId> documentId)
     {
         return new Events<TId>.FirstEvent(documentId, Fixture.Create<string>());
     }
 
-    protected override object GetTransformationEvent(TId documentId, IImmutableList<object> transformTo)
+    protected override object GetTransformationEvent(SimpleIdContext<TId> documentId, IImmutableList<object> transformTo)
     {
         return new Events<TId>.TransformToMultipleEvents(transformTo.OfType<Events<TId>.IEvent>().ToImmutableList());
     }
 
-    protected override object GetUnMatchedEvent(TId documentId)
+    protected override object GetUnMatchedEvent(SimpleIdContext<TId> documentId)
     {
         return new Events<TId>.UnHandledEvent(documentId);
     }
 
-    protected override object GetEventThatIsFilteredOut(TId documentId)
+    protected override object GetEventThatIsFilteredOut(SimpleIdContext<TId> documentId)
     {
         return new Events<TId>.EventWithFilter(documentId, Fixture.Create<string>(), () => false);
     }
 
     protected override Task VerifyContext(
-        TId documentId,
-        InMemoryProjectionContext<TId, TestDocument<TId>> context,
+        SimpleIdContext<TId> documentId,
+        InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>> context,
         IImmutableList<object> events,
         IProjection projection)
     {

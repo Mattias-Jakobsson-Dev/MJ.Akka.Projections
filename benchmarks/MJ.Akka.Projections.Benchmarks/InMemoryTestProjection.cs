@@ -2,12 +2,13 @@ using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage.InMemory;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
-public class InMemoryTestProjection : InMemoryProjection<string, InMemoryTestProjection.TestDocument>
+public class InMemoryTestProjection : InMemoryProjection<SimpleIdContext<string>, InMemoryTestProjection.TestDocument>
 {
     private readonly IImmutableList<TestEvent> _events;
 
@@ -30,8 +31,8 @@ public class InMemoryTestProjection : InMemoryProjection<string, InMemoryTestPro
         _events = events.ToImmutableList();
     }
     
-    public override ISetupProjectionHandlers<string, InMemoryProjectionContext<string, TestDocument>> Configure(
-        ISetupProjection<string, InMemoryProjectionContext<string, TestDocument>> config)
+    public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument>> Configure(
+        ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument>> config)
     {
         return config
             .On<TestEvent>(evnt => evnt.DocId)
