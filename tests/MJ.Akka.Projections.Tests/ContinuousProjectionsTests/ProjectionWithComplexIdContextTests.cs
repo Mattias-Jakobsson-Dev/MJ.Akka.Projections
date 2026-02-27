@@ -66,7 +66,12 @@ public class ProjectionWithComplexIdContextTests(NormalTestKitActorSystem actorS
     {
         return new Events<string>.EventWithFilter(documentId, Fixture.Create<string>(), () => false);
     }
-    
+
+    protected override object GetEventThatDoesntGetDocumentId(ComplexIdContext documentId)
+    {
+        return new Events<string>.EventThatDoesntGetDocumentId(documentId, Fixture.Create<string>());
+    }
+
     protected override Task VerifyContext(
         ComplexIdContext documentId,
         InMemoryProjectionContext<ComplexIdContext, TestDocument<string>> context, 

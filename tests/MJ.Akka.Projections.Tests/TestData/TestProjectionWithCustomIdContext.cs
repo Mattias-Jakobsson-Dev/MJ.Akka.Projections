@@ -10,14 +10,28 @@ using MJ.Akka.Projections.Storage.InMemory;
 namespace MJ.Akka.Projections.Tests.TestData;
 
 public class TestProjectionWithCustomIdContext<TIdContext, TId>(
-    IImmutableList<object> events,
+    IAsyncEnumerable<EventWithPosition> events,
     IImmutableList<StorageFailures> failures,
     Func<TId, TIdContext> createContext,
     string? overrideName = null,
     long? initialPosition = null) : InMemoryProjection<TIdContext, TestDocument<TId>>
-    where TIdContext : IProjectionIdContext
+    where TIdContext : class, IProjectionIdContext
     where TId : notnull
 {
+    public TestProjectionWithCustomIdContext(
+        IEnumerable<object> events,
+        IImmutableList<StorageFailures> failures,
+        Func<TId, TIdContext> createContext,
+        string? overrideName = null,
+        long? initialPosition = null) : this(
+        events.Select((x, i) => new EventWithPosition(x, i + 1)).ToAsyncEnumerable(),
+        failures, 
+        createContext, 
+        overrideName,
+        initialPosition)
+    {
+    }
+    
     public override TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(5);
 
     public ConcurrentDictionary<string, Events<TId>.IEvent> HandledEvents { get; } = new();
@@ -142,14 +156,33 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
                     documentFailures[evnt.FailureKey]);
 
                 return doc;
+            })
+            .On<Events<TId>.EventThatDoesntGetDocumentId>(_ => Task.FromResult<TIdContext?>(null))
+            .ModifyDocument((evnt, doc) =>
+            {
+                HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+
+                doc ??= new TestDocument<TId>
+                {
+                    Id = evnt.DocId
+                };
+
+                doc.AddHandledEvent(evnt.EventId);
+
+                return doc;
             });
     }
 
     public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
     {
-        return Source.From(events
-            .Select((x, i) => new EventWithPosition(x, i + 1))
-            .Where(x => fromPosition == null || x.Position > fromPosition)
-            .ToImmutableList());
+        return Source.From(() => events)
+            .SelectAsync(1, async evnt =>
+            {
+                if (fromPosition.HasValue && evnt.Position <= fromPosition && evnt is IEventWithAck eventWithAck)
+                    await eventWithAck.Ack();
+
+                return evnt;
+            })
+            .Where(x => fromPosition == null || x.Position > fromPosition);
     }
 }

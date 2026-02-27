@@ -127,6 +127,11 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
         return new Events<TId>.EventWithFilter(documentId, Fixture.Create<string>(), () => false);
     }
 
+    protected override object GetEventThatDoesntGetDocumentId(SimpleIdContext<TId> documentId)
+    {
+        return new Events<TId>.EventThatDoesntGetDocumentId(documentId, Fixture.Create<string>());
+    }
+
     protected override Task VerifyContext(
         SimpleIdContext<TId> documentId,
         InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>> context,

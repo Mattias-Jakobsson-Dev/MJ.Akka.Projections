@@ -4,7 +4,7 @@ using MJ.Akka.Projections.ProjectionIds;
 namespace MJ.Akka.Projections.Tests.TestData;
 
 public class TestProjection<TId>(
-    IImmutableList<object> events,
+    IAsyncEnumerable<EventWithPosition> events,
     IImmutableList<StorageFailures> failures,
     string? overrideName = null,
     long? initialPosition = null)
@@ -12,6 +12,19 @@ public class TestProjection<TId>(
         events,
         failures,
         x => x,
-        overrideName, 
+        overrideName,
         initialPosition)
-    where TId : notnull;
+    where TId : notnull
+{
+    public TestProjection(
+        IEnumerable<object> events,
+        IImmutableList<StorageFailures> failures,
+        string? overrideName = null,
+        long? initialPosition = null) : this(
+        events.Select((x, i) => new EventWithPosition(x, i + 1)).ToAsyncEnumerable(),
+        failures,
+        overrideName,
+        initialPosition)
+    {
+    }
+}

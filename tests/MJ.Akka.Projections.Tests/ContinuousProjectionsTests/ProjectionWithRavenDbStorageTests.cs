@@ -70,6 +70,11 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
         return new Events<string>.EventWithFilter(documentId, Fixture.Create<string>(), () => false);
     }
 
+    protected override object GetEventThatDoesntGetDocumentId(SimpleIdContext<string> documentId)
+    {
+        return new Events<string>.EventThatDoesntGetDocumentId(documentId, Fixture.Create<string>());
+    }
+
     protected override Task VerifyContext(
         SimpleIdContext<string> documentId,
         RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>> context,
@@ -208,6 +213,20 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     doc.PreviousEventFailures = doc.PreviousEventFailures.SetItem(
                         evnt.EventId,
                         documentFailures[evnt.FailureKey]);
+
+                    return doc;
+                })
+                .On<Events<string>.EventThatDoesntGetDocumentId>(_ => Task.FromResult<SimpleIdContext<string>?>(null))
+                .ModifyDocument((evnt, doc) =>
+                {
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+
+                    doc ??= new TestDocument<string>
+                    {
+                        Id = evnt.DocId
+                    };
+
+                    doc.AddHandledEvent(evnt.EventId);
 
                     return doc;
                 });

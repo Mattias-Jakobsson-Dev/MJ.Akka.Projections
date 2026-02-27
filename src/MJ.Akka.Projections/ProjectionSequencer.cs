@@ -95,12 +95,37 @@ public class ProjectionSequencer : ReceiveActor
 
             var eventsWithIds = await Task.WhenAll(cmd
                 .Events
-                .SelectMany(x => _configuration
-                    .TransformEvent(x.Event)
-                    .Select(y => x with
+                .SelectMany(x =>
+                {
+                    var transformed = _configuration.TransformEvent(x.Event).ToList();
+
+                    if (x is not IEventWithAck originalAck)
+                        return transformed.Select(y => x with { Event = y });
+
+                    switch (transformed.Count)
                     {
-                        Event = y
-                    }))
+                        case 0:
+                            _ = originalAck.Ack();
+                            return [];
+                        case 1:
+                            return [x with { Event = transformed[0] }];
+                    }
+
+                    var remaining = transformed.Count;
+                    var nacked = 0;
+
+                    return transformed.Select(y => new CountdownAckEvent(y, x.Position, Ack, Nack));
+
+                    Task Nack(Exception? exception)
+                    {
+                        return Interlocked.Exchange(ref nacked, 1) == 0 ? originalAck.Nack(exception) : Task.CompletedTask;
+                    }
+
+                    Task Ack()
+                    {
+                        return Interlocked.Decrement(ref remaining) == 0 ? originalAck.Ack() : Task.CompletedTask;
+                    }
+                })
                 .Select(async x => new
                 {
                     Event = x,
@@ -135,8 +160,7 @@ public class ProjectionSequencer : ReceiveActor
                             groupId,
                             groupedEvent.TaskId,
                             groupedEvent.Id,
-                            Task.FromResult<Messages.IProjectEventsResponse>(
-                                new Messages.Acknowledge(groupedEvent.Events.GetHighestEventNumber()))));
+                            AckEvents(groupedEvent.Events, cancellationToken)));
 
                         continue;
                     }
@@ -347,6 +371,29 @@ public class ProjectionSequencer : ReceiveActor
             _configuration.GetProjection().ProjectionTimeout,
             cancellationToken);
     }
+    
+    private static async Task<Messages.IProjectEventsResponse> AckEvents(
+        ImmutableList<EventWithPosition> events,
+        CancellationToken cancellationToken)
+    {
+        var ackableEvents = events
+            .OfType<IEventWithAck>()
+            .ToImmutableList();
+
+        if (ackableEvents.IsEmpty)
+            return new Messages.Acknowledge(events.GetHighestEventNumber());
+
+        try
+        {
+            await Task.WhenAll(ackableEvents.Select(x => x.Ack()));
+            
+            return new Messages.Acknowledge(events.GetHighestEventNumber());
+        }
+        catch (Exception e)
+        {
+            return new Messages.Reject(e);
+        }
+    }
 
     public static Proxy Create(
         IActorRefFactory refFactory,
@@ -405,5 +452,18 @@ public class ProjectionSequencer : ReceiveActor
         {
             return _waitingTasks.Count == 0;
         }
+    }
+
+    private record CountdownAckEvent(object Event, long? Position, Func<Task> AckFunc, Func<Exception?, Task> NackFunc)
+        : EventWithPosition(Event, Position), IEventWithAck
+    {
+        public CountdownAckEvent(EventWithPosition inner, IEventWithAck original)
+            : this(inner.Event, inner.Position, original.Ack, original.Nack) { }
+
+        public CountdownAckEvent(EventWithPosition inner, Func<Task> ack, Func<Exception?, Task> nack)
+            : this(inner.Event, inner.Position, ack, nack) { }
+
+        public Task Ack() => AckFunc();
+        public Task Nack(Exception? exception = null) => NackFunc(exception);
     }
 }
