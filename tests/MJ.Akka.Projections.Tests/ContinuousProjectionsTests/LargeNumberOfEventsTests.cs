@@ -242,12 +242,12 @@ public class LargeNumberOfEventsTests : TestKit
 
         foreach (var documentId in documentIds)
         {
-            var context = await loader.Load(documentId);
+            var context = await loader.Load(documentId, projection.GetDefaultContext);
 
             context.Exists().Should().BeTrue();
 
             var documentEvents = events
-                .Where(x => x.DocId == context.Id)
+                .Where(x => x.DocId.ToString() == context.Id.ToString())
                 .ToImmutableList();
 
             context.Document!.HandledEvents.Should().HaveCount(documentEvents.Count);

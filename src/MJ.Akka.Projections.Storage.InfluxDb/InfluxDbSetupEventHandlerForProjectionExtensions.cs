@@ -58,9 +58,11 @@ public static class InfluxDbSetupEventHandlerForProjectionExtensions
             Func<TEvent, InfluxDbTimeSeriesContext, long?, CancellationToken, Task<IEnumerable<PointData>>> getTimeSeries)
     {
         return setup.HandleWith(async (evnt, context, position, cancellationToken) =>
-        [
-            new InfluxDbWritePoint(context.Id, (await getTimeSeries(evnt, context, position, cancellationToken)).ToImmutableList())
-        ]);
+        {
+            var pointsToAdd = await getTimeSeries(evnt, context, position, cancellationToken);
+            
+            context.AddPoints(pointsToAdd.ToImmutableList());
+        });
     }
     
     public static ISetupEventHandlerForProjection<InfluxDbTimeSeriesId, InfluxDbTimeSeriesContext, TEvent>
@@ -116,10 +118,7 @@ public static class InfluxDbSetupEventHandlerForProjectionExtensions
         {
             var seriesToDelete = await getTimeSeries(evnt, context, position, cancellationToken);
             
-            return
-            [
-                new InfluxDbDeletePoint(context.Id, seriesToDelete.Start, seriesToDelete.Stop, seriesToDelete.Predicate)
-            ];
+            context.DeletePoint(seriesToDelete);
         });
     }
 }

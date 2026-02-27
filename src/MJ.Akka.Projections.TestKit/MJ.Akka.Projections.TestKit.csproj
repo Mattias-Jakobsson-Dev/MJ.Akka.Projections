@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Copyright>Copyright © 2026 Mattias Jakobsson</Copyright>
+        <Authors>Mattias Jakobsson</Authors>
+        <Version>0.4.0</Version>
+        <PackageProjectUrl>
+            https://github.com/Mattias-Jakobsson-Dev/MJ.Akka.Projections
+        </PackageProjectUrl>
+        <PackageTags>akka</PackageTags>
+        <PackageLicenseUrl>https://github.com/Mattias-Jakobsson-Dev/MJ.Akka.Projections/blob/master/LICENSE</PackageLicenseUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\MJ.Akka.Projections\MJ.Akka.Projections.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Akka.TestKit.Xunit2" Version="1.5.60" />
+        <PackageReference Include="JetBrains.Annotations" Version="2025.2.0">
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+    </ItemGroup>
+
+</Project>

@@ -1,50 +1,50 @@
 using System.Collections.Immutable;
-using MJ.Akka.Projections.Storage.Messages;
+using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.Setup;
 
-internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
-    where TId : notnull where TContext : IProjectionContext
+internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdContext, TContext>
+    where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    private IImmutableDictionary<Type, HandlerBuilder<TId, TContext>> _handlers;
+    private IImmutableDictionary<Type, HandlerBuilder<TIdContext, TContext>> _handlers;
 
     private readonly IImmutableDictionary<Type, Func<object, IImmutableList<object>>> _transformers;
 
     public SetupProjection()
         : this(
-            ImmutableDictionary<Type, HandlerBuilder<TId, TContext>>.Empty,
+            ImmutableDictionary<Type, HandlerBuilder<TIdContext, TContext>>.Empty,
             ImmutableDictionary<Type, Func<object, IImmutableList<object>>>.Empty)
     {
     }
 
     private SetupProjection(
-        IImmutableDictionary<Type, HandlerBuilder<TId, TContext>> handlers,
+        IImmutableDictionary<Type, HandlerBuilder<TIdContext, TContext>> handlers,
         IImmutableDictionary<Type, Func<object, IImmutableList<object>>> transformers)
     {
         _handlers = handlers;
         _transformers = transformers;
     }
 
-    public ISetupProjection<TId, TContext> TransformUsing<TEvent>(
+    public ISetupProjection<TIdContext, TContext> TransformUsing<TEvent>(
         Func<TEvent, IImmutableList<object>> transform)
     {
-        return new SetupProjection<TId, TContext>(
+        return new SetupProjection<TIdContext, TContext>(
             _handlers,
             _transformers.SetItem(typeof(TEvent), evnt => transform((TEvent)evnt)));
     }
-
-    public ISetupEventHandlerForProjection<TId, TContext, TEvent> On<TEvent>(
-        Func<TEvent, TId> getId,
+    
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> On<TEvent>(
+        Func<TEvent, Task<TIdContext>> getId,
         Func<
-            IProjectionFilterSetup<TId, TContext, TEvent>,
-            IProjectionFilterSetup<TId, TContext, TEvent>>? filter = null)
+            IProjectionFilterSetup<TIdContext, TContext, TEvent>,
+            IProjectionFilterSetup<TIdContext, TContext, TEvent>>? filter = null)
     {
-        IProjectionFilterSetup<TId, TContext, TEvent> projectionFilterSetup
-            = ProjectionFilterSetup<TId, TContext, TEvent>.Create();
+        IProjectionFilterSetup<TIdContext, TContext, TEvent> projectionFilterSetup
+            = ProjectionFilterSetup<TIdContext, TContext, TEvent>.Create();
 
         projectionFilterSetup = filter?.Invoke(projectionFilterSetup) ?? projectionFilterSetup;
 
-        var builder = new HandlerBuilder<TId, TContext, TEvent>(
+        var builder = new HandlerBuilder<TIdContext, TContext, TEvent>(
             getId,
             projectionFilterSetup.Build(),
             this);
@@ -54,7 +54,7 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
         return builder;
     }
 
-    public IHandleEventInProjection<TId, TContext> Build()
+    public IHandleEventInProjection<TIdContext, TContext> Build()
     {
         return new EventHandler(
             _handlers.ToImmutableDictionary(
@@ -64,15 +64,14 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
     }
 
     private class EventHandler(
-        IImmutableDictionary<Type, HandlerBuilder<TId, TContext>.Handler> handlers,
+        IImmutableDictionary<Type, HandlerBuilder<TIdContext, TContext>.Handler> handlers,
         IImmutableDictionary<Type, Func<object, IImmutableList<object>>> transformers)
-        : IHandleEventInProjection<TId, TContext>
+        : IHandleEventInProjection<TIdContext, TContext>
     {
         public IImmutableList<object> Transform(object evnt)
         {
             var typesToCheck = evnt.GetType().GetInheritedTypes();
-            var results = ImmutableList<object>.Empty;
-            var hasTransformed = false;
+            var results = ImmutableList.Create(evnt);
 
             foreach (var type in typesToCheck)
             {
@@ -80,30 +79,24 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
                     continue;
 
                 results = results.AddRange(transformers[type](evnt));
-
-                hasTransformed = true;
             }
 
-            return hasTransformed ? results : ImmutableList.Create(evnt);
+            return results;
         }
 
-        public DocumentId GetDocumentIdFrom(object evnt)
+        public async Task<TIdContext?> GetIdContextFor(object evnt)
         {
             var typesToCheck = evnt.GetType().GetInheritedTypes();
 
-            var ids = (from type in typesToCheck
+            return (await Task.WhenAll(from type in typesToCheck
                     where handlers.ContainsKey(type)
                     let handler = handlers[type]
                     where handler.Filter.FilterEvent(evnt)
-                    select handler.GetId(evnt))
-                .ToImmutableList();
-
-            return new DocumentId(
-                ids.FirstOrDefault(),
-                !ids.IsEmpty);
+                    select handler.GetId(evnt)))
+                .FirstOrDefault(x => x != null);
         }
 
-        public async Task<(bool handled, IImmutableList<IProjectionResult> results)> Handle(
+        public async Task<bool> Handle(
             TContext context,
             object evnt,
             long position,
@@ -113,22 +106,20 @@ internal class SetupProjection<TId, TContext> : ISetupProjection<TId, TContext>
 
             var handled = false;
 
-            var results = new List<IProjectionResult>();
-
             foreach (var type in typesToCheck)
             {
                 if (!handlers.TryGetValue(type, out var handler))
                     continue;
 
                 if (!handler.Filter.FilterResult(context))
-                    return (handled, results.ToImmutableList());
+                    return handled;
 
-                results.AddRange(await handler.Handle(evnt, context, position, cancellationToken));
+                await handler.Handle(evnt, context, position, cancellationToken);
 
                 handled = true;
             }
 
-            return (handled, results.ToImmutableList());
+            return handled;
         }
     }
 }

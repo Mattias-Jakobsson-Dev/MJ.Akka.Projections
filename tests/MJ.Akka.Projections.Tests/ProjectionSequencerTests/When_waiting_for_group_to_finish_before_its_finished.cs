@@ -4,6 +4,7 @@ using Akka.Actor;
 using Akka.TestKit.Xunit2;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
@@ -33,7 +34,7 @@ public class When_waiting_for_group_to_finish_before_its_finished(
         
         public async Task InitializeAsync()
         {
-            var id = Guid.NewGuid().ToString();
+            SimpleIdContext<string> id = Guid.NewGuid().ToString();
             
             var projection = new TestProjection<string>(
                 ImmutableList<object>.Empty,
@@ -44,8 +45,8 @@ public class When_waiting_for_group_to_finish_before_its_finished(
             var sequencer = ProjectionSequencer.Create(
                 Sys,
                 new ProjectionConfiguration<
-                    string, 
-                    InMemoryProjectionContext<string, TestDocument<string>>, 
+                    SimpleIdContext<string>, 
+                    InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>, 
                     SetupInMemoryStorage>(
                     projection,
                     storageSetup.CreateProjectionStorage(),

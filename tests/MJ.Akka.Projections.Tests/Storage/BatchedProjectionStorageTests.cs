@@ -5,10 +5,9 @@ using Akka.TestKit.Xunit2;
 using AutoFixture;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
-using MJ.Akka.Projections.Documents;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.Batched;
 using MJ.Akka.Projections.Storage.InMemory;
-using MJ.Akka.Projections.Storage.Messages;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
@@ -29,25 +28,30 @@ public class BatchedProjectionStorageTests : TestKit
             1,
             new BatchSizeStorageBatchingStrategy(5));
 
+        var projectionName = _fixture.Create<string>();
+
         var writes = Enumerable
             .Range(0, 10)
             .Select(_ =>
             {
                 var id = _fixture.Create<string>();
                 
-                return new DocumentResults.DocumentModified(
+                return new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
                     id,
                     new TestDocument<string>
                     {
                         Id = id
                     });
             })
-            .OfType<IProjectionResult>()
             .ToImmutableList();
 
         await Task.WhenAll(
             writes
-                .Select(write => batchedStorage.Store(new StoreProjectionRequest(ImmutableList.Create(write)))));
+                .Select(write => batchedStorage
+                    .Store(new Dictionary<ProjectionContextId, IProjectionContext>
+                    {
+                        [new ProjectionContextId(projectionName, write.Id)] = write
+                    }.ToImmutableDictionary())));
 
         innerStorage.NumberOfWrites.Should().BeLessThan(4);
     }
@@ -63,25 +67,30 @@ public class BatchedProjectionStorageTests : TestKit
             1,
             new BufferWithinStorageBatchingStrategy(10, TimeSpan.FromMilliseconds(200)));
 
+        var projectionName = _fixture.Create<string>();
+
         var writes = Enumerable
             .Range(0, 10)
             .Select(_ =>
             {
                 var id = _fixture.Create<string>();
                 
-                return new DocumentResults.DocumentModified(
+                return new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
                     id,
                     new TestDocument<string>
                     {
                         Id = id
                     });
             })
-            .OfType<IProjectionResult>()
             .ToImmutableList();
 
         await Task.WhenAll(
             writes
-                .Select(write => batchedStorage.Store(new StoreProjectionRequest(ImmutableList.Create(write)))));
+                .Select(write => batchedStorage
+                    .Store(new Dictionary<ProjectionContextId, IProjectionContext>
+                    {
+                        [new ProjectionContextId(projectionName, write.Id)] = write
+                    }.ToImmutableDictionary())));
 
         innerStorage.NumberOfWrites.Should().Be(1);
     }
@@ -99,15 +108,21 @@ public class BatchedProjectionStorageTests : TestKit
 
         var cancellationTokenSource = new CancellationTokenSource();
         
-        var id = _fixture.Create<string>();
+        SimpleIdContext<string> id = _fixture.Create<string>();
+        var projectionName = _fixture.Create<string>();
 
         var task = batchedStorage
             .Store(
-                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-                    new DocumentResults.DocumentModified(id, new TestDocument<string>
-                    {
-                        Id = id
-                    }))),
+                new Dictionary<ProjectionContextId, IProjectionContext>
+                {
+                    [new ProjectionContextId(projectionName, id)] =
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                            id,
+                            new TestDocument<string>
+                            {
+                                Id = id
+                            })
+                }.ToImmutableDictionary(),
                 cancellationTokenSource.Token);
         
         await cancellationTokenSource.CancelAsync();
@@ -129,27 +144,38 @@ public class BatchedProjectionStorageTests : TestKit
         
         var cancellationTokenSource = new CancellationTokenSource();
         
-        var firstId = _fixture.Create<string>();
-        var secondId = _fixture.Create<string>();
+        SimpleIdContext<string> firstId = _fixture.Create<string>();
+        SimpleIdContext<string> secondId = _fixture.Create<string>();
+        var projectionName = _fixture.Create<string>();
 
         await cancellationTokenSource.CancelAsync();
         
         var firstTask = batchedStorage
             .Store(
-                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-                    new DocumentResults.DocumentModified(firstId, new TestDocument<string>
-                    {
-                        Id = firstId
-                    }))),
+                new Dictionary<ProjectionContextId, IProjectionContext>
+                {
+                    [new ProjectionContextId(projectionName, firstId)] =
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                            firstId,
+                            new TestDocument<string>
+                            {
+                                Id = firstId
+                            })
+                }.ToImmutableDictionary(),
                 cancellationTokenSource.Token);
         
         var secondTask = batchedStorage
             .Store(
-                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-                    new DocumentResults.DocumentModified(secondId, new TestDocument<string>
-                    {
-                        Id = secondId
-                    }))),
+                new Dictionary<ProjectionContextId, IProjectionContext>
+                {
+                    [new ProjectionContextId(projectionName, secondId)] =
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                            secondId,
+                            new TestDocument<string>
+                            {
+                                Id = secondId
+                            })
+                }.ToImmutableDictionary(),
                 cancellationTokenSource.Token);
         
         await firstTask
@@ -165,8 +191,11 @@ public class BatchedProjectionStorageTests : TestKit
         var setup = new SetupInMemoryStorage();
         
         var innerStorage = setup.CreateProjectionStorage();
+        
+        var projectionName = _fixture.Create<string>();
 
-        var loader = new InMemoryProjectionLoader<string, TestDocument<string>>(id => setup.LoadDocument(id));
+        var loader = new InMemoryProjectionLoader<SimpleIdContext<string>, TestDocument<string>>(
+            id => setup.LoadDocument(new ProjectionContextId(projectionName, id)));
         
         var batchedStorage = new BatchedProjectionStorage(
             Sys,
@@ -177,27 +206,37 @@ public class BatchedProjectionStorageTests : TestKit
         var firstCancellationTokenSource = new CancellationTokenSource();
         var secondCancellationTokenSource = new CancellationTokenSource();
         
-        var firstId = _fixture.Create<string>();
-        var secondId = _fixture.Create<string>();
+        SimpleIdContext<string> firstId = _fixture.Create<string>();
+        SimpleIdContext<string> secondId = _fixture.Create<string>();
 
         await firstCancellationTokenSource.CancelAsync();
         
         var firstTask = batchedStorage
             .Store(
-                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-                    new DocumentResults.DocumentModified(firstId, new TestDocument<string>
-                    {
-                        Id = firstId
-                    }))),
+                new Dictionary<ProjectionContextId, IProjectionContext>
+                {
+                    [new ProjectionContextId(projectionName, firstId)] =
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                            firstId,
+                            new TestDocument<string>
+                            {
+                                Id = firstId
+                            })
+                }.ToImmutableDictionary(),
                 firstCancellationTokenSource.Token);
         
         var secondTask = batchedStorage
             .Store(
-                new StoreProjectionRequest(ImmutableList.Create<IProjectionResult>(
-                    new DocumentResults.DocumentModified(secondId, new TestDocument<string>
-                    {
-                        Id = secondId
-                    }))),
+                new Dictionary<ProjectionContextId, IProjectionContext>
+                {
+                    [new ProjectionContextId(projectionName, secondId)] =
+                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                            secondId,
+                            new TestDocument<string>
+                            {
+                                Id = secondId
+                            })
+                }.ToImmutableDictionary(),
                 secondCancellationTokenSource.Token);
         
         await firstTask
@@ -206,7 +245,10 @@ public class BatchedProjectionStorageTests : TestKit
         await secondTask
             .ShouldCompleteWithin(TimeSpan.FromSeconds(1));
         
-        var document = await loader.Load(secondId, secondCancellationTokenSource.Token);
+        var document = await loader.Load(
+            secondId,
+            id => new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(id, null),
+            secondCancellationTokenSource.Token);
 
         document.Exists().Should().BeTrue();
         document.Id.Should().Be(secondId);
@@ -216,23 +258,21 @@ public class BatchedProjectionStorageTests : TestKit
     {
         private readonly object _lock = new { };
         
-        private readonly InMemoryProjectionStorage _storage = new(new ConcurrentDictionary<object, ReadOnlyMemory<byte>>());
+        private readonly InMemoryProjectionStorage _storage = new(new ConcurrentDictionary<ProjectionContextId, ReadOnlyMemory<byte>>());
         public int NumberOfWrites { get; private set; }
         
-        public async Task<StoreProjectionResponse> Store(
-            StoreProjectionRequest request, 
+        public async Task Store(
+            IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts, 
             CancellationToken cancellationToken = default)
         {
             await Task.Delay(delay, cancellationToken);
 
-            var response = await _storage.Store(request, cancellationToken);
+            await _storage.Store(contexts, cancellationToken);
 
             lock (_lock)
             {
                 NumberOfWrites++;
             }
-
-            return response;
         }
     }
 }

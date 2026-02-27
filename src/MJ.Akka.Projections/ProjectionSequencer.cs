@@ -3,6 +3,7 @@ using Akka.Actor;
 using Akka.Event;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections;
 
@@ -18,7 +19,11 @@ public class ProjectionSequencer : ReceiveActor
     
     private static class InternalCommands
     {
-        public record TaskFinished(Guid GroupId, Guid TaskId, object? Id, Messages.IProjectEventsResponse Response);
+        public record TaskFinished(
+            Guid GroupId,
+            Guid TaskId,
+            IProjectionIdContext? Id,
+            Messages.IProjectEventsResponse Response);
         
         public record Reset(CancellationToken CancellationToken);
 
@@ -31,13 +36,13 @@ public class ProjectionSequencer : ReceiveActor
             ImmutableList<(
                 Guid groupId,
                 Guid taskId,
-                object? documentId,
+                IProjectionIdContext? idContext,
                 Task<Messages.IProjectEventsResponse> task)> Tasks);
 
         public record WaitForGroupToFinishResponse(PositionData PositionData);
     }
 
-    private readonly List<object> _inprogressIds = [];
+    private readonly List<IProjectionIdContext> _inprogressIds = [];
     private readonly Dictionary<Guid, WaitingGroup> _inProcessGroups = new();
 
     private readonly ProjectionConfiguration _configuration;
@@ -78,30 +83,57 @@ public class ProjectionSequencer : ReceiveActor
 
     private void Started(Guid instanceId, CancellationToken cancellationToken)
     {
-        Receive<Commands.StartProjecting>(cmd =>
+        ReceiveAsync<Commands.StartProjecting>(async cmd =>
         {
             var self = Self;
             
             var tasks = new List<(
                 Guid groupId,
                 Guid taskId,
-                object? documentId,
+                IProjectionIdContext? idContext,
                 Task<Messages.IProjectEventsResponse> task)>();
 
-            var groupedEvents = cmd
+            var eventsWithIds = await Task.WhenAll(cmd
                 .Events
-                .SelectMany(x => _configuration
-                    .TransformEvent(x.Event)
-                    .Select(y => x with
+                .SelectMany(x =>
+                {
+                    var transformed = _configuration.TransformEvent(x.Event).ToList();
+
+                    if (x is not IEventWithAck originalAck)
+                        return transformed.Select(y => x with { Event = y });
+
+                    switch (transformed.Count)
                     {
-                        Event = y
-                    }))
-                .Select(x => new
+                        case 0:
+                            _ = originalAck.Ack();
+                            return [];
+                        case 1:
+                            return [x with { Event = transformed[0] }];
+                    }
+
+                    var remaining = transformed.Count;
+                    var nacked = 0;
+
+                    return transformed.Select(y => new CountdownAckEvent(y, x.Position, Ack, Nack));
+
+                    Task Nack(Exception? exception)
+                    {
+                        return Interlocked.Exchange(ref nacked, 1) == 0 ? originalAck.Nack(exception) : Task.CompletedTask;
+                    }
+
+                    Task Ack()
+                    {
+                        return Interlocked.Decrement(ref remaining) == 0 ? originalAck.Ack() : Task.CompletedTask;
+                    }
+                })
+                .Select(async x => new
                 {
                     Event = x,
-                    Id = _configuration.GetDocumentIdFrom(x.Event),
+                    Id = await _configuration.GetIdContextFor(x.Event),
                     x.Position
-                })
+                }));
+
+            var groupedEvents = eventsWithIds
                 .GroupBy(x => x.Id)
                 .Select(x => (
                     Events: x.Select(y => y.Event).ToImmutableList(),
@@ -122,43 +154,44 @@ public class ProjectionSequencer : ReceiveActor
 
                 foreach (var groupedEvent in chunk)
                 {
-                    if (!groupedEvent.Id.IsUsable)
+                    if (groupedEvent.Id == null)
                     {
                         tasks.Add((
                             groupId,
                             groupedEvent.TaskId,
-                            groupedEvent.Id.Id,
-                            Task.FromResult<Messages.IProjectEventsResponse>(
-                                new Messages.Acknowledge(groupedEvent.Events.GetHighestEventNumber()))));
+                            groupedEvent.Id,
+                            AckEvents(groupedEvent.Events, cancellationToken)));
 
                         continue;
                     }
 
-                    var id = groupedEvent.Id.Id;
-
-                    if (!_inprogressIds.Contains(id))
+                    if (!_inprogressIds.Contains(groupedEvent.Id))
                     {
-                        _inprogressIds.Add(id);
+                        _inprogressIds.Add(groupedEvent.Id);
 
-                        tasks.Add((groupId, groupedEvent.TaskId, id, Run(id, groupedEvent.Events, cancellationToken)));
+                        tasks.Add((
+                            groupId, 
+                            groupedEvent.TaskId, 
+                            groupedEvent.Id, 
+                            Run(groupedEvent.Id, groupedEvent.Events, cancellationToken)));
                     }
                     else
                     {
                         var promise = new TaskCompletionSource<Messages.IProjectEventsResponse>(
                             TaskCreationOptions.RunContinuationsAsynchronously);
 
-                        if (!_queues.TryGetValue(id, out var queue))
+                        if (!_queues.TryGetValue(groupedEvent.Id, out var queue))
                         {
                             queue = new Queue<(
                                 ImmutableList<EventWithPosition>,
                                 TaskCompletionSource<Messages.IProjectEventsResponse>)>();
 
-                            _queues[id] = queue;
+                            _queues[groupedEvent.Id] = queue;
                         }
 
                         queue.Enqueue((groupedEvent.Events, promise));
 
-                        tasks.Add((groupId, groupedEvent.TaskId, id, promise.Task));
+                        tasks.Add((groupId, groupedEvent.TaskId, groupedEvent.Id, promise.Task));
                     }
                 }
 
@@ -167,9 +200,11 @@ public class ProjectionSequencer : ReceiveActor
 
                 foreach (var task in tasks)
                 {
+#pragma warning disable CS4014 // This is intentional, we want the continuations to run without awaiting the tasks here
                     task
                         .task
                         .ContinueWith(result =>
+#pragma warning restore CS4014
                         {
                             InternalCommands.TaskFinished response;
 
@@ -178,7 +213,7 @@ public class ProjectionSequencer : ReceiveActor
                                 response = new InternalCommands.TaskFinished(
                                     groupId,
                                     task.taskId,
-                                    task.documentId,
+                                    task.idContext,
                                     result.Result);
                             }
                             else
@@ -186,7 +221,7 @@ public class ProjectionSequencer : ReceiveActor
                                 response = new InternalCommands.TaskFinished(
                                     groupId,
                                     task.taskId,
-                                    task.documentId,
+                                    task.idContext,
                                     new Messages.Reject(result.Exception));
                             }
 
@@ -283,7 +318,7 @@ public class ProjectionSequencer : ReceiveActor
     }
 
     private void HandleWaitingTasks(
-        object? id,
+        IProjectionIdContext? id,
         Messages.IProjectEventsResponse response,
         CancellationToken cancellationToken)
     {
@@ -325,7 +360,7 @@ public class ProjectionSequencer : ReceiveActor
     }
 
     private async Task<Messages.IProjectEventsResponse> Run(
-        object id,
+        IProjectionIdContext id,
         ImmutableList<EventWithPosition> events,
         CancellationToken cancellationToken)
     {
@@ -335,6 +370,29 @@ public class ProjectionSequencer : ReceiveActor
             events,
             _configuration.GetProjection().ProjectionTimeout,
             cancellationToken);
+    }
+    
+    private static async Task<Messages.IProjectEventsResponse> AckEvents(
+        ImmutableList<EventWithPosition> events,
+        CancellationToken cancellationToken)
+    {
+        var ackableEvents = events
+            .OfType<IEventWithAck>()
+            .ToImmutableList();
+
+        if (ackableEvents.IsEmpty)
+            return new Messages.Acknowledge(events.GetHighestEventNumber());
+
+        try
+        {
+            await Task.WhenAll(ackableEvents.Select(x => x.Ack()));
+            
+            return new Messages.Acknowledge(events.GetHighestEventNumber());
+        }
+        catch (Exception e)
+        {
+            return new Messages.Reject(e);
+        }
     }
 
     public static Proxy Create(
@@ -394,5 +452,18 @@ public class ProjectionSequencer : ReceiveActor
         {
             return _waitingTasks.Count == 0;
         }
+    }
+
+    private record CountdownAckEvent(object Event, long? Position, Func<Task> AckFunc, Func<Exception?, Task> NackFunc)
+        : EventWithPosition(Event, Position), IEventWithAck
+    {
+        public CountdownAckEvent(EventWithPosition inner, IEventWithAck original)
+            : this(inner.Event, inner.Position, original.Ack, original.Nack) { }
+
+        public CountdownAckEvent(EventWithPosition inner, Func<Task> ack, Func<Exception?, Task> nack)
+            : this(inner.Event, inner.Position, ack, nack) { }
+
+        public Task Ack() => AckFunc();
+        public Task Nack(Exception? exception = null) => NackFunc(exception);
     }
 }

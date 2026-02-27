@@ -4,6 +4,7 @@ using Akka;
 using Akka.Streams.Dsl;
 using AutoFixture;
 using FluentAssertions;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.RavenDb;
@@ -17,8 +18,8 @@ namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 
 public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTestKitActorSystem actorSystemSetup)
     : BaseContinuousProjectionsTests<
-            string,
-            RavenDbProjectionContext<TestDocument<string>>,
+            SimpleIdContext<string>,
+            RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>,
             SetupRavenDbStorage>(actorSystemSetup), IClassFixture<RavenDbFixture>,
         IClassFixture<NormalTestKitActorSystem>
 {
@@ -29,15 +30,16 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
         return new SetupRavenDbStorage(_documentStore, new BulkInsertOptions());
     }
 
-    protected override IProjection<string, RavenDbProjectionContext<TestDocument<string>>, SetupRavenDbStorage>
+    protected override IProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>, SetupRavenDbStorage>
         GetProjection(
             IImmutableList<object> events,
-            IImmutableList<StorageFailures> storageFailures)
+            IImmutableList<StorageFailures> storageFailures,
+            long? initialPosition = null)
     {
-        return new TestProjection(events, storageFailures);
+        return new TestProjection(events, storageFailures, initialPosition);
     }
 
-    protected override object GetEventThatFails(string id, int numberOfFailures)
+    protected override object GetEventThatFails(SimpleIdContext<string> id, int numberOfFailures)
     {
         return new Events<string>.FailProjection(
             id,
@@ -47,25 +49,35 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
             new Exception("Projection failed"));
     }
 
-    protected override object GetTestEvent(string documentId)
+    protected override object GetTestEvent(SimpleIdContext<string> documentId)
     {
         return new Events<string>.FirstEvent(documentId, Fixture.Create<string>());
     }
 
-    protected override object GetTransformationEvent(string documentId, IImmutableList<object> transformTo)
+    protected override object GetTransformationEvent(SimpleIdContext<string> documentId, IImmutableList<object> transformTo)
     {
         return new Events<string>.TransformToMultipleEvents(transformTo.OfType<Events<string>.IEvent>()
             .ToImmutableList());
     }
 
-    protected override object GetUnMatchedEvent(string documentId)
+    protected override object GetUnMatchedEvent(SimpleIdContext<string> documentId)
     {
         return new Events<string>.UnHandledEvent(documentId);
     }
 
+    protected override object GetEventThatIsFilteredOut(SimpleIdContext<string> documentId)
+    {
+        return new Events<string>.EventWithFilter(documentId, Fixture.Create<string>(), () => false);
+    }
+
+    protected override object GetEventThatDoesntGetDocumentId(SimpleIdContext<string> documentId)
+    {
+        return new Events<string>.EventThatDoesntGetDocumentId(documentId, Fixture.Create<string>());
+    }
+
     protected override Task VerifyContext(
-        string documentId,
-        RavenDbProjectionContext<TestDocument<string>> context,
+        SimpleIdContext<string> documentId,
+        RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>> context,
         IImmutableList<object> events,
         IProjection projection)
     {
@@ -104,12 +116,13 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 
     private class TestProjection(
         IImmutableList<object> events,
-        IImmutableList<StorageFailures> storageFailures) : RavenDbProjection<TestDocument<string>>
+        IImmutableList<StorageFailures> storageFailures,
+        long? initialPosition) : RavenDbProjection<TestDocument<string>, SimpleIdContext<string>>
     {
         public ConcurrentDictionary<string, Events<string>.IEvent> HandledEvents { get; } = new();
         
-        public override ISetupProjectionHandlers<string, RavenDbProjectionContext<TestDocument<string>>> Configure(
-            ISetupProjection<string, RavenDbProjectionContext<TestDocument<string>>> config)
+        public override ISetupProjectionHandlers<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>> Configure(
+            ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>> config)
         {
             var runFailures = new ConcurrentDictionary<string, Dictionary<string, int>>();
 
@@ -117,6 +130,22 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 .TransformUsing<Events<string>.TransformToMultipleEvents>(evnt =>
                     evnt.Events.OfType<object>().ToImmutableList())
                 .On<Events<string>.FirstEvent>(x => x.DocId)
+                .ModifyDocument((evnt, doc) =>
+                {
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+
+                    doc ??= new TestDocument<string>
+                    {
+                        Id = evnt.DocId
+                    };
+
+                    doc.AddHandledEvent(evnt.EventId);
+
+                    return doc;
+                })
+                .On<Events<string>.EventWithFilter>(
+                    x => x.DocId,
+                    filter => filter.WithEventFilter(evnt => evnt.Filter()))
                 .ModifyDocument((evnt, doc) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
@@ -186,13 +215,27 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                         documentFailures[evnt.FailureKey]);
 
                     return doc;
+                })
+                .On<Events<string>.EventThatDoesntGetDocumentId>(_ => Task.FromResult<SimpleIdContext<string>?>(null))
+                .ModifyDocument((evnt, doc) =>
+                {
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+
+                    doc ??= new TestDocument<string>
+                    {
+                        Id = evnt.DocId
+                    };
+
+                    doc.AddHandledEvent(evnt.EventId);
+
+                    return doc;
                 });
         }
-
-        public override ILoadProjectionContext<string, RavenDbProjectionContext<TestDocument<string>>> 
+        
+        public override ILoadProjectionContext<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>> 
             GetLoadProjectionContext(SetupRavenDbStorage storageSetup)
         {
-            return new LoaderWithStorageFailures<string, RavenDbProjectionContext<TestDocument<string>>>(
+            return new LoaderWithStorageFailures<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>>(
                 base.GetLoadProjectionContext(storageSetup),
                 storageFailures);
         }
@@ -203,6 +246,11 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 .Select((x, i) => new EventWithPosition(x, i + 1))
                 .Where(x => fromPosition == null || x.Position > fromPosition)
                 .ToImmutableList());
+        }
+
+        public override long? GetInitialPosition()
+        {
+            return initialPosition;
         }
     }
 }

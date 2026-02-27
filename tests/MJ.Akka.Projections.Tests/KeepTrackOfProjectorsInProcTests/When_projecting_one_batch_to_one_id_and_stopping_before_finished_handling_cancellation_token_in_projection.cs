@@ -1,11 +1,11 @@
 using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
-using Akka.Util;
 using FluentAssertions;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.InProc;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
@@ -37,7 +37,7 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_ha
         
         public async Task InitializeAsync()
         {
-            var id = Guid.NewGuid().ToString();
+            SimpleIdContext<string> id = Guid.NewGuid().ToString();
             const string instanceId = "test-instance";
             
             var factory = new KeepTrackOfProjectorsInProc(Sys, new MaxNumberOfProjectorsPassivation(10), instanceId);
@@ -47,8 +47,8 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_ha
             var storageSetup = new SetupInMemoryStorage();
 
             var projectionConfiguration = new ProjectionConfiguration<
-                string,
-                InMemoryProjectionContext<string, TestDocument<string>>,
+                SimpleIdContext<string>,
+                InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>,
                 SetupInMemoryStorage>(
                 projection,
                 storageSetup.CreateProjectionStorage(),
@@ -58,7 +58,8 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_ha
                 null,
                 BatchEventBatchingStrategy.Default,
                 BatchWithinEventPositionBatchingStrategy.Default,
-                projection.Configure(new SetupProjection<string, InMemoryProjectionContext<string, TestDocument<string>>>()).Build());
+                projection.Configure(
+                    new SetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>>()).Build());
             
             var projector = await factory.GetProjector(id, projectionConfiguration);
             
@@ -77,7 +78,7 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_ha
 
             Response = await projectorTask;
             
-            var projectorId = MurmurHash.StringHash(id).ToString();
+            var projectorId = ((IProjectionIdContext)id).GetProjectorId();
 
             var coordinator = await Sys.ActorSelection($"/user/in-proc-projector-{instanceId}-{projectionConfiguration.Name}")
                 .ResolveOne(TimeSpan.FromSeconds(1));

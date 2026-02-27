@@ -7,6 +7,7 @@ using BenchmarkDotNet.Loggers;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Benchmarks.Columns;
 using MJ.Akka.Projections.OneTime;
+using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
@@ -26,7 +27,7 @@ public class OneTimeProjectionBenchmarks
     
     private ActorSystem ActorSystem { get; set; } = null!;
     private InMemoryTestProjection _projection = null!;
-    private IOneTimeProjection<string, InMemoryTestProjection.TestDocument> _coordinator = null!;
+    private IOneTimeProjection<SimpleIdContext<string>, InMemoryTestProjection.TestDocument> _coordinator = null!;
     
     [IterationSetup]
     public void Setup()

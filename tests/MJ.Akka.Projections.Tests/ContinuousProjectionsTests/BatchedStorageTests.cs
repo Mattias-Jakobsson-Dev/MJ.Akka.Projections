@@ -4,6 +4,7 @@ using Akka.TestKit.Xunit2;
 using AutoFixture;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.Batched;
 using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
@@ -18,7 +19,7 @@ public class BatchedStorageTests : TestKit
     [Fact]
     public async Task Projecting_events_when_storage_fails_once_with_restart_settings()
     {
-        var id = _fixture.Create<string>();
+        SimpleIdContext<string> id = _fixture.Create<string>();
         var eventId = _fixture.Create<string>();
 
         var events = ImmutableList.Create<object>(new Events<string>.FirstEvent(id, eventId));
@@ -56,7 +57,7 @@ public class BatchedStorageTests : TestKit
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 

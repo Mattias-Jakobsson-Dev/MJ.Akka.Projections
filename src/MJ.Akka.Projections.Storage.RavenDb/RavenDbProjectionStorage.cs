@@ -1,8 +1,6 @@
 ﻿using System.Collections.Immutable;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;
-using Raven.Client.Documents.Commands.Batches;
-using Raven.Client.Documents.Operations;
 using Raven.Client.Json;
 
 namespace MJ.Akka.Projections.Storage.RavenDb;
@@ -10,39 +8,51 @@ namespace MJ.Akka.Projections.Storage.RavenDb;
 public class RavenDbDocumentProjectionStorage(IDocumentStore documentStore, BulkInsertOptions insertOptions)
     : IProjectionStorage
 {
-    private readonly InProcessProjector<RavenDbStorageProjectorResult> _storageProjector = RavenDbStorageProjector
-        .Setup();
-
-    public async Task<StoreProjectionResponse> Store(
-        StoreProjectionRequest request,
+    public async Task Store(
+        IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts,
         CancellationToken cancellationToken = default)
     {
-        var (unhandledEvents, toStore) = _storageProjector.RunFor(
-            request.Results.OfType<object>().ToImmutableList(),
-            RavenDbStorageProjectorResult.Empty);
+        cancellationToken.ThrowIfCancellationRequested();
+        
+        var invalidContexts = contexts
+            .Where(x => x.Value is not IRavenDbProjectionContext)
+            .Select(x => x.Key)
+            .ToImmutableList();
 
-        if (toStore.DocumentsToUpsert.Any() || toStore.TimeSeriesToAdd.Any())
+        if (!invalidContexts.IsEmpty)
+            throw new InvalidContextStorageException(invalidContexts);
+        
+        var validContexts = contexts
+            .Values
+            .Select(x => x as IRavenDbProjectionContext)
+            .Where(x => x != null)
+            .Select(x => x!)
+            .ToImmutableList();
+
+        var documentsToUpsert = validContexts
+            .Where(x => x.Document != null)
+            .ToImmutableList();
+
+        var timeSeriesToAdd = validContexts
+            .Where(x => x.AddedTimeSeries.Any())
+            .ToImmutableList();
+        
+        if (!documentsToUpsert.IsEmpty || !timeSeriesToAdd.IsEmpty)
         {
             await using var bulkInsert = documentStore.BulkInsert(insertOptions, cancellationToken);
 
-            foreach (var item in toStore.DocumentsToUpsert)
+            foreach (var item in documentsToUpsert)
             {
-                var metadata = toStore
-                    .MetadataToUpsert
-                    .TryGetValue((string)item.Key, out var metadataValue)
-                    ? metadataValue
-                    : ImmutableDictionary<string, object>.Empty;
-
-                await bulkInsert.StoreAsync(item.Value, (string)item.Key,
-                    new MetadataAsDictionary(metadata.ToDictionary()));
+                await bulkInsert.StoreAsync(item.Document, item.GetDocumentId(),
+                    new MetadataAsDictionary(item.Metadata.ToDictionary()));
             }
 
-            foreach (var timeSeriesDocument in toStore.TimeSeriesToAdd)
+            foreach (var timeSeriesDocument in timeSeriesToAdd)
             {
-                foreach (var timeSeries in timeSeriesDocument.Value)
+                foreach (var timeSeries in timeSeriesDocument.AddedTimeSeries)
                 {
                     using var timeSeriesBatch = bulkInsert.TimeSeriesFor(
-                        timeSeriesDocument.Key,
+                        timeSeriesDocument.GetDocumentId(),
                         timeSeries.Key);
 
                     foreach (var timeSeriesRecord in timeSeries.Value)
@@ -56,42 +66,20 @@ public class RavenDbDocumentProjectionStorage(IDocumentStore documentStore, Bulk
                 }
             }
         }
+        
+        var documentsToDelete = validContexts
+            .Where(x => x.Document == null)
+            .Select(x => x.GetDocumentId())
+            .ToImmutableList();
 
-        var metadataToUpsert = toStore.MetadataToUpsert
-            .Where(kvp => !toStore.DocumentsToUpsert.ContainsKey(kvp.Key))
-            .ToImmutableDictionary();
-
-        if (!toStore.DocumentsToDelete.Any() && metadataToUpsert.IsEmpty)
-            return StoreProjectionResponse.From(unhandledEvents);
+        if (documentsToDelete.IsEmpty)
+            return;
 
         using var session = documentStore.OpenAsyncSession();
 
-        foreach (var item in toStore.DocumentsToDelete)
-            session.Delete((string)item);
-
-        foreach (var metadataItem in metadataToUpsert)
-        {
-            session.Advanced.Defer(new PatchCommandData(
-                metadataItem.Key,
-                null,
-                new PatchRequest
-                {
-                    Script = """
-                             const metadata = getMetadata(this);
-
-                             for (const prop in args.NewMetadata) {
-                                metadata[prop] = args.NewMetadata[prop];
-                             }
-                             """,
-                    Values = new Dictionary<string, object?>
-                    {
-                        ["NewMetadata"] = metadataItem.Value.ToDictionary()
-                    }
-                }));
-        }
+        foreach (var item in documentsToDelete)
+            session.Delete(item);
 
         await session.SaveChangesAsync(cancellationToken);
-
-        return StoreProjectionResponse.From(unhandledEvents);
     }
 }

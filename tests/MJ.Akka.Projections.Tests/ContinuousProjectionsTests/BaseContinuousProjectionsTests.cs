@@ -5,21 +5,23 @@ using AutoFixture;
 using MJ.Akka.Projections.Storage;
 using FluentAssertions;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 
-public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetup>(IHaveActorSystem actorSystemHandler)
-    where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
+public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStorageSetup>(IHaveActorSystem actorSystemHandler)
+    where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
     protected readonly Fixture Fixture = new();
+    protected virtual TimeSpan Timeout => TimeSpan.FromSeconds(5);
 
     [Fact]
     public async Task Projecting_event_that_fails_once_with_restart_behaviour()
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetEventThatFails(id, 1));
         var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
@@ -42,13 +44,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
     }
@@ -58,7 +60,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetEventThatFails(id, 1));
         var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
@@ -77,14 +79,14 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         await coordinator
             .Get(projection.Name)!
-            .WaitForCompletion(TimeSpan.FromSeconds(5))
+            .WaitForCompletion(Timeout)
             .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().BeNull();
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeFalse();
     }
@@ -94,7 +96,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetTestEvent(id));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -124,13 +126,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
     }
@@ -140,7 +142,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetTestEvent(id));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -166,14 +168,14 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         await coordinator
             .Get(projection.Name)!
-            .WaitForCompletion(TimeSpan.FromSeconds(5))
+            .WaitForCompletion(Timeout)
             .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().BeNull();
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeFalse();
     }
@@ -183,7 +185,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetEventThatFails(id, 1));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -213,13 +215,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
     }
@@ -229,7 +231,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetTestEvent(id));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -259,13 +261,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
     }
@@ -275,7 +277,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(GetTestEvent(id));
         var failures = ImmutableList.Create(new StorageFailures(
@@ -301,14 +303,14 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         await coordinator
             .Get(projection.Name)!
-            .WaitForCompletion(TimeSpan.FromSeconds(5))
+            .WaitForCompletion(Timeout)
             .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().BeNull();
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeFalse();
     }
@@ -318,7 +320,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(id);
         var secondEvent = GetTestEvent(id);
@@ -339,13 +341,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -357,13 +359,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var firstId = Fixture.Create<TId>();
-        var secondId = Fixture.Create<TId>();
+        var firstId = Fixture.Create<TIdContext>();
+        var secondId = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(firstId);
         var secondEvent = GetTestEvent(secondId);
         var transformEvent = GetTransformationEvent(
-            Fixture.Create<TId>(),
+            Fixture.Create<TIdContext>(),
             ImmutableList.Create(firstEvent, secondEvent));
 
         var events = ImmutableList.Create(transformEvent);
@@ -381,19 +383,19 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(1);
 
-        var firstContext = await loader.Load(firstId);
+        var firstContext = await loader.Load(firstId, projection.GetDefaultContext);
 
         firstContext.Exists().Should().BeTrue();
 
         await VerifyContext(firstId, firstContext, events, projection);
 
-        var secondContext = await loader.Load(secondId);
+        var secondContext = await loader.Load(secondId, projection.GetDefaultContext);
 
         secondContext.Exists().Should().BeTrue();
 
@@ -405,7 +407,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(
             GetUnMatchedEvent(id),
@@ -425,13 +427,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(2);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeFalse();
     }
@@ -441,7 +443,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(id);
 
@@ -460,13 +462,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(1);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -478,7 +480,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(id);
         var secondEvent = GetTestEvent(id);
@@ -498,13 +500,13 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(2);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -516,8 +518,8 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var firstId = Fixture.Create<TId>();
-        var secondId = Fixture.Create<TId>();
+        var firstId = Fixture.Create<TIdContext>();
+        var secondId = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(firstId);
         var secondEvent = GetTestEvent(secondId);
@@ -537,19 +539,19 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(2);
 
-        var firstContext = await loader.Load(firstId);
+        var firstContext = await loader.Load(firstId, projection.GetDefaultContext);
 
         firstContext.Exists().Should().BeTrue();
 
         await VerifyContext(firstId, firstContext, events, projection);
 
-        var secondContext = await loader.Load(secondId);
+        var secondContext = await loader.Load(secondId, projection.GetDefaultContext);
 
         secondContext.Exists().Should().BeTrue();
 
@@ -561,7 +563,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var id = Fixture.Create<TId>();
+        var id = Fixture.Create<TIdContext>();
 
         var firstEvent = GetTestEvent(id);
         var secondEvent = GetTestEvent(id);
@@ -584,13 +586,52 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
         var coordinator = await projectionsSetup.Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(2);
 
-        var context = await loader.Load(id);
+        var context = await loader.Load(id, projection.GetDefaultContext);
+
+        context.Exists().Should().BeTrue();
+
+        await VerifyContext(id, context, ImmutableList.Create(secondEvent), projection);
+    }
+
+    [Fact]
+    public async Task Projecting_from_initial_position_after_first_event()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+
+        var firstEvent = GetTestEvent(id);
+        var secondEvent = GetTestEvent(id);
+
+        var events = ImmutableList.Create(firstEvent, secondEvent);
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty, 1);
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var projectionsSetup = system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup);
+        
+        var coordinator = await projectionsSetup.Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(2);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
@@ -602,7 +643,7 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
     {
         using var system = actorSystemHandler.StartNewActorSystem();
 
-        var documentId = Fixture.Create<TId>();
+        var documentId = Fixture.Create<TIdContext>();
 
         var events = ImmutableList.Create(
             GetTestEvent(documentId),
@@ -626,17 +667,125 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
                 storageSetup)
             .Start();
 
-        await coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5));
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
         position.Should().Be(3);
 
-        var context = await loader.Load(documentId);
+        var context = await loader.Load(documentId, projection.GetDefaultContext);
 
         context.Exists().Should().BeTrue();
 
         await VerifyContext(documentId, context, events, projection);
+    }
+
+    [Fact]
+    public async Task Projecting_ten_events_that_are_filtered_out()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+
+        var events = Enumerable.Range(1, 10)
+            .Select(_ => GetEventThatIsFilteredOut(id))
+            .ToImmutableList();
+        
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(10);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
+
+        context.Exists().Should().BeFalse();
+    }
+    
+    [Fact]
+    public async Task Projecting_ten_events_without_document_id()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+
+        var events = Enumerable.Range(1, 10)
+            .Select(_ => GetEventThatDoesntGetDocumentId(id))
+            .ToImmutableList();
+        
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(10);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
+
+        context.Exists().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Projecting_two_events_that_transform_into_no_events()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+        
+        var projection = GetProjection([
+            GetTransformationEvent(id, ImmutableList<object>.Empty), 
+            GetTransformationEvent(id, ImmutableList<object>.Empty)], 
+            ImmutableList<StorageFailures>.Empty);
+        
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(2);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
+
+        context.Exists().Should().BeFalse();
     }
 
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> Configure(
@@ -647,20 +796,25 @@ public abstract class BaseContinuousProjectionsTests<TId, TContext, TStorageSetu
 
     protected abstract TStorageSetup CreateStorageSetup();
     
-    protected abstract IProjection<TId, TContext, TStorageSetup> GetProjection(
+    protected abstract IProjection<TIdContext, TContext, TStorageSetup> GetProjection(
         IImmutableList<object> events,
-        IImmutableList<StorageFailures> storageFailures);
+        IImmutableList<StorageFailures> storageFailures,
+        long? initialPosition = null);
 
-    protected abstract object GetEventThatFails(TId id, int numberOfFailures);
+    protected abstract object GetEventThatFails(TIdContext id, int numberOfFailures);
 
-    protected abstract object GetTestEvent(TId documentId);
+    protected abstract object GetTestEvent(TIdContext documentId);
 
-    protected abstract object GetTransformationEvent(TId documentId, IImmutableList<object> transformTo);
+    protected abstract object GetTransformationEvent(TIdContext documentId, IImmutableList<object> transformTo);
 
-    protected abstract object GetUnMatchedEvent(TId documentId);
+    protected abstract object GetUnMatchedEvent(TIdContext documentId);
+    
+    protected abstract object GetEventThatIsFilteredOut(TIdContext documentId);
+    
+    protected abstract object GetEventThatDoesntGetDocumentId(TIdContext documentId);
 
     protected abstract Task VerifyContext(
-        TId documentId,
+        TIdContext documentId,
         TContext context,
         IImmutableList<object> events,
         IProjection projection);

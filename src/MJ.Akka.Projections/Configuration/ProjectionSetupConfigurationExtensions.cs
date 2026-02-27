@@ -1,4 +1,5 @@
 using Akka.Actor;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 
@@ -6,12 +7,12 @@ namespace MJ.Akka.Projections.Configuration;
 
 public static class ProjectionSetupConfigurationExtensions
 {
-    public static IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> WithProjection<TId, TContext, TStorageSetup>(
+    public static IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> WithProjection<TIdContext, TContext, TStorageSetup>(
         this IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> source,
-        IProjection<TId, TContext, TStorageSetup> projection,
+        IProjection<TIdContext, TContext, TStorageSetup> projection,
         Func<IHaveConfiguration<ProjectionInstanceConfiguration>, IHaveConfiguration<ProjectionInstanceConfiguration>>?
             configure = null)
-        where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
+        where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
     {
         return source
             .WithModifiedConfig(x => x with
@@ -33,7 +34,7 @@ public static class ProjectionSetupConfigurationExtensions
                             storageSetup = modifier.Modify(storageSetup);
                         }
 
-                        return new ProjectionConfiguration<TId, TContext, TStorageSetup>(
+                        return new ProjectionConfiguration<TIdContext, TContext, TStorageSetup>(
                             projection,
                             storageSetup.CreateProjectionStorage(),
                             projection.GetLoadProjectionContext(conf.StorageSetup),
@@ -42,7 +43,7 @@ public static class ProjectionSetupConfigurationExtensions
                             configuredProjection.RestartSettings,
                             configuredProjection.EventBatchingStrategy!,
                             configuredProjection.PositionBatchingStrategy!,
-                            projection.Configure(new SetupProjection<TId, TContext>()).Build());
+                            projection.Configure(new SetupProjection<TIdContext, TContext>()).Build());
                     })
             });
     }

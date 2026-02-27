@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using AutoFixture;
 using FluentAssertions;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 
@@ -9,13 +10,13 @@ namespace MJ.Akka.Projections.Tests.OnTimeProjectionsTests;
 public abstract class TestProjectionBaseOneTimeTests<TId>(IHaveActorSystem actorSystemHandler) 
     : BaseOneTimeProjectionsTest<TId, TestDocument<TId>>(actorSystemHandler) where TId : notnull
 {
-    protected override IProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage> 
+    protected override IProjection<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>, SetupInMemoryStorage> 
         GetProjection(IImmutableList<object> events)
     {
         return new TestProjection<TId>(events, ImmutableList<StorageFailures>.Empty);
     }
 
-    protected override IProjection<TId, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage> 
+    protected override IProjection<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>, SetupInMemoryStorage> 
         GetSecondaryProjection(IImmutableList<object> events)
     {
         return new TestProjection<TId>(

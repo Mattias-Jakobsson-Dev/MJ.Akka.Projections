@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Akka.Actor;
-using Akka.Util;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.InProc;
 
@@ -31,7 +31,7 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
         _instanceId = instanceId;
     }
 
-    public Task<IProjectorProxy> GetProjector(object id, ProjectionConfiguration configuration)
+    public Task<IProjectorProxy> GetProjector(IProjectionIdContext id, ProjectionConfiguration configuration)
     {
         var coordinator = _coordinators
             .GetOrAdd(
@@ -51,7 +51,7 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
         return new KeepTrackOfProjectorsInProc(_actorSystem, _passivationHandler);
     }
 
-    private class InProcDocumentProjectorProxy(object id, IActorRef coordinator) : IProjectorProxy
+    private class InProcDocumentProjectorProxy(IProjectionIdContext id, IActorRef coordinator) : IProjectorProxy
     {
         public Task<Messages.IProjectEventsResponse> ProjectEvents(
             ImmutableList<EventWithPosition> events,
@@ -83,11 +83,11 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
         public static class Commands
         {
             public record Project(
-                object Id,
+                IProjectionIdContext Id,
                 ImmutableList<EventWithPosition> Events,
                 TimeSpan Timeout);
             
-            public record StopInProcessEvents(object Id);
+            public record StopInProcessEvents(IProjectionIdContext Id);
         }
 
         private static class InternalCommands
@@ -108,7 +108,7 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
 
             Receive<Commands.Project>(cmd =>
             {
-                var id = GetProjectionId(cmd.Id);
+                var id = cmd.Id.GetProjectorId();
 
                 var projectionId = Guid.NewGuid();
 
@@ -186,7 +186,7 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
 
             Receive<Commands.StopInProcessEvents>(cmd =>
             {
-                var id = GetProjectionId(cmd.Id);
+                var id = cmd.Id.GetProjectorId();
                 
                 var projectionRef = Context.Child(id);
 
@@ -195,11 +195,6 @@ public class KeepTrackOfProjectorsInProc : IKeepTrackOfProjectors
                 else
                     Sender.Tell(new DocumentProjection.Responses.StopInProcessEventsResponse());
             });
-        }
-        
-        private string GetProjectionId(object id)
-        {
-            return MurmurHash.StringHash(id.ToString()).ToString();
         }
     }
 }

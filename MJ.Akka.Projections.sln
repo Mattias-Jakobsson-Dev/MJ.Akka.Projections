@@ -31,6 +31,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{4C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MJ.Akka.Projections.EventStoreToRavenDbExample", "examples\MJ.Akka.Projections.EventStoreToRavenDbExample\MJ.Akka.Projections.EventStoreToRavenDbExample.csproj", "{48C9913C-3AF5-498F-BD50-6BB724C6151E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MJ.Akka.Projections.TestKit", "src\MJ.Akka.Projections.TestKit\MJ.Akka.Projections.TestKit.csproj", "{A38AF823-B6DE-4F7A-B74A-816283F78F23}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MJ.Akka.Projections.Storage.Sql", "src\MJ.Akka.Projections.Storage.Sql\MJ.Akka.Projections.Storage.Sql.csproj", "{7FD5C1D5-6A0C-47DE-B89A-EA18E15E4020}"
 EndProject
 Global
@@ -67,6 +69,10 @@ Global
 		{48C9913C-3AF5-498F-BD50-6BB724C6151E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{48C9913C-3AF5-498F-BD50-6BB724C6151E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{48C9913C-3AF5-498F-BD50-6BB724C6151E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A38AF823-B6DE-4F7A-B74A-816283F78F23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A38AF823-B6DE-4F7A-B74A-816283F78F23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A38AF823-B6DE-4F7A-B74A-816283F78F23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A38AF823-B6DE-4F7A-B74A-816283F78F23}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7FD5C1D5-6A0C-47DE-B89A-EA18E15E4020}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{7FD5C1D5-6A0C-47DE-B89A-EA18E15E4020}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7FD5C1D5-6A0C-47DE-B89A-EA18E15E4020}.Release|Any CPU.ActiveCfg = Release|Any CPU

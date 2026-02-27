@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using MJ.Akka.Projections.Documents;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Tests.TestData;
 
@@ -20,16 +21,15 @@ public class TrackEventsStorageWrapper(ConcurrentBag<string> storedEvents, IStor
     
     private class Storage(ConcurrentBag<string> storedEvents, IProjectionStorage innerStorage) : IProjectionStorage
     {
-        public Task<StoreProjectionResponse> Store(
-            StoreProjectionRequest request,
+        public Task Store(
+            IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts,
             CancellationToken cancellationToken = default)
         {
-            var events = request
-                .Results
+            var events = contexts
+                .Values
                 .SelectMany(x => x switch
                 {
-                    DocumentResults.DocumentModified { Document: TestDocument<string> testDoc } => testDoc.HandledEvents,
-                    DocumentResults.DocumentCreated { Document: TestDocument<string> testDoc } => testDoc.HandledEvents,
+                    ContextWithDocument<SimpleIdContext<string>, TestDocument<string>> { Document: { } testDoc } => testDoc.HandledEvents,
                     _ => ImmutableList<string>.Empty
                 })
                 .ToImmutableList();
@@ -39,7 +39,7 @@ public class TrackEventsStorageWrapper(ConcurrentBag<string> storedEvents, IStor
                 storedEvents.Add(evnt);
             }
 
-            return innerStorage.Store(request, cancellationToken);
+            return innerStorage.Store(contexts, cancellationToken);
         }
     }
     

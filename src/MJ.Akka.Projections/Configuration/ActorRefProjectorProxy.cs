@@ -1,9 +1,10 @@
 using System.Collections.Immutable;
 using Akka.Actor;
+using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.Configuration;
 
-public class ActorRefProjectorProxy(object id, IActorRef projector) : IProjectorProxy
+public class ActorRefProjectorProxy(IProjectionIdContext id, IActorRef projector) : IProjectorProxy
 {
     public Task<Messages.IProjectEventsResponse> ProjectEvents(
         ImmutableList<EventWithPosition> events,

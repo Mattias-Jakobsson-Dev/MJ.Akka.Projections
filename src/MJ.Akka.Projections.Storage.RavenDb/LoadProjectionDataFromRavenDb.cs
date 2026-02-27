@@ -1,24 +1,27 @@
 using System.Collections.Immutable;
+using MJ.Akka.Projections.ProjectionIds;
 using Raven.Client.Documents;
 
 namespace MJ.Akka.Projections.Storage.RavenDb;
 
-public class LoadProjectionDataFromRavenDb<TDocument>(IDocumentStore documentStore)
-    : ILoadProjectionContext<string, RavenDbProjectionContext<TDocument>>
-    where TDocument : class
+public class LoadProjectionDataFromRavenDb<TDocument, TIdContext>(IDocumentStore documentStore)
+    : ILoadProjectionContext<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>>
+    where TDocument : class where TIdContext : IProjectionIdContext
 {
-    public async Task<RavenDbProjectionContext<TDocument>> Load(
-        string id,
+    public async Task<RavenDbProjectionContext<TDocument, TIdContext>> Load(
+        TIdContext id,
+        Func<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>> getDefaultContext,
         CancellationToken cancellationToken = default)
     {
         using var session = documentStore.OpenAsyncSession();
 
-        var document = await session.LoadAsync<TDocument>(id, cancellationToken);
-        
-        var metadata = document != null 
-            ? session.Advanced.GetMetadataFor(document).ToImmutableDictionary() 
-            : ImmutableDictionary<string, object>.Empty;
+        var document = await session.LoadAsync<TDocument>(id.GetStringRepresentation(), cancellationToken);
 
-        return new RavenDbProjectionContext<TDocument>(id, document, metadata);
+        if (document == null)
+            return getDefaultContext(id);
+        
+        var metadata = session.Advanced.GetMetadataFor(document).ToImmutableDictionary();
+
+        return new RavenDbProjectionContext<TDocument, TIdContext>(id, document, metadata);
     }
 }

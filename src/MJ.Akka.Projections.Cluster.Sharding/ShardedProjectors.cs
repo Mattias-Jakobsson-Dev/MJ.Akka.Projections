@@ -2,40 +2,9 @@ using System.Collections.Concurrent;
 using Akka.Actor;
 using Akka.Cluster.Sharding;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.Cluster.Sharding;
-
-internal class ShardedProjectionConfigurationSupplier(string runnerId, string projectionName) : ISupplyProjectionConfigurations
-{
-    private static readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ProjectionConfiguration>>
-        Configurations = new();
-    
-    public ProjectionConfiguration GetConfiguration()
-    {
-        var runnerConfigurations = Configurations
-            .TryGetValue(runnerId, out var configurations)
-            ? configurations
-            : throw new NoDocumentProjectionException(projectionName);
-
-        return runnerConfigurations.TryGetValue(projectionName, out var projectionConfig)
-            ? projectionConfig
-            : throw new NoDocumentProjectionException(projectionName);
-    }
-    
-    public static void ConfigureProjection(
-        string runnerId,
-        string projectionName,
-        ProjectionConfiguration configuration)
-    {
-        var runnerConfigurations = Configurations
-            .GetOrAdd(runnerId, _ => new ConcurrentDictionary<string, ProjectionConfiguration>());
-        
-        runnerConfigurations.AddOrUpdate(
-            projectionName,
-            _ => configuration,
-            (_, _) => configuration);
-    }
-}
 
 public class ShardedProjectors(
     ActorSystem actorSystem,
@@ -46,7 +15,7 @@ public class ShardedProjectors(
 {
     private readonly ConcurrentDictionary<string, Task<IActorRef>> _projectors = new();
     
-    public async Task<IProjectorProxy> GetProjector(object id, ProjectionConfiguration configuration)
+    public async Task<IProjectorProxy> GetProjector(IProjectionIdContext id, ProjectionConfiguration configuration)
     {
         var projector = await _projectors
             .GetOrAdd(
@@ -83,7 +52,7 @@ public class ShardedProjectors(
         public override string EntityId(object message)
         {
             return message is DocumentProjection.Commands.IMessageWithId messageWithId 
-                ? messageWithId.Id.ToString() ?? "" 
+                ? messageWithId.Id.GetProjectorId() 
                 : "";
         }
     }

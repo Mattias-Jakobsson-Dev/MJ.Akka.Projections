@@ -3,6 +3,7 @@ using Akka;
 using Akka.Actor;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.InMemory;
@@ -10,7 +11,7 @@ using MJ.Akka.Projections.Storage.InMemory;
 namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
 
 public class FakeProjection(TimeSpan delay) 
-    : IProjection<object, InMemoryProjectionContext<object, object>, SetupInMemoryStorage>
+    : IProjection<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>, SetupInMemoryStorage>
 {
     public string Name => GetType().Name;
     
@@ -30,19 +31,30 @@ public class FakeProjection(TimeSpan delay)
     {
         return Props.Create(() => new FakeProjector(delay));
     }
-    
-    public ISetupProjectionHandlers<object, InMemoryProjectionContext<object, object>> Configure(
-        ISetupProjection<object, InMemoryProjectionContext<object, object>> config)
+
+    public long? GetInitialPosition()
+    {
+        return null;
+    }
+
+    public ISetupProjectionHandlers<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>> Configure(
+        ISetupProjection<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>> config)
     {
         return config;
     }
     
-    public ILoadProjectionContext<object, InMemoryProjectionContext<object, object>> GetLoadProjectionContext(
+    public ILoadProjectionContext<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>> GetLoadProjectionContext(
         SetupInMemoryStorage storageSetup)
     {
-        return new InMemoryProjectionLoader<object, object>(storageSetup.LoadDocument);
+        return new InMemoryProjectionLoader<SimpleIdContext<object>, object>(
+            id => storageSetup.LoadDocument(new ProjectionContextId(Name, id)));
     }
-    
+
+    public InMemoryProjectionContext<SimpleIdContext<object>, object> GetDefaultContext(SimpleIdContext<object> id)
+    {
+        return new InMemoryProjectionContext<SimpleIdContext<object>, object>(id, null);
+    }
+
     private class FakeProjector : ReceiveActor
     {
         public FakeProjector(TimeSpan delay)

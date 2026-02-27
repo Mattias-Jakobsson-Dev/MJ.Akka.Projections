@@ -3,8 +3,8 @@ using Akka.Actor;
 using Akka.Event;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
-using MJ.Akka.Projections.Storage.Messages;
 
 namespace MJ.Akka.Projections;
 
@@ -15,12 +15,12 @@ public class DocumentProjection : ReceiveActor, IWithStash
     {
         public interface IMessageWithId
         {
-            object Id { get; }
+            IProjectionIdContext Id { get; }
         }
 
-        public record ProjectEvents(object Id, ImmutableList<EventWithPosition> Events) : IMessageWithId;
+        public record ProjectEvents(IProjectionIdContext Id, ImmutableList<EventWithPosition> Events) : IMessageWithId;
 
-        public record StopInProcessEvents(object Id) : IMessageWithId;
+        public record StopInProcessEvents(IProjectionIdContext Id) : IMessageWithId;
     }
     
     public static class Responses
@@ -128,7 +128,7 @@ public class DocumentProjection : ReceiveActor, IWithStash
     }
 
     private void ProjectEvents(
-        object id,
+        IProjectionIdContext id,
         ImmutableList<EventWithPosition> events,
         Func<Task<IProjectionContext>> loadContext)
     {
@@ -145,7 +145,7 @@ public class DocumentProjection : ReceiveActor, IWithStash
     }
 
     private async Task<ProjectionResponse> StartProjectingEvents(
-        object id,
+        IProjectionIdContext id,
         Func<Task<IProjectionContext>> loadContext,
         ImmutableList<EventWithPosition> events,
         CancellationToken cancellationToken)
@@ -167,15 +167,25 @@ public class DocumentProjection : ReceiveActor, IWithStash
         {
             var (projectedContext, result) = await RunProjections();
 
+            await Task.WhenAll(events
+                // ReSharper disable once SuspiciousTypeConversion.Global
+                .OfType<IEventWithAck>()
+                .Select(x => x.Ack()));
+
             return new ProjectionResponse(projectedContext, new Messages.Acknowledge(result));
         }
         catch (Exception e)
         {
             _logger.Warning(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, id);
+            
+            await Task.WhenAll(events
+                // ReSharper disable once SuspiciousTypeConversion.Global
+                .OfType<IEventWithAck>()
+                .Select(x => x.Nack(e)));
 
             return new ProjectionResponse(null, new Messages.Reject(e));
         }
-
+        
         async Task<(IProjectionContext context, long? position)> RunProjections()
         {
             var existsBefore = context.Exists();
@@ -184,27 +194,24 @@ public class DocumentProjection : ReceiveActor, IWithStash
                 return (context, null);
 
             var wasHandled = false;
-
-            var results = new List<IProjectionResult>();
-
+            
             foreach (var evnt in events.OrderBy(x => x.Position ?? 0))
             {
-                var (hasHandler, handlerResults) = await _configuration.HandleEvent(
+                wasHandled = await _configuration.HandleEvent(
                     context,
                     evnt.Event,
                     evnt.Position ?? 0,
-                    cancellationToken);
-
-                results.AddRange(handlerResults);
-
-                wasHandled = wasHandled || hasHandler;
+                    cancellationToken) || wasHandled;
             }
 
             if (!wasHandled || !existsBefore && !context.Exists())
                 return (context, events.GetHighestEventNumber());
             
             await _configuration
-                .Store(new StoreProjectionRequest(results.ToImmutableList()), cancellationToken);
+                .Store(new Dictionary<ProjectionContextId, IProjectionContext>
+                {
+                    [new ProjectionContextId(_configuration.Name, id)] = context.Freeze()
+                }.ToImmutableDictionary(), cancellationToken);
 
             if (context is IResettableProjectionContext resettable)
                 context = resettable.Reset();

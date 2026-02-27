@@ -1,12 +1,13 @@
 using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
-using Akka.Util;
 using FluentAssertions;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.InProc;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.InMemory;
+using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
@@ -53,16 +54,16 @@ public class When_projecting_two_batches_to_two_ids_with_settings_to_keep_one_pr
             
             var factory = new KeepTrackOfProjectorsInProc(Sys, new MaxNumberOfProjectorsPassivation(1), instanceId);
 
-            var firstId = Guid.NewGuid().ToString();
-            var secondId = Guid.NewGuid().ToString();
+            SimpleIdContext<object> firstId = Guid.NewGuid().ToString();
+            SimpleIdContext<object> secondId = Guid.NewGuid().ToString();
             
             var storageSetup = new SetupInMemoryStorage();
 
             var projection = new FakeProjection(TimeSpan.FromMilliseconds(100));
 
             var projectionConfiguration = new ProjectionConfiguration<
-                object,
-                InMemoryProjectionContext<object, object>,
+                SimpleIdContext<object>,
+                InMemoryProjectionContext<SimpleIdContext<object>, object>,
                 SetupInMemoryStorage>(
                 projection,
                 storageSetup.CreateProjectionStorage(),
@@ -89,8 +90,8 @@ public class When_projecting_two_batches_to_two_ids_with_settings_to_keep_one_pr
                     TimeSpan.FromSeconds(5),
                     CancellationToken.None);
 
-            var firstProjectorId = MurmurHash.StringHash(firstId).ToString();
-            var secondProjectorId = MurmurHash.StringHash(secondId).ToString();
+            var firstProjectorId = ((IProjectionIdContext)firstId).GetProjectorId();
+            var secondProjectorId = ((IProjectionIdContext)secondId).GetProjectorId();
 
             var coordinator = await Sys.ActorSelection($"/user/in-proc-projector-{instanceId}-{projectionConfiguration.Name}")
                 .ResolveOne(TimeSpan.FromSeconds(1));

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 using JetBrains.Annotations;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage.RavenDb;
 
@@ -30,8 +31,8 @@ public class RavenDbTestProjection : RavenDbProjection<RavenDbTestProjection.Tes
         _events = events.ToImmutableList();
     }
     
-    public override ISetupProjectionHandlers<string, RavenDbProjectionContext<TestDocument>> Configure(
-        ISetupProjection<string, RavenDbProjectionContext<TestDocument>> config)
+    public override ISetupProjectionHandlers<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> Configure(
+        ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> config)
     {
         return config
             .On<TestEvent>(evnt => evnt.DocId)

@@ -3,40 +3,55 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.Json;
 using JetBrains.Annotations;
-using MJ.Akka.Projections.Documents;
 
 namespace MJ.Akka.Projections.Storage.InMemory;
 
-public class InMemoryProjectionStorage(ConcurrentDictionary<object, ReadOnlyMemory<byte>> storage) 
+public class InMemoryProjectionStorage(ConcurrentDictionary<ProjectionContextId, ReadOnlyMemory<byte>> storage) 
     : IProjectionStorage
 {
-    private readonly InProcessProjector<InMemoryStorageProjectorResult> _storageProjector = DocumentsStorageProjector
-        .Setup<InMemoryStorageProjectorResult>(_ => { });
-    
-    public async Task<StoreProjectionResponse> Store(
-        StoreProjectionRequest request,
+    public async Task Store(
+        IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var (unhandledEvents, results) = _storageProjector
-            .RunFor(
-                request.Results.OfType<object>().ToImmutableList(),
-                InMemoryStorageProjectorResult.Empty);
+        var invalidDocuments = contexts
+            .Where(x => x.Value is not IInMemoryProjectionContext)
+            .Select(x => x.Key)
+            .ToImmutableList();
+
+        if (!invalidDocuments.IsEmpty)
+            throw new InvalidContextStorageException(invalidDocuments);
+
+        var documents = contexts
+            .Where(x => x.Value is IInMemoryProjectionContext)
+            .Select(x => new
+            {
+                Id = x.Key,
+                ((IInMemoryProjectionContext)x.Value).Document
+            })
+            .ToImmutableList();
         
-        foreach (var item in results.DocumentsToUpsert)
+        var documentsToUpsert = documents
+            .Where(x => x.Document != null)
+            .ToImmutableDictionary(x => x.Id, x => x.Document!);
+        
+        var documentsToDelete = documents
+            .Where(x => x.Document == null)
+            .Select(x => x.Id)
+            .ToImmutableList();
+        
+        foreach (var item in documentsToUpsert)
         {
             var serialized = await SerializeData(item.Value);
                 
             storage.AddOrUpdate(item.Key, _ => serialized, (_, _) => serialized);
         }
 
-        foreach (var item in results.DocumentsToDelete)
+        foreach (var item in documentsToDelete)
         {
             storage.TryRemove(item, out _);
         }
-
-        return StoreProjectionResponse.From(unhandledEvents);
     }
     
     [PublicAPI]

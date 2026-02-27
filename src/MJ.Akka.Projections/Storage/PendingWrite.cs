@@ -4,37 +4,37 @@ namespace MJ.Akka.Projections.Storage;
 
 public class PendingWrite
 {
-    private readonly IImmutableList<TaskCompletionSource<StoreProjectionResponse>> _completions;
+    private readonly IImmutableList<TaskCompletionSource> _completions;
 
     public static PendingWrite Empty { get; } = new(
-        StoreProjectionRequest.Empty,
-        ImmutableList<TaskCompletionSource<StoreProjectionResponse>>.Empty,
+        ImmutableDictionary<ProjectionContextId, IProjectionContext>.Empty,
+        ImmutableList<TaskCompletionSource>.Empty,
         CancellationToken.None);
 
     public PendingWrite(
-        StoreProjectionRequest request,
-        TaskCompletionSource<StoreProjectionResponse> completion,
+        IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts,
+        TaskCompletionSource completion,
         CancellationToken cancellationToken) : this(
-        request,
+        contexts,
         ImmutableList.Create(completion),
         cancellationToken)
     {
     }
 
     private PendingWrite(
-        StoreProjectionRequest request,
-        IImmutableList<TaskCompletionSource<StoreProjectionResponse>> completions,
+        IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts,
+        IImmutableList<TaskCompletionSource> completions,
         CancellationToken cancellationToken)
     {
-        Request = request;
+        Contexts = contexts;
         _completions = completions;
         CancellationToken = cancellationToken;
     }
-    
-    public StoreProjectionRequest Request { get; }
+
+    public IImmutableDictionary<ProjectionContextId, IProjectionContext> Contexts { get; }
     public CancellationToken CancellationToken { get; }
-    
-    public bool IsEmpty => Request.IsEmpty && _completions.Count == 0;
+
+    public bool IsEmpty => !Contexts.Any() && _completions.Count == 0;
 
     public PendingWrite MergeWith(PendingWrite other)
     {
@@ -43,17 +43,26 @@ public class PendingWrite
             : CancellationTokenSource
                 .CreateLinkedTokenSource(CancellationToken, other.CancellationToken)
                 .Token;
-        
+
+        var result = other
+            .Contexts
+            .Aggregate(
+                Contexts,
+                (current, projectionContext) => current
+                    .SetItem(projectionContext.Key, current.TryGetValue(projectionContext.Key, out var existingContext)
+                        ? existingContext.MergeWith(projectionContext.Value)
+                        : projectionContext.Value));
+
         return new PendingWrite(
-            Request.MergeWith(other.Request),
+            result,
             _completions.AddRange(other.GetCompletions()),
             cancellationToken);
     }
 
-    public void Completed(StoreProjectionResponse response)
+    public void Completed()
     {
         foreach (var completion in _completions)
-            completion.TrySetResult(response);
+            completion.TrySetResult();
     }
 
     public void Fail(Exception exception)
@@ -62,7 +71,7 @@ public class PendingWrite
             completion.TrySetException(exception);
     }
 
-    private IImmutableList<TaskCompletionSource<StoreProjectionResponse>> GetCompletions()
+    private IImmutableList<TaskCompletionSource> GetCompletions()
     {
         return _completions;
     }

@@ -4,6 +4,7 @@ using Akka.Actor;
 using Akka.Persistence.EventStore.Query;
 using Akka.Persistence.Query;
 using Akka.Streams.Dsl;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage.RavenDb;
 
@@ -12,8 +13,8 @@ namespace MJ.Akka.Projections.EventStoreToRavenDbExample;
 public class ExampleProjection(ActorSystem actorSystem)
     : RavenDbProjection<ExampleDocument>
 {
-    public override ISetupProjectionHandlers<string, RavenDbProjectionContext<ExampleDocument>>
-        Configure(ISetupProjection<string, RavenDbProjectionContext<ExampleDocument>> config)
+    public override ISetupProjectionHandlers<SimpleIdContext<string>, RavenDbProjectionContext<ExampleDocument, SimpleIdContext<string>>>
+        Configure(ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<ExampleDocument, SimpleIdContext<string>>> config)
     {
         return config
             .TransformUsing<Events.ThirdEvent>(evnt => ImmutableList.Create<object>(

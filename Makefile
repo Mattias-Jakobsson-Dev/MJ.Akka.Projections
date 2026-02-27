@@ -56,6 +56,7 @@ package: clean
 	dotnet pack ./src/MJ.Akka.Projections.Cluster.Sharding -c Release -o ./.packages
 	dotnet pack ./src/MJ.Akka.Projections.Storage.RavenDb -c Release -o ./.packages
 	dotnet pack ./src/MJ.Akka.Projections.Storage.InfluxDb -c Release -o ./.packages
+	dotnet pack ./src/MJ.Akka.Projections.TestKit -c Release -o ./.packages
 	dotnet pack ./src/MJ.Akka.Projections.Storage.Sql -c Release -o ./.packages
 
 .PHONY: publish

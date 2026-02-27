@@ -2,6 +2,7 @@ using Akka;
 using Akka.Actor;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Configuration;
+using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 
@@ -14,11 +15,13 @@ public interface IProjection
     Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
     Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier);
     Props CreateProjectionProps(ISupplyProjectionConfigurations configSupplier);
+    long? GetInitialPosition();
 }
 
-public interface IProjection<TId, TContext, in TStorageSetup> : IProjection 
-    where TId : notnull where TContext : IProjectionContext where TStorageSetup : IStorageSetup
+public interface IProjection<TIdContext, TContext, in TStorageSetup> : IProjection 
+    where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
-    ISetupProjectionHandlers<TId, TContext> Configure(ISetupProjection<TId, TContext> config);
-    ILoadProjectionContext<TId, TContext> GetLoadProjectionContext(TStorageSetup storageSetup);
+    ISetupProjectionHandlers<TIdContext, TContext> Configure(ISetupProjection<TIdContext, TContext> config);
+    ILoadProjectionContext<TIdContext, TContext> GetLoadProjectionContext(TStorageSetup storageSetup);
+    TContext GetDefaultContext(TIdContext id);
 }
