@@ -162,15 +162,18 @@ public class DocumentProjection : ReceiveActor, IWithStash
 
             return new ProjectionResponse(null, new Messages.Reject(e));
         }
+        
+        var eventsWithAck = events.OfType<IEventWithAck>().ToImmutableList();
 
         try
         {
             var (projectedContext, result) = await RunProjections();
 
-            await Task.WhenAll(events
-                // ReSharper disable once SuspiciousTypeConversion.Global
-                .OfType<IEventWithAck>()
-                .Select(x => x.Ack()));
+            if (!eventsWithAck.IsEmpty)
+            {
+                await Task.WhenAll(eventsWithAck
+                    .Select(x => x.Ack(cancellationToken)));
+            }
 
             return new ProjectionResponse(projectedContext, new Messages.Acknowledge(result));
         }
@@ -178,10 +181,11 @@ public class DocumentProjection : ReceiveActor, IWithStash
         {
             _logger.Warning(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, id);
             
-            await Task.WhenAll(events
-                // ReSharper disable once SuspiciousTypeConversion.Global
-                .OfType<IEventWithAck>()
-                .Select(x => x.Nack(e)));
+            if (!eventsWithAck.IsEmpty)
+            {
+                await Task.WhenAll(eventsWithAck
+                    .Select(x => x.Nack(e, cancellationToken)));
+            }
 
             return new ProjectionResponse(null, new Messages.Reject(e));
         }

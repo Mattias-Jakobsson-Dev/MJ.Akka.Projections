@@ -179,7 +179,7 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
             .SelectAsync(1, async evnt =>
             {
                 if (fromPosition.HasValue && evnt.Position <= fromPosition && evnt is IEventWithAck eventWithAck)
-                    await eventWithAck.Ack();
+                    await eventWithAck.Ack(CancellationToken.None);
 
                 return evnt;
             })

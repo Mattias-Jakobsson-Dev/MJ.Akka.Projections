@@ -66,14 +66,14 @@ public class ProjectionWithAckTests(NormalTestKitActorSystem actorSystemSetup)
         public GatedAckEvent(EventWithPosition inner, SemaphoreSlim gate)
             : this(inner.Event, inner.Position, gate) { }
 
-        public Task Ack()
+        public Task Ack(CancellationToken cancellationToken)
         {
             Gate.Release();
             
             return Task.CompletedTask;
         }
 
-        public Task Nack(Exception? exception = null)
+        public Task Nack(Exception error, CancellationToken cancellationToken)
         {
             Gate.Release();
             

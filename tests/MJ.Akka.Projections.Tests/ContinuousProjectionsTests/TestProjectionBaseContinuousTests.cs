@@ -144,7 +144,9 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
                 if (x is Events<TId>.TransformToMultipleEvents transform)
                     return transform.Events;
 
-                return ImmutableList.Create((Events<TId>.IEvent)x);
+                return x is Events<TId>.IEvent parsedEvent 
+                    ? ImmutableList.Create(parsedEvent) 
+                    : ImmutableList<Events<TId>.IEvent>.Empty;
             })
             .ToImmutableList();
 

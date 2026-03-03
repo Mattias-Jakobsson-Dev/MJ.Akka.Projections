@@ -5,7 +5,7 @@ namespace MJ.Akka.Projections.Tests.TestData;
 public static class Events<TId>
 {
     public record FirstEvent(TId DocId, string EventId) : IEvent;
-    
+
     public record UnHandledEvent(TId DocId);
 
     public record EventWithFilter(TId DocId, string EventId, Func<bool> Filter) : IEvent;

@@ -105,7 +105,7 @@ public class ProjectionSequencer : ReceiveActor
                     switch (transformed.Count)
                     {
                         case 0:
-                            _ = originalAck.Ack();
+                            _ = originalAck.Ack(cancellationToken);
                             return [];
                         case 1:
                             return [x with { Event = transformed[0] }];
@@ -116,14 +116,16 @@ public class ProjectionSequencer : ReceiveActor
 
                     return transformed.Select(y => new CountdownAckEvent(y, x.Position, Ack, Nack));
 
-                    Task Nack(Exception? exception)
+                    Task Nack(Exception error, CancellationToken token)
                     {
-                        return Interlocked.Exchange(ref nacked, 1) == 0 ? originalAck.Nack(exception) : Task.CompletedTask;
+                        return Interlocked.Exchange(ref nacked, 1) == 0
+                            ? originalAck.Nack(error, token) 
+                            : Task.CompletedTask;
                     }
 
-                    Task Ack()
+                    Task Ack(CancellationToken token)
                     {
-                        return Interlocked.Decrement(ref remaining) == 0 ? originalAck.Ack() : Task.CompletedTask;
+                        return Interlocked.Decrement(ref remaining) == 0 ? originalAck.Ack(token) : Task.CompletedTask;
                     }
                 })
                 .Select(async x => new
@@ -385,7 +387,7 @@ public class ProjectionSequencer : ReceiveActor
 
         try
         {
-            await Task.WhenAll(ackableEvents.Select(x => x.Ack()));
+            await Task.WhenAll(ackableEvents.Select(x => x.Ack(cancellationToken)));
             
             return new Messages.Acknowledge(events.GetHighestEventNumber());
         }
@@ -454,16 +456,23 @@ public class ProjectionSequencer : ReceiveActor
         }
     }
 
-    private record CountdownAckEvent(object Event, long? Position, Func<Task> AckFunc, Func<Exception?, Task> NackFunc)
+    private record CountdownAckEvent(
+        object Event,
+        long? Position,
+        Func<CancellationToken, Task> AckFunc,
+        Func<Exception, CancellationToken, Task> NackFunc)
         : EventWithPosition(Event, Position), IEventWithAck
     {
         public CountdownAckEvent(EventWithPosition inner, IEventWithAck original)
             : this(inner.Event, inner.Position, original.Ack, original.Nack) { }
 
-        public CountdownAckEvent(EventWithPosition inner, Func<Task> ack, Func<Exception?, Task> nack)
+        public CountdownAckEvent(
+            EventWithPosition inner,
+            Func<CancellationToken, Task> ack,
+            Func<Exception, CancellationToken, Task> nack)
             : this(inner.Event, inner.Position, ack, nack) { }
 
-        public Task Ack() => AckFunc();
-        public Task Nack(Exception? exception = null) => NackFunc(exception);
+        public Task Ack(CancellationToken cancellationToken) => AckFunc(cancellationToken);
+        public Task Nack(Exception error, CancellationToken cancellationToken) => NackFunc(error, cancellationToken);
     }
 }

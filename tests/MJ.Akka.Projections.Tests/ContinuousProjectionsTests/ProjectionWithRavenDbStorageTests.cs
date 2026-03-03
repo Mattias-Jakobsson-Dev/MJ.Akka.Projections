@@ -87,7 +87,9 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 if (x is Events<string>.TransformToMultipleEvents transform)
                     return transform.Events;
 
-                return ImmutableList.Create((Events<string>.IEvent)x);
+                return x is Events<string>.IEvent parsedEvent 
+                    ? ImmutableList.Create(parsedEvent) 
+                    : ImmutableList<Events<string>.IEvent>.Empty;
             })
             .ToImmutableList();
 

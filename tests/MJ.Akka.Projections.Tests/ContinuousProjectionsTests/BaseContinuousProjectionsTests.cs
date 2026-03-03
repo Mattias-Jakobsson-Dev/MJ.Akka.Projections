@@ -439,6 +439,44 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
     }
 
     [Fact]
+    public async Task Projecting_one_matched_and_one_unmatched_event()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+
+        var events = ImmutableList.Create(
+            GetUnMatchedEvent(id),
+            GetTestEvent(id));
+        
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(2);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
+
+        context.Exists().Should().BeTrue();
+        
+        await VerifyContext(id, context, events, projection);
+    }
+
+    [Fact]
     public async Task Projecting_one_event_for_one_document()
     {
         using var system = actorSystemHandler.StartNewActorSystem();
@@ -664,6 +702,138 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
                     new BatchWithinEventBatchingStrategy(3, TimeSpan.FromSeconds(1)))
                 .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
                 .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(3);
+
+        var context = await loader.Load(documentId, projection.GetDefaultContext);
+
+        context.Exists().Should().BeTrue();
+
+        await VerifyContext(documentId, context, events, projection);
+    }
+    
+    [Fact]
+    public async Task Projecting_six_events_in_two_groups()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var documentId = Fixture.Create<TIdContext>();
+
+        var events = ImmutableList.Create(
+            GetTestEvent(documentId),
+            GetTestEvent(documentId),
+            GetTestEvent(documentId),
+            GetTestEvent(documentId),
+            GetTestEvent(documentId),
+            GetTestEvent(documentId));
+
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithEventBatchingStrategy(
+                        new BatchWithinEventBatchingStrategy(3, TimeSpan.FromSeconds(1)))
+                    .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(6);
+
+        var context = await loader.Load(documentId, projection.GetDefaultContext);
+
+        context.Exists().Should().BeTrue();
+
+        await VerifyContext(documentId, context, events, projection);
+    }
+    
+    [Fact]
+    public async Task Projecting_six_events_in_two_groups_where_two_events_are_unhandled()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var documentId = Fixture.Create<TIdContext>();
+
+        var events = ImmutableList.Create(
+            GetTestEvent(documentId),
+            GetUnMatchedEvent(documentId),
+            GetTestEvent(documentId),
+            GetTestEvent(documentId),
+            GetUnMatchedEvent(documentId),
+            GetTestEvent(documentId));
+
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithEventBatchingStrategy(
+                        new BatchWithinEventBatchingStrategy(3, TimeSpan.FromSeconds(1)))
+                    .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.Should().Be(6);
+
+        var context = await loader.Load(documentId, projection.GetDefaultContext);
+
+        context.Exists().Should().BeTrue();
+
+        await VerifyContext(documentId, context, events, projection);
+    }
+    
+    [Fact]
+    public async Task Projecting_three_events_in_same_group_where_one_is_un_matched()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var documentId = Fixture.Create<TIdContext>();
+
+        var events = ImmutableList.Create(
+            GetTestEvent(documentId),
+            GetUnMatchedEvent(documentId),
+            GetTestEvent(documentId));
+
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithEventBatchingStrategy(
+                        new BatchWithinEventBatchingStrategy(3, TimeSpan.FromSeconds(1)))
+                    .WithPositionStorageBatchingStrategy(new NoBatchingPositionStrategy())
+                    .WithModifiedStorage(storageWrapper),
                 storageSetup)
             .Start();
 
