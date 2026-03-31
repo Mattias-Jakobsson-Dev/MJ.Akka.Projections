@@ -75,6 +75,10 @@ public class ProjectionsCoordinator : ReceiveActor
                 {
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Name, latestPosition);
                     
+                    ProjectionDiagnostics.RestartCount.Add(
+                        1,
+                        new KeyValuePair<string, object?>("projection.name", _configuration.Name));
+
                     var cancellation = new CancellationTokenSource();
                     
                     _sequencer.Reset(cancellation.Token);
@@ -135,6 +139,8 @@ public class ProjectionsCoordinator : ReceiveActor
                                 _configuration.Name,
                                 highestPosition.Position, 
                                 cancellation.Token);
+
+                            ProjectionDiagnostics.RecordPosition(_configuration.Name, latestPosition);
 
                             return NotUsed.Instance;
                         })

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using Akka.Actor;
 using Akka.Event;
 using JetBrains.Annotations;
@@ -150,6 +151,15 @@ public class DocumentProjection : ReceiveActor, IWithStash
         ImmutableList<EventWithPosition> events,
         CancellationToken cancellationToken)
     {
+        using var activity = ProjectionDiagnostics.ActivitySource
+            .StartActivity(
+                $"{_configuration.Name}.HandleEvents",
+                ActivityKind.Internal);
+
+        activity?.SetTag("projection.name", _configuration.Name);
+        activity?.SetTag("projection.document.id", id.ToString());
+        activity?.SetTag("projection.events.count", events.Count);
+
         IProjectionContext? context;
 
         try
@@ -160,14 +170,31 @@ public class DocumentProjection : ReceiveActor, IWithStash
         {
             _logger.Warning(e, "Failed loading context for {0}.{1}", _configuration.Name, id);
 
+            activity?.SetStatus(ActivityStatusCode.Error, e.Message);
+            activity?.AddEvent(new ActivityEvent(
+                "exception",
+                tags: new ActivityTagsCollection
+                {
+                    ["exception.type"] = e.GetType().FullName,
+                    ["exception.message"] = e.Message,
+                    ["exception.stacktrace"] = e.StackTrace
+                }));
+
             return new ProjectionResponse(null, new Messages.Reject(e));
         }
         
         var eventsWithAck = events.OfType<IEventWithAck>().ToImmutableList();
+        var sw = Stopwatch.StartNew();
 
         try
         {
             var (projectedContext, result) = await RunProjections();
+
+            sw.Stop();
+            ProjectionDiagnostics.EventHandlingDuration.Record(
+                sw.Elapsed.TotalMilliseconds,
+                new KeyValuePair<string, object?>("projection.name", _configuration.Name),
+                new KeyValuePair<string, object?>("projection.outcome", "success"));
 
             if (!eventsWithAck.IsEmpty)
             {
@@ -175,11 +202,37 @@ public class DocumentProjection : ReceiveActor, IWithStash
                     .Select(x => x.Ack(cancellationToken)));
             }
 
+            ProjectionDiagnostics.EventsProcessed.Add(
+                events.Count,
+                new KeyValuePair<string, object?>("projection.name", _configuration.Name));
+
+            activity?.SetStatus(ActivityStatusCode.Ok);
+
             return new ProjectionResponse(projectedContext, new Messages.Acknowledge(result));
         }
         catch (Exception e)
         {
+            sw.Stop();
+            ProjectionDiagnostics.EventHandlingDuration.Record(
+                sw.Elapsed.TotalMilliseconds,
+                new KeyValuePair<string, object?>("projection.name", _configuration.Name),
+                new KeyValuePair<string, object?>("projection.outcome", "failure"));
+
             _logger.Warning(e, "Failed handling {0} events for {1}.{2}", events.Count, _configuration.Name, id);
+
+            ProjectionDiagnostics.EventsFailed.Add(
+                events.Count,
+                new KeyValuePair<string, object?>("projection.name", _configuration.Name));
+
+            activity?.SetStatus(ActivityStatusCode.Error, e.Message);
+            activity?.AddEvent(new ActivityEvent(
+                "exception",
+                tags: new ActivityTagsCollection
+                {
+                    ["exception.type"] = e.GetType().FullName,
+                    ["exception.message"] = e.Message,
+                    ["exception.stacktrace"] = e.StackTrace
+                }));
             
             if (!eventsWithAck.IsEmpty)
             {
@@ -201,6 +254,13 @@ public class DocumentProjection : ReceiveActor, IWithStash
             
             foreach (var evnt in events.OrderBy(x => x.Position ?? 0))
             {
+                activity?.AddEvent(new ActivityEvent(
+                    evnt.Event.GetType().Name,
+                    tags: new ActivityTagsCollection
+                    {
+                        ["event.position"] = evnt.Position
+                    }));
+
                 wasHandled = await _configuration.HandleEvent(
                     context,
                     evnt.Event,
