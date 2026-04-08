@@ -193,12 +193,24 @@ public class ProjectionSequencer : ReceiveActor
 
                         queue.Enqueue((groupedEvent.Events, promise));
 
+                        ProjectionDiagnostics.QueuedEvents.Add(
+                            1,
+                            new KeyValuePair<string, object?>("projection.name", _configuration.Name));
+
                         tasks.Add((groupId, groupedEvent.TaskId, groupedEvent.Id, promise.Task));
                     }
                 }
 
                 _inProcessGroups[groupId] = WaitingGroup.NewGroup(
                     tasks.Select(x => x.taskId).ToImmutableList());
+
+                ProjectionDiagnostics.ActiveGroups.Add(
+                    1,
+                    new KeyValuePair<string, object?>("projection.name", _configuration.Name));
+
+                ProjectionDiagnostics.ActiveTasks.Add(
+                    tasks.Count,
+                    new KeyValuePair<string, object?>("projection.name", _configuration.Name));
 
                 foreach (var task in tasks)
                 {
@@ -253,11 +265,21 @@ public class ProjectionSequencer : ReceiveActor
 
             if (!_inProcessGroups.TryGetValue(cmd.GroupId, out var group)) 
                 return;
+
+            ProjectionDiagnostics.ActiveTasks.Add(
+                -1,
+                new KeyValuePair<string, object?>("projection.name", _configuration.Name));
             
             group.FinishTask(cmd.TaskId);
 
             if (group.AllFinished())
+            {
                 _inProcessGroups.Remove(cmd.GroupId);
+
+                ProjectionDiagnostics.ActiveGroups.Add(
+                    -1,
+                    new KeyValuePair<string, object?>("projection.name", _configuration.Name));
+            }
         });
 
         ReceiveAsync<InternalCommands.Reset>(async cmd =>
@@ -333,11 +355,19 @@ public class ProjectionSequencer : ReceiveActor
             {
                 while (value.TryDequeue(out var item))
                 {
+                    ProjectionDiagnostics.QueuedEvents.Add(
+                        -1,
+                        new KeyValuePair<string, object?>("projection.name", _configuration.Name));
+
                     item.task.TrySetResult(response);
                 }
             } 
             else if (value.TryDequeue(out var queuedItem))
             {
+                ProjectionDiagnostics.QueuedEvents.Add(
+                    -1,
+                    new KeyValuePair<string, object?>("projection.name", _configuration.Name));
+
                 Run(id, queuedItem.events, cancellationToken)
                     .ContinueWith(result =>
                     {
