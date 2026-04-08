@@ -34,19 +34,17 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
     }
     
     public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> On<TEvent>(
-        Func<TEvent, Task<TIdContext>> getId,
-        Func<
-            IProjectionFilterSetup<TIdContext, TContext, TEvent>,
-            IProjectionFilterSetup<TIdContext, TContext, TEvent>>? filter = null)
+        Func<TEvent, TIdContext?> getId)
     {
-        IProjectionFilterSetup<TIdContext, TContext, TEvent> projectionFilterSetup
-            = ProjectionFilterSetup<TIdContext, TContext, TEvent>.Create();
+        return On<TEvent>(evnt => Task.FromResult(getId(evnt)));
+    }
 
-        projectionFilterSetup = filter?.Invoke(projectionFilterSetup) ?? projectionFilterSetup;
-
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> On<TEvent>(
+        Func<TEvent, Task<TIdContext?>> getId)
+    {
         var builder = new HandlerBuilder<TIdContext, TContext, TEvent>(
             getId,
-            projectionFilterSetup.Build(),
+            ProjectionFilterSetup<TIdContext, TContext, TEvent>.Create().Build(),
             this);
         
         _handlers = _handlers.SetItem(typeof(TEvent), builder);
@@ -111,8 +109,6 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
                 if (!handlers.TryGetValue(type, out var handler))
                     continue;
 
-                if (!handler.Filter.FilterResult(context))
-                    return handled;
 
                 await handler.Handle(evnt, context, position, cancellationToken);
 

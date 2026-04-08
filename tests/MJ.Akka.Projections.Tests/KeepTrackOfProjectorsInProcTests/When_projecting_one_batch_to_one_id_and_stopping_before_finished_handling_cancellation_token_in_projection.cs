@@ -30,7 +30,7 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_ha
     }
     
     [PublicAPI]
-    public class Fixture : TestKit, IAsyncLifetime
+    public class Fixture : global::Akka.TestKit.Xunit2.TestKit, IAsyncLifetime
     {
         public Messages.IProjectEventsResponse Response { get; private set; } = null!;
         public IActorRef? Projector { get; private set; }

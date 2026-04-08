@@ -83,8 +83,8 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
                 return doc;
             })
             .On<Events<TId>.EventWithFilter>(
-                x => createContext(x.DocId),
-                filter => filter.WithEventFilter(evnt => evnt.Filter()))
+                x => createContext(x.DocId))
+            .When(filter => filter.WithEventFilter(evnt => evnt.Filter()))
             .ModifyDocument((evnt, doc) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);

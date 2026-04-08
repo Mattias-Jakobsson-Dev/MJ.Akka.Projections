@@ -41,7 +41,7 @@ public class When_projecting_two_batches_to_two_ids_with_settings_to_keep_one_pr
     }
 
     [PublicAPI]
-    public class Fixture : TestKit, IAsyncLifetime
+    public class Fixture : global::Akka.TestKit.Xunit2.TestKit, IAsyncLifetime
     {
         public Messages.IProjectEventsResponse FirstResponse { get; private set; } = null!;
         public Messages.IProjectEventsResponse SecondResponse { get; private set; } = null!;

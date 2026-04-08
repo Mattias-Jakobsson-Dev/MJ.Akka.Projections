@@ -11,7 +11,7 @@ using Xunit;
 
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 
-public class LargeNumberOfEventsTests : TestKit
+public class LargeNumberOfEventsTests : global::Akka.TestKit.Xunit2.TestKit
 {
     private readonly Random _random = new();
     private readonly Fixture _fixture = new();

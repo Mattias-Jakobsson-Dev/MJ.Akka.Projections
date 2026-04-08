@@ -8,6 +8,30 @@ namespace MJ.Akka.Projections.Storage.RavenDb;
 [PublicAPI]
 public static class ModifyDocumentExtensions
 {
+    // -------------------------------------------------------------------------
+    // WhenExists / WhenNotExists — return the document-aware interface
+    // -------------------------------------------------------------------------
+
+    public static ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent>
+        WhenExists<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        => new SetupEventHandlerForProjectionWithDocument<TIdContext, TDocument, TEvent>(
+            setup.When(f => f.WithDocumentFilter(ctx => ctx.Exists())));
+
+    public static ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent>
+        WhenNotExists<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        => new SetupEventHandlerForProjectionWithDocument<TIdContext, TDocument, TEvent>(
+            setup.When(f => f.WithDocumentFilter(ctx => !ctx.Exists())));
+
+    // -------------------------------------------------------------------------
+    // Nullable document (standard path)
+    // -------------------------------------------------------------------------
+
     public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
         ModifyDocument<TIdContext, TDocument, TEvent>(
             this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
@@ -15,43 +39,77 @@ public static class ModifyDocumentExtensions
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.ModifyDocument((evnt, doc, _) => modify(evnt, doc));
 
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>ModifyDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-        Func<TEvent, TDocument?, DocumentHandlingMetaData<TIdContext>, TDocument> modify)
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+        ModifyDocument<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            Func<TEvent, TDocument?, DocumentHandlingMetaData<TIdContext>, TDocument> modify)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.ModifyDocument((evnt, doc, metadata) => Task.FromResult(modify(evnt, doc, metadata)));
 
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> 
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
         ModifyDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-        Func<TEvent, TDocument?, Task<TDocument>> modify)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            Func<TEvent, TDocument?, Task<TDocument>> modify)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.ModifyDocument(async (evnt, doc, _, _) => await modify(evnt, doc));
 
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> 
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
         ModifyDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-        Func<TEvent, TDocument?, DocumentHandlingMetaData<TIdContext>, Task<TDocument>> modify)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            Func<TEvent, TDocument?, DocumentHandlingMetaData<TIdContext>, Task<TDocument>> modify)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.ModifyDocument(async (evnt, doc, metadata, _) => await modify(evnt, doc, metadata));
 
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> ModifyDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-        Func<TEvent, TDocument?, CancellationToken, Task<TDocument>> modify)
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+        ModifyDocument<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            Func<TEvent, TDocument?, CancellationToken, Task<TDocument>> modify)
         where TIdContext : IProjectionIdContext
-        where TDocument : class => setup.ModifyDocument(async (evnt, doc, _, cancellationToken) => await modify(evnt, doc, cancellationToken));
+        where TDocument : class => setup.ModifyDocument(async (evnt, doc, _, ct) => await modify(evnt, doc, ct));
 
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> ModifyDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-        Func<TEvent, TDocument?, DocumentHandlingMetaData<TIdContext>, CancellationToken, Task<TDocument>> modify)
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+        ModifyDocument<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            Func<TEvent, TDocument?, DocumentHandlingMetaData<TIdContext>, CancellationToken, Task<TDocument>> modify)
         where TIdContext : IProjectionIdContext
         where TDocument : class
     {
         return setup.HandleWith((evnt, context, position, cancellationToken) =>
             context.ModifyDocument(doc => modify(
-                evnt,
-                doc, 
-                new DocumentHandlingMetaData<TIdContext>(context.Id, position), 
+                evnt, doc,
+                new DocumentHandlingMetaData<TIdContext>(context.Id, position),
                 cancellationToken)));
     }
+
+    // -------------------------------------------------------------------------
+    // Non-nullable document (WhenExists path)
+    // -------------------------------------------------------------------------
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+        ModifyDocument<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent> setup,
+            Func<TEvent, TDocument, TDocument> modify)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        => setup.HandleWith((evnt, ctx, _, _) =>
+        {
+            ctx.ModifyDocument(doc => modify(evnt, doc!));
+            return Task.CompletedTask;
+        });
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+        ModifyDocument<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent> setup,
+            Func<TEvent, TDocument, Task<TDocument>> modify)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        => setup.HandleWith((evnt, ctx, _, _) => ctx.ModifyDocument(doc => modify(evnt, doc!)));
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+        ModifyDocument<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent> setup,
+            Func<TEvent, TDocument, CancellationToken, Task<TDocument>> modify)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        => setup.HandleWith((evnt, ctx, _, ct) => ctx.ModifyDocument(doc => modify(evnt, doc!, ct)));
 }

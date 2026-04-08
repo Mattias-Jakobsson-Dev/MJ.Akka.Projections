@@ -10,7 +10,7 @@ using Xunit;
 
 namespace MJ.Akka.Projections.Tests.ProjectionSequencerTests;
 
-public abstract class ProjectionSequencerBaseFixture : TestKit, IAsyncLifetime
+public abstract class ProjectionSequencerBaseFixture : global::Akka.TestKit.Xunit2.TestKit, IAsyncLifetime
 {
     public async Task InitializeAsync()
     {

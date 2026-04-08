@@ -6,7 +6,7 @@ using Xunit;
 
 namespace MJ.Akka.Projections.Tests.Storage;
 
-public abstract class PositionStorageTests : TestKit
+public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
 {
     [Fact]
     public async Task LoadingNonExistingPosition()

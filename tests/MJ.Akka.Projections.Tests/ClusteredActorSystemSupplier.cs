@@ -10,7 +10,7 @@ using JetBrains.Annotations;
 namespace MJ.Akka.Projections.Tests;
 
 [PublicAPI]
-public class ClusteredActorSystemSupplier : TestKit, IHaveActorSystem
+public class ClusteredActorSystemSupplier : global::Akka.TestKit.Xunit2.TestKit, IHaveActorSystem
 {
     public ActorSystem StartNewActorSystem()
     {

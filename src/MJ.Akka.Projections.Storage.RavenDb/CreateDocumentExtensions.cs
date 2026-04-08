@@ -10,42 +10,42 @@ public static class CreateDocumentExtensions
 {
     public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
         CreateDocument<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
             Func<TEvent, TDocument> create)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.CreateDocument((evnt, _) => create(evnt));
 
     public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
         CreateDocument<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
             Func<TEvent, DocumentHandlingMetaData<TIdContext>, TDocument> create)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.CreateDocument((evnt, metadata) => Task.FromResult(create(evnt, metadata)));
 
     public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
         CreateDocument<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
             Func<TEvent, Task<TDocument>> create)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.CreateDocument(async (evnt, _, _) => await create(evnt));
 
     public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
         CreateDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+        this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
         Func<TEvent, DocumentHandlingMetaData<TIdContext>, Task<TDocument>> create)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.CreateDocument(async (evnt, metadata, _) => await create(evnt, metadata));
 
     public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> 
         CreateDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+        this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
         Func<TEvent, CancellationToken, Task<TDocument>> create)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.CreateDocument(async (evnt, _, cancellationToken) => await create(evnt, cancellationToken));
 
     public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> 
         CreateDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+        this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
         Func<TEvent, DocumentHandlingMetaData<TIdContext>, CancellationToken, Task<TDocument>> create)
         where TIdContext : IProjectionIdContext
         where TDocument : class

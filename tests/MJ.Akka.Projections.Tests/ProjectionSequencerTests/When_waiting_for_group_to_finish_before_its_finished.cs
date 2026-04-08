@@ -27,7 +27,7 @@ public class When_waiting_for_group_to_finish_before_its_finished(
         fixture.TaskFinishedBeforeWait.Should().BeFalse();
     }
     
-    public class Fixture : TestKit, IAsyncLifetime
+    public class Fixture : global::Akka.TestKit.Xunit2.TestKit, IAsyncLifetime
     {
         public bool TaskFinishedBeforeWait { get; private set; }
         public bool TaskFinishedAfterWait { get; private set; }

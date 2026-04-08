@@ -12,7 +12,7 @@ using Xunit;
 
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 
-public class BatchedStorageTests : TestKit
+public class BatchedStorageTests : global::Akka.TestKit.Xunit2.TestKit
 {
     private readonly Fixture _fixture = new();
 

@@ -1,5 +1,16 @@
 namespace MJ.Akka.Projections;
 
+internal class CombinedProjectionFilter<TContext>(
+    IProjectionFilter<TContext> first,
+    IProjectionFilter<TContext> second)
+    : IProjectionFilter<TContext>
+    where TContext : IProjectionContext
+{
+    public bool FilterEvent(object evnt) => first.FilterEvent(evnt) && second.FilterEvent(evnt);
+    public bool FilterResult(TContext context) => first.FilterResult(context) && second.FilterResult(context);
+}
+
+
 internal class ProjectionFilterSetup<TId, TContext, TEvent> : IProjectionFilterSetup<TId, TContext, TEvent>
     where TId : notnull where TContext : IProjectionContext
 {

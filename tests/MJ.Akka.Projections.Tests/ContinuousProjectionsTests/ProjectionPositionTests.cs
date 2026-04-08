@@ -10,7 +10,7 @@ using Xunit;
 
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 
-public class ProjectionPositionTests : TestKit
+public class ProjectionPositionTests : global::Akka.TestKit.Xunit2.TestKit
 {
     private readonly Fixture _fixture = new();
 

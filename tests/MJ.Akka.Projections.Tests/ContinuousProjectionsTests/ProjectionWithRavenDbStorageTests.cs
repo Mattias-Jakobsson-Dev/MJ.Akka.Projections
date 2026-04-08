@@ -146,8 +146,8 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     return doc;
                 })
                 .On<Events<string>.EventWithFilter>(
-                    x => x.DocId,
-                    filter => filter.WithEventFilter(evnt => evnt.Filter()))
+                    x => x.DocId)
+                .When(filter => filter.WithEventFilter(evnt => evnt.Filter()))
                 .ModifyDocument((evnt, doc) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);

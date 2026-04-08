@@ -10,7 +10,7 @@ using Xunit;
 namespace MJ.Akka.Projections.Tests.Storage;
 
 public abstract class ProjectionStorageTests<TIdContext, TContext, TStorageSetup> 
-    : TestKit where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
+    : global::Akka.TestKit.Xunit2.TestKit where TIdContext : IProjectionIdContext where TContext : IProjectionContext where TStorageSetup : IStorageSetup
 {
     private readonly Fixture _fixture = new();
     

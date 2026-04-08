@@ -11,10 +11,15 @@
       <ProjectReference Include="..\..\src\MJ.Akka.Projections.Storage.InfluxDb\MJ.Akka.Projections.Storage.InfluxDb.csproj" />
       <ProjectReference Include="..\..\src\MJ.Akka.Projections.Storage.RavenDb\MJ.Akka.Projections.Storage.RavenDb.csproj" />
       <ProjectReference Include="..\..\src\MJ.Akka.Projections\MJ.Akka.Projections.csproj" />
+      <ProjectReference Include="..\..\src\MJ.Akka.Projections.TestKit\MJ.Akka.Projections.TestKit.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Akka.TestKit.Xunit2" Version="1.5.47" />
+      <PackageReference Include="Akka.TestKit.Xunit2" Version="1.5.60" />
+      <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
       <PackageReference Include="AutoFixture" Version="4.18.1" />
       <PackageReference Include="Docker.DotNet" Version="3.125.15" />
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

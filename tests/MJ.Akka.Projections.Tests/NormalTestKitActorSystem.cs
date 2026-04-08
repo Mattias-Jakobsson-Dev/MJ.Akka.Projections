@@ -5,7 +5,7 @@ using JetBrains.Annotations;
 namespace MJ.Akka.Projections.Tests;
 
 [PublicAPI]
-public class NormalTestKitActorSystem : TestKit, IHaveActorSystem
+public class NormalTestKitActorSystem : global::Akka.TestKit.Xunit2.TestKit, IHaveActorSystem
 {
     public ActorSystem StartNewActorSystem()
     {
