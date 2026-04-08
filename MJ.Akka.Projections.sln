@@ -19,6 +19,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{6BEC8584
 		.github\workflows\test-pull-requests.yml = .github\workflows\test-pull-requests.yml
 		.github\main.workflow = .github\main.workflow
 		.gitignore = .gitignore
+		.github\dependabot.yml = .github\dependabot.yml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MJ.Akka.Projections.Storage.InfluxDb", "src\MJ.Akka.Projections.Storage.InfluxDb\MJ.Akka.Projections.Storage.InfluxDb.csproj", "{E477DE81-8A6D-4966-8CAD-D8C4DD29A2C8}"
