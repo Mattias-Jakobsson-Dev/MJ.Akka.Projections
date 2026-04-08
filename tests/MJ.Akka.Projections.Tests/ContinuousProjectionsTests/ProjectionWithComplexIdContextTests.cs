@@ -4,7 +4,7 @@ using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
 using Xunit;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using JetBrains.Annotations;
 
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
@@ -94,21 +94,21 @@ public class ProjectionWithComplexIdContextTests(NormalTestKitActorSystem actorS
             .Where(x => x.DocId.ToString() == documentId.ToString())
             .ToImmutableList();
     
-        context.Document!.HandledEvents.Count.Should().Be(eventsToCheck.Count);
+        context.Document!.HandledEvents.Count.ShouldBe(eventsToCheck.Count);
     
         var position = 1;
     
         foreach (var evnt in eventsToCheck)
         {
-            context.Document!.HandledEvents.Should().Contain(evnt.EventId);
-            context.Document!.EventHandledOrder[evnt.EventId].Should().Be(position);
+            context.Document!.HandledEvents.ShouldContain(evnt.EventId);
+            context.Document!.EventHandledOrder[evnt.EventId].ShouldBe(position);
     
             position++;
         }
     
         var testProjection = (TestProjectionWithCustomIdContext<ComplexIdContext, string>)projection;
     
-        testProjection.HandledEvents.Should().HaveCount(projectedEvents.Count);
+        testProjection.HandledEvents.Count.ShouldBe(projectedEvents.Count);
     
         return Task.CompletedTask;
     }

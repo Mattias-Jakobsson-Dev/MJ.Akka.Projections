@@ -1,7 +1,6 @@
-using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using MJ.Akka.Projections.Storage;
-using FluentAssertions;
+using Shouldly;
 using Xunit;
 
 namespace MJ.Akka.Projections.Tests.Storage;
@@ -15,7 +14,7 @@ public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
 
         var position = await storage.LoadLatestPosition(Guid.NewGuid().ToString());
 
-        position.Should().BeNull();
+        position.ShouldBeNull();
     }
 
     [Fact]
@@ -28,7 +27,7 @@ public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
 
         var position = await storage.LoadLatestPosition(projectionName);
 
-        position.Should().Be(10);
+        position.ShouldBe(10);
     }
 
     [Fact]
@@ -38,7 +37,7 @@ public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
 
         var position = await storage.StoreLatestPosition(Guid.NewGuid().ToString(), 10);
 
-        position.Should().Be(10);
+        position.ShouldBe(10);
     }
 
     [Fact]
@@ -53,8 +52,8 @@ public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
 
         var loadedPosition = await storage.LoadLatestPosition(projectionName);
 
-        position.Should().Be(10);
-        loadedPosition.Should().Be(10);
+        position.ShouldBe(10);
+        loadedPosition.ShouldBe(10);
     }
 
     [Fact]
@@ -65,13 +64,12 @@ public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
         var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        await ConvertToAsync(() => storage
-                .StoreLatestPosition(projectionName, 10, cancellation.Token))
-            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            ConvertToAsync(() => storage.StoreLatestPosition(projectionName, 10, cancellation.Token)));
         
         var position = await storage.LoadLatestPosition(projectionName, CancellationToken.None);
 
-        position.Should().BeNull();
+        position.ShouldBeNull();
     }
 
     [Fact]
@@ -82,9 +80,8 @@ public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
         var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
-        await ConvertToAsync(() => storage
-                .LoadLatestPosition(projectionName, cancellation.Token))
-            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            ConvertToAsync(() => storage.LoadLatestPosition(projectionName, cancellation.Token)));
     }
 
     [Fact]
@@ -97,7 +94,7 @@ public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
         
         var position = await storage.LoadLatestPosition(projectionName);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
     }
     
     [Fact]
@@ -112,7 +109,7 @@ public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
         
         var position = await storage.LoadLatestPosition(projectionName);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
     }
     
     [Fact]
@@ -127,7 +124,7 @@ public abstract class PositionStorageTests : global::Akka.TestKit.Xunit2.TestKit
         
         var position = await storage.LoadLatestPosition(projectionName);
 
-        position.Should().Be(0);
+        position.ShouldBe(0);
     }
 
     private static async Task<T> ConvertToAsync<T>(Func<Task<T>> action)

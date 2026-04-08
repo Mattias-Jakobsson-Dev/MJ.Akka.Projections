@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.Storage.RavenDb;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.ProjectionIds;
@@ -57,14 +57,14 @@ public class RavenDbProjectionStorageTests(RavenDbFixture fixture)
 
     protected override async Task VerifyContext(RavenDbProjectionContext<TestDocument, SimpleIdContext<string>> loaded)
     {
-        loaded.Document!.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(_eventId));
+        loaded.Document!.HandledEvents.ShouldBe(ImmutableList.Create(_eventId), ignoreOrder: true);
         
         using var session = _documentStore.OpenAsyncSession();
         
         var document = await session.LoadAsync<TestDocument>(loaded.Id);
 
-        document.Should().NotBeNull();
-        document.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(_eventId));
+        document.ShouldNotBeNull();
+        document.HandledEvents.ShouldBe(ImmutableList.Create(_eventId), ignoreOrder: true);
     }
 
     [PublicAPI]

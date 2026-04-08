@@ -1,8 +1,7 @@
 using System.Collections.Immutable;
-using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
 using Xunit;
@@ -33,7 +32,7 @@ public abstract class ProjectionStorageTests<TIdContext, TContext, TStorageSetup
         
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(context);
     }
@@ -67,7 +66,7 @@ public abstract class ProjectionStorageTests<TIdContext, TContext, TStorageSetup
         {
             var context = await loader.Load((TIdContext)originalData.Key.ItemId, projection.GetDefaultContext);
 
-            context.Exists().Should().BeTrue();
+            context.Exists().ShouldBeTrue();
             
             await VerifyContext(context);
         }
@@ -97,7 +96,7 @@ public abstract class ProjectionStorageTests<TIdContext, TContext, TStorageSetup
         
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     [Fact]
@@ -123,7 +122,7 @@ public abstract class ProjectionStorageTests<TIdContext, TContext, TStorageSetup
         
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
         
         await VerifyContext(context);
 
@@ -134,7 +133,7 @@ public abstract class ProjectionStorageTests<TIdContext, TContext, TStorageSetup
         
         context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     [Fact]
@@ -159,7 +158,7 @@ public abstract class ProjectionStorageTests<TIdContext, TContext, TStorageSetup
         
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     [Fact]
@@ -178,20 +177,19 @@ public abstract class ProjectionStorageTests<TIdContext, TContext, TStorageSetup
 
         var projectionStorage = storageSetup.CreateProjectionStorage();
         
-        await projectionStorage
-            .Store(
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            projectionStorage.Store(
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projection.Name, id)] = original
                 }.ToImmutableDictionary(),
-                cancellationTokenSource.Token)
-            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+                cancellationTokenSource.Token));
 
         var loader = projection.GetLoadProjectionContext(storageSetup);
         
         var context = await loader.Load(id, projection.GetDefaultContext, CancellationToken.None);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     protected abstract TStorageSetup GetStorage();

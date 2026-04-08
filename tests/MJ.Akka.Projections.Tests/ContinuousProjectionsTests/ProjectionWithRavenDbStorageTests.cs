@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
@@ -97,21 +97,21 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
             .Where(x => x.DocId.ToString() == documentId)
             .ToImmutableList();
 
-        context.Document!.HandledEvents.Count.Should().Be(eventsToCheck.Count);
+        context.Document!.HandledEvents.Count.ShouldBe(eventsToCheck.Count);
 
         var position = 1;
 
         foreach (var evnt in eventsToCheck)
         {
-            context.Document!.HandledEvents.Should().Contain(evnt.EventId);
-            context.Document!.EventHandledOrder[evnt.EventId].Should().Be(position);
+            context.Document!.HandledEvents.ShouldContain(evnt.EventId);
+            context.Document!.EventHandledOrder[evnt.EventId].ShouldBe(position);
 
             position++;
         }
 
         var testProjection = (TestProjection)projection;
 
-        testProjection.HandledEvents.Should().HaveCount(projectedEvents.Count);
+        testProjection.HandledEvents.Count.ShouldBe(projectedEvents.Count);
 
         return Task.CompletedTask;
     }

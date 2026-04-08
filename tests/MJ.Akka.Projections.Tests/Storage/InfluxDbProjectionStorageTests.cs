@@ -1,9 +1,8 @@
 using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
-using Akka.TestKit.Extensions;
 using MJ.Akka.Projections.Storage.InfluxDb;
-using FluentAssertions;
+using Shouldly;
 using InfluxDB.Client;
 using InfluxDB.Client.Api.Domain;
 using InfluxDB.Client.Writes;
@@ -46,7 +45,7 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
             .GetQueryApi()
             .QueryAsync($"from(bucket:\"{fixture.BucketName}\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{_measurementName}\")", fixture.Organization);
 
-        items.Should().HaveCount(0);
+        items.Count.ShouldBe(0);
     }
 
     public override async Task StoreAndDeleteSingleDocumentInTwoTransactions()
@@ -82,7 +81,7 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
             .GetQueryApi()
             .QueryAsync($"from(bucket:\"{fixture.BucketName}\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{_measurementName}\")", fixture.Organization);
 
-        items.Should().HaveCount(0);
+        items.Count.ShouldBe(0);
     }
 
     public override async Task DeleteNonExistingDocument()
@@ -106,7 +105,7 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
             .GetQueryApi()
             .QueryAsync($"from(bucket:\"{fixture.BucketName}\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{_measurementName}\")", fixture.Organization);
 
-        items.Should().HaveCount(0);
+        items.Count.ShouldBe(0);
     }
     
     public override async Task WriteWithCancelledTask()
@@ -125,13 +124,13 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
 
         var projectionStorage = storageSetup.CreateProjectionStorage();
         
-        await projectionStorage
-            .Store(new Dictionary<ProjectionContextId, IProjectionContext>
-            {
-                [new ProjectionContextId(projection.Name, id)] = original
-            }.ToImmutableDictionary(), 
-                cancellationTokenSource.Token)
-            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            projectionStorage.Store(
+                new Dictionary<ProjectionContextId, IProjectionContext>
+                {
+                    [new ProjectionContextId(projection.Name, id)] = original
+                }.ToImmutableDictionary(),
+                cancellationTokenSource.Token));
     }
 
     protected override SetupInfluxDbStorage GetStorage()
@@ -175,11 +174,11 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
             .GetQueryApi()
             .QueryAsync($"from(bucket:\"{fixture.BucketName}\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{_measurementName}\")", fixture.Organization);
 
-        items.Should().HaveCount(1);
+        items.Count.ShouldBe(1);
 
-        items[0].Records.Should().HaveCount(1);
+        items[0].Records.Count.ShouldBe(1);
         
-        items[0].Records[0].Values["_value"].Should().Be(5d);
+        items[0].Records[0].Values["_value"].ShouldBe(5d);
     }
     
     protected override InfluxDbTimeSeriesId CreateRandomId()

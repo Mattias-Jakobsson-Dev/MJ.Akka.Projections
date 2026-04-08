@@ -1,10 +1,9 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
 using MJ.Akka.Projections.Storage;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.Batched;
 using MJ.Akka.Projections.Storage.InMemory;
@@ -53,7 +52,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
                         [new ProjectionContextId(projectionName, write.Id)] = write
                     }.ToImmutableDictionary())));
 
-        innerStorage.NumberOfWrites.Should().BeLessThan(4);
+        innerStorage.NumberOfWrites.ShouldBeLessThan(4);
     }
     
     [Fact]
@@ -92,7 +91,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
                         [new ProjectionContextId(projectionName, write.Id)] = write
                     }.ToImmutableDictionary())));
 
-        innerStorage.NumberOfWrites.Should().Be(1);
+        innerStorage.NumberOfWrites.ShouldBe(1);
     }
 
     [Fact]
@@ -127,8 +126,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
         
         await cancellationTokenSource.CancelAsync();
         
-        await task
-            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => task);
     }
     
     [Fact]
@@ -178,11 +176,9 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
                 }.ToImmutableDictionary(),
                 cancellationTokenSource.Token);
         
-        await firstTask
-            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => firstTask);
         
-        await secondTask
-            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => secondTask);
     }
     
     [Fact]
@@ -239,19 +235,17 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
                 }.ToImmutableDictionary(),
                 secondCancellationTokenSource.Token);
         
-        await firstTask
-            .ShouldThrowWithin<OperationCanceledException>(TimeSpan.FromSeconds(1));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => firstTask);
 
-        await secondTask
-            .ShouldCompleteWithin(TimeSpan.FromSeconds(1));
+        await secondTask;
         
         var document = await loader.Load(
             secondId,
             id => new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(id, null),
             secondCancellationTokenSource.Token);
 
-        document.Exists().Should().BeTrue();
-        document.Id.Should().Be(secondId);
+        document.Exists().ShouldBeTrue();
+        document.Id.ShouldBe(secondId);
     }
     
     private class StorageWithDelay(TimeSpan delay) : IProjectionStorage

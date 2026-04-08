@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
@@ -63,11 +63,11 @@ public abstract class TestProjectionBaseOneTimeTests<TId>(IHaveActorSystem actor
             .Where(x => x.DocId.ToString() == documentId.ToString())
             .ToImmutableList();
 
-        document.HandledEvents.Count.Should().Be(eventsToCheck.Count);
+        document.HandledEvents.Count.ShouldBe(eventsToCheck.Count);
 
         foreach (var evnt in eventsToCheck)
         {
-            document.HandledEvents.Should().Contain(evnt.EventId);
+            document.HandledEvents.ShouldContain(evnt.EventId);
         }
         
         return Task.CompletedTask;

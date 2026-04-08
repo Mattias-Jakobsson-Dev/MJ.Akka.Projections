@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
-using FluentAssertions;
+using Shouldly;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
@@ -60,19 +60,19 @@ public class RavenDbMetadataWithDocumentProjectionStorageTests(RavenDbFixture fi
     
     protected override async Task VerifyContext(RavenDbProjectionContext<TestDocument, SimpleIdContext<string>> loaded)
     {
-        loaded.Document.Should().NotBeNull();
-        loaded.Document!.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(_eventId));
+        loaded.Document.ShouldNotBeNull();
+        loaded.Document!.HandledEvents.ShouldBe(ImmutableList.Create(_eventId), ignoreOrder: true);
 
         using var session = _documentStore.OpenAsyncSession();
         
         var document = await session.LoadAsync<TestDocument>(loaded.Id);
 
-        document.Should().NotBeNull();
-        document.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(_eventId));
+        document.ShouldNotBeNull();
+        document.HandledEvents.ShouldBe(ImmutableList.Create(_eventId), ignoreOrder: true);
 
         var metadata = session.Advanced.GetMetadataFor(document);
 
-        metadata["testkey"].Should().Be("testvalue");
+        metadata["testkey"].ShouldBe("testvalue");
     }
     
     [PublicAPI]

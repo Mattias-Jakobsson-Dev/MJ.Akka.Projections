@@ -1,8 +1,7 @@
 using System.Collections.Immutable;
-using Akka.TestKit.Extensions;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.Storage.InMemory;
 using MJ.Akka.Projections.Tests.TestData;
@@ -43,14 +42,12 @@ public class ProjectionPositionTests : global::Akka.TestKit.Xunit2.TestKit
                 new SetupInMemoryStorage())
             .Start();
 
-        await coordinator
-            .Get(projection.Name)!
-            .WaitForCompletion(TimeSpan.FromSeconds(5))
-            .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
+        await Should.ThrowAsync<Exception>(() =>
+            coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5)));
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        (position ?? 0).Should().BeLessThan(2);
+        (position ?? 0).ShouldBeLessThan(2);
     }
 
     [Fact]
@@ -89,17 +86,15 @@ public class ProjectionPositionTests : global::Akka.TestKit.Xunit2.TestKit
                 storageSetup)
             .Start();
 
-        await coordinator
-            .Get(projection.Name)!
-            .WaitForCompletion(TimeSpan.FromSeconds(5))
-            .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
+        await Should.ThrowAsync<Exception>(() =>
+            coordinator.Get(projection.Name)!.WaitForCompletion(TimeSpan.FromSeconds(5)));
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().BeLessThan(3);
+        (position ?? 0).ShouldBeLessThan(3);
 
         var firstContext = await loader.Load(documentId, projection.GetDefaultContext);
 
-        firstContext.Exists().Should().BeTrue();
+        firstContext.Exists().ShouldBeTrue();
     }
 }

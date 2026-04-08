@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
-using FluentAssertions;
+using Shouldly;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.InProc;
@@ -19,25 +19,25 @@ public class When_projecting_two_batches_to_two_ids_with_settings_to_keep_one_pr
     [Fact]
     public void Then_first_response_should_be_success()
     {
-        fixture.FirstResponse.Should().BeOfType<Messages.Acknowledge>();
+        fixture.FirstResponse.ShouldBeOfType<Messages.Acknowledge>();
     }
 
     [Fact]
     public void Then_second_response_should_be_success()
     {
-        fixture.SecondResponse.Should().BeOfType<Messages.Acknowledge>();
+        fixture.SecondResponse.ShouldBeOfType<Messages.Acknowledge>();
     }
 
     [Fact]
     public void Then_first_projector_should_be_stopped()
     {
-        fixture.FirstProjector.Should().BeNull();
+        fixture.FirstProjector.ShouldBeNull();
     }
 
     [Fact]
     public void Then_second_projector_should_still_be_running()
     {
-        fixture.SecondProjector.Should().NotBeNull();
+        fixture.SecondProjector.ShouldNotBeNull();
     }
 
     [PublicAPI]

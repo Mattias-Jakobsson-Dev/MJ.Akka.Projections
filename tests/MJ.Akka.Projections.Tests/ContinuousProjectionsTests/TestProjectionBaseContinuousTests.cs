@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Akka.Streams;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.ProjectionIds;
@@ -68,19 +68,19 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(5);
+        position.ShouldBe(5);
 
         var firstContext = await loader.Load(firstDocumentId, projection.GetDefaultContext);
 
-        firstContext.Exists().Should().BeTrue();
+        firstContext.Exists().ShouldBeTrue();
 
-        firstContext.Document!.HandledEvents.Should().HaveCount(3);
+        firstContext.Document!.HandledEvents.Count.ShouldBe(3);
 
         var secondContext = await loader.Load(secondDocumentId, projection.GetDefaultContext);
 
-        secondContext.Exists().Should().BeTrue();
+        secondContext.Exists().ShouldBeTrue();
 
-        secondContext.Document!.HandledEvents.Should().HaveCount(2);
+        secondContext.Document!.HandledEvents.Count.ShouldBe(2);
     }
     
     protected override SetupInMemoryStorage CreateStorageSetup()
@@ -154,21 +154,21 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
             .Where(x => x.DocId.ToString() == documentId.ToString())
             .ToImmutableList();
 
-        context.Document!.HandledEvents.Count.Should().Be(eventsToCheck.Count);
+        context.Document!.HandledEvents.Count.ShouldBe(eventsToCheck.Count);
 
         var position = 1;
 
         foreach (var evnt in eventsToCheck)
         {
-            context.Document!.HandledEvents.Should().Contain(evnt.EventId);
-            context.Document!.EventHandledOrder[evnt.EventId].Should().Be(position);
+            context.Document!.HandledEvents.ShouldContain(evnt.EventId);
+            context.Document!.EventHandledOrder[evnt.EventId].ShouldBe(position);
 
             position++;
         }
 
         var testProjection = (TestProjection<TId>)projection;
 
-        testProjection.HandledEvents.Should().HaveCount(projectedEvents.Count);
+        testProjection.HandledEvents.Count.ShouldBe(projectedEvents.Count);
 
         return Task.CompletedTask;
     }

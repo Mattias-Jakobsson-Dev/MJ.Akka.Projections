@@ -1,4 +1,4 @@
-using FluentAssertions;
+using Shouldly;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
@@ -14,7 +14,7 @@ public class ProjectionContextIdTests
         var id1 = new ProjectionContextId("projection", new SimpleIdContext<string>("id"));
         var id2 = new ProjectionContextId("projection", new SimpleIdContext<string>("id"));
 
-        id1.Should().Be(id2);
+        id1.ShouldBe(id2);
     }
     
     [Fact]
@@ -23,7 +23,7 @@ public class ProjectionContextIdTests
         var id1 = new ProjectionContextId("projection", new ComplexIdContext("id", new ChildData(1)));
         var id2 = new ProjectionContextId("projection", new ComplexIdContext("id", new ChildData(2)));
 
-        id1.Should().Be(id2);
+        id1.ShouldBe(id2);
     }
     
     [Fact]
@@ -32,7 +32,7 @@ public class ProjectionContextIdTests
         var id1 = new ProjectionContextId("projection", new ComplexIdContext("id1", new ChildData(1)));
         var id2 = new ProjectionContextId("projection", new ComplexIdContext("id2", new ChildData(1)));
 
-        id1.Should().NotBe(id2);
+        id1.ShouldNotBe(id2);
     }
     
     [Fact]
@@ -41,7 +41,7 @@ public class ProjectionContextIdTests
         var id1 = new ProjectionContextId("projection1", new ComplexIdContext("id", new ChildData(1)));
         var id2 = new ProjectionContextId("projection2", new ComplexIdContext("id", new ChildData(1)));
 
-        id1.Should().NotBe(id2);
+        id1.ShouldNotBe(id2);
     }
     
     [Fact]
@@ -50,7 +50,7 @@ public class ProjectionContextIdTests
         var id1 = new ProjectionContextId("projection", new ComplexIdContext("id1", new ChildData(1)));
         var id2 = new ProjectionContextId("projection", new ComplexIdContext("id2", new ChildData(1)));
 
-        id1.Should().NotBe(id2);
+        id1.ShouldNotBe(id2);
     }
     
     [Fact]
@@ -64,7 +64,7 @@ public class ProjectionContextIdTests
             [id1] = "value"
         };
 
-        dictionary.TryGetValue(id2, out _).Should().BeTrue();
+        dictionary.TryGetValue(id2, out _).ShouldBeTrue();
     }
     
     [PublicAPI]

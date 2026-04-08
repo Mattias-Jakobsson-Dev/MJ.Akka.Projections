@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.InMemory;
@@ -18,13 +18,13 @@ public class When_waiting_for_group_to_finish_before_its_finished(
     [Fact]
     public void Then_task_should_be_finished_after_waiting()
     {
-        fixture.TaskFinishedAfterWait.Should().BeTrue();
+        fixture.TaskFinishedAfterWait.ShouldBeTrue();
     }
     
     [Fact]
     public void Then_task_should_not_be_finished_before_waiting()
     {
-        fixture.TaskFinishedBeforeWait.Should().BeFalse();
+        fixture.TaskFinishedBeforeWait.ShouldBeFalse();
     }
     
     public class Fixture : global::Akka.TestKit.Xunit2.TestKit, IAsyncLifetime

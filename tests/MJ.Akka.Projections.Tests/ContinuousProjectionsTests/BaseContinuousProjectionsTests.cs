@@ -1,9 +1,8 @@
 using System.Collections.Immutable;
 using Akka.Streams;
-using Akka.TestKit.Extensions;
 using AutoFixture;
 using MJ.Akka.Projections.Storage;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.ProjectionIds;
 using Xunit;
@@ -48,11 +47,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
     }
 
     [Fact]
@@ -77,18 +76,16 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
                 storageSetup)
             .Start();
 
-        await coordinator
-            .Get(projection.Name)!
-            .WaitForCompletion(Timeout)
-            .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
+        await Should.ThrowAsync<Exception>(() =>
+            coordinator.Get(projection.Name)!.WaitForCompletion(Timeout));
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().BeNull();
+        position.ShouldBeNull();
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     [Fact]
@@ -130,11 +127,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
     }
 
     [Fact]
@@ -166,18 +163,16 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
                 storageSetup)
             .Start();
 
-        await coordinator
-            .Get(projection.Name)!
-            .WaitForCompletion(Timeout)
-            .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
+        await Should.ThrowAsync<Exception>(() =>
+            coordinator.Get(projection.Name)!.WaitForCompletion(Timeout));
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().BeNull();
+        position.ShouldBeNull();
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     [Fact]
@@ -219,11 +214,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
     }
 
     [Fact]
@@ -265,11 +260,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
     }
 
     [Fact]
@@ -301,18 +296,16 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
                 storageSetup)
             .Start();
 
-        await coordinator
-            .Get(projection.Name)!
-            .WaitForCompletion(Timeout)
-            .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
+        await Should.ThrowAsync<Exception>(() =>
+            coordinator.Get(projection.Name)!.WaitForCompletion(Timeout));
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().BeNull();
+        position.ShouldBeNull();
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     [Fact]
@@ -345,11 +338,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(id, context, events, projection);
     }
@@ -387,17 +380,17 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
 
         var firstContext = await loader.Load(firstId, projection.GetDefaultContext);
 
-        firstContext.Exists().Should().BeTrue();
+        firstContext.Exists().ShouldBeTrue();
 
         await VerifyContext(firstId, firstContext, events, projection);
 
         var secondContext = await loader.Load(secondId, projection.GetDefaultContext);
 
-        secondContext.Exists().Should().BeTrue();
+        secondContext.Exists().ShouldBeTrue();
 
         await VerifyContext(secondId, secondContext, events, projection);
     }
@@ -431,11 +424,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(2);
+        position.ShouldBe(2);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     [Fact]
@@ -467,11 +460,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(2);
+        position.ShouldBe(2);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
         
         await VerifyContext(id, context, events, projection);
     }
@@ -504,11 +497,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(id, context, events, projection);
     }
@@ -542,11 +535,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(2);
+        position.ShouldBe(2);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(id, context, events, projection);
     }
@@ -581,17 +574,17 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(2);
+        position.ShouldBe(2);
 
         var firstContext = await loader.Load(firstId, projection.GetDefaultContext);
 
-        firstContext.Exists().Should().BeTrue();
+        firstContext.Exists().ShouldBeTrue();
 
         await VerifyContext(firstId, firstContext, events, projection);
 
         var secondContext = await loader.Load(secondId, projection.GetDefaultContext);
 
-        secondContext.Exists().Should().BeTrue();
+        secondContext.Exists().ShouldBeTrue();
 
         await VerifyContext(secondId, secondContext, events, projection);
     }
@@ -628,11 +621,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(2);
+        position.ShouldBe(2);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(id, context, ImmutableList.Create(secondEvent), projection);
     }
@@ -667,11 +660,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(2);
+        position.ShouldBe(2);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(id, context, ImmutableList.Create(secondEvent), projection);
     }
@@ -709,11 +702,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(3);
+        position.ShouldBe(3);
 
         var context = await loader.Load(documentId, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(documentId, context, events, projection);
     }
@@ -754,11 +747,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(6);
+        position.ShouldBe(6);
 
         var context = await loader.Load(documentId, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(documentId, context, events, projection);
     }
@@ -799,11 +792,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(6);
+        position.ShouldBe(6);
 
         var context = await loader.Load(documentId, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(documentId, context, events, projection);
     }
@@ -841,11 +834,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(3);
+        position.ShouldBe(3);
 
         var context = await loader.Load(documentId, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
         await VerifyContext(documentId, context, events, projection);
     }
@@ -879,11 +872,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(10);
+        position.ShouldBe(10);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
     
     [Fact]
@@ -915,11 +908,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(10);
+        position.ShouldBe(10);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     [Fact]
@@ -951,11 +944,11 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(2);
+        position.ShouldBe(2);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeFalse();
+        context.Exists().ShouldBeFalse();
     }
 
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> Configure(
@@ -989,3 +982,7 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
         IImmutableList<object> events,
         IProjection projection);
 }
+
+
+
+

@@ -1,8 +1,7 @@
 using System.Collections.Immutable;
 using Akka.Streams;
-using Akka.TestKit.Extensions;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.OneTime;
 using MJ.Akka.Projections.ProjectionIds;
@@ -41,7 +40,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var document = await result.Load(id);
 
-        document.Should().NotBeNull();
+        document.ShouldNotBeNull();
     }
 
     [Fact]
@@ -54,12 +53,10 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
         var events = ImmutableList.Create(GetEventThatFails(id, 1));
         var projection = GetProjection(events);
 
-        await system
-            .CreateOneTimeProjection(
-                projection,
-                Configure)
-            .Run(TimeSpan.FromSeconds(5))
-            .ShouldThrowWithin<Exception>(TimeSpan.FromSeconds(5));
+        await Should.ThrowAsync<Exception>(() =>
+            system
+                .CreateOneTimeProjection(projection, Configure)
+                .Run(TimeSpan.FromSeconds(5)));
     }
 
     [Fact]
@@ -82,7 +79,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var document = await result.Load(id);
 
-        document.Should().NotBeNull();
+        document.ShouldNotBeNull();
 
         await VerifyDocument(id, document!, events);
     }
@@ -110,13 +107,13 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var firstDocument = await result.Load(firstId);
 
-        firstDocument.Should().NotBeNull();
+        firstDocument.ShouldNotBeNull();
 
         await VerifyDocument(firstId, firstDocument!, events);
 
         var secondDocument = await result.Load(secondId);
 
-        secondDocument.Should().NotBeNull();
+        secondDocument.ShouldNotBeNull();
 
         await VerifyDocument(secondId, secondDocument!, events);
     }
@@ -140,7 +137,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var document = await result.Load(id);
 
-        document.Should().BeNull();
+        document.ShouldBeNull();
     }
 
     [Fact]
@@ -162,7 +159,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var document = await result.Load(id);
 
-        document.Should().NotBeNull();
+        document.ShouldNotBeNull();
 
         await VerifyDocument(id, document!, events);
     }
@@ -186,7 +183,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var firstDocument = await firstResult.Load(id);
 
-        firstDocument.Should().NotBeNull();
+        firstDocument.ShouldNotBeNull();
 
         await VerifyDocument(id, firstDocument!, events);
         
@@ -198,7 +195,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var secondDocument = await secondResult.Load(id);
 
-        secondDocument.Should().NotBeNull();
+        secondDocument.ShouldNotBeNull();
 
         await VerifyDocument(id, secondDocument!, events);
     }
@@ -222,7 +219,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var firstDocument = await firstResult.Load(id);
 
-        firstDocument.Should().NotBeNull();
+        firstDocument.ShouldNotBeNull();
 
         await VerifyDocument(id, firstDocument!, events);
         
@@ -234,7 +231,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var secondDocument = await secondResult.Load(id);
 
-        secondDocument.Should().NotBeNull();
+        secondDocument.ShouldNotBeNull();
 
         await VerifyDocument(id, secondDocument!, events);
     }
@@ -259,13 +256,13 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var firstDocument = await result.Load(firstId);
 
-        firstDocument.Should().NotBeNull();
+        firstDocument.ShouldNotBeNull();
 
         await VerifyDocument(firstId, firstDocument!, events);
 
         var secondDocument = await result.Load(secondId);
 
-        secondDocument.Should().NotBeNull();
+        secondDocument.ShouldNotBeNull();
 
         await VerifyDocument(secondId, secondDocument!, events);
     }
@@ -292,7 +289,7 @@ public abstract class BaseOneTimeProjectionsTest<TId, TDocument>(IHaveActorSyste
 
         var document = await result.Load(id);
 
-        document.Should().NotBeNull();
+        document.ShouldNotBeNull();
 
         await VerifyDocument(id, document!, ImmutableList.Create(secondEvent));
     }

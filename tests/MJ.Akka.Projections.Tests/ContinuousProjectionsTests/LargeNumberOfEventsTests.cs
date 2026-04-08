@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Akka.Streams;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.Storage.Batched;
 using MJ.Akka.Projections.Storage.InMemory;
@@ -238,26 +238,26 @@ public class LargeNumberOfEventsTests : global::Akka.TestKit.Xunit2.TestKit
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(numberOfEvents);
+        position.ShouldBe(numberOfEvents);
 
         foreach (var documentId in documentIds)
         {
             var context = await loader.Load(documentId, projection.GetDefaultContext);
 
-            context.Exists().Should().BeTrue();
+            context.Exists().ShouldBeTrue();
 
             var documentEvents = events
                 .Where(x => x.DocId.ToString() == context.Id.ToString())
                 .ToImmutableList();
 
-            context.Document!.HandledEvents.Should().HaveCount(documentEvents.Count);
+            context.Document!.HandledEvents.Count.ShouldBe(documentEvents.Count);
 
-            context.Document!.HandledEvents.Should().BeEquivalentTo(documentEvents.Select(x => x.EventId));
+            context.Document!.HandledEvents.ShouldBe(documentEvents.Select(x => x.EventId), ignoreOrder: true);
         }
 
-        projection.HandledEvents.Should().HaveCount(numberOfEvents);
+        projection.HandledEvents.Count.ShouldBe(numberOfEvents);
 
-        eventTracker.StoredEvents.Distinct().Should().HaveCount(numberOfEvents);
+        eventTracker.StoredEvents.Distinct().Count().ShouldBe(numberOfEvents);
     }
 
     private class SequentialPositionStorageTester : InMemoryPositionStorage

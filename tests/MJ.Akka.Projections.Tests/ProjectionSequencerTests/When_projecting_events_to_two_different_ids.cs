@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using FluentAssertions;
+using Shouldly;
 using JetBrains.Annotations;
 using Xunit;
 
@@ -11,13 +11,13 @@ public class When_projecting_events_to_two_different_ids(When_projecting_events_
     [Fact]
     public void Then_first_task_should_finish()
     {
-        fixture.FirstTaskResponse.Should().NotBeNull();
+        fixture.FirstTaskResponse.ShouldNotBeNull();
     }
 
     [Fact]
     public void Then_second_task_should_finish()
     {
-        fixture.SecondTaskResponse.Should().NotBeNull();
+        fixture.SecondTaskResponse.ShouldNotBeNull();
     }
 
     [Fact]
@@ -26,8 +26,7 @@ public class When_projecting_events_to_two_different_ids(When_projecting_events_
         fixture
             .SecondTaskResponse!
             .TimeSinceStarted
-            .Should()
-            .BeLessThan(fixture.FirstTaskResponse!.TimeSinceCompleted);
+            .ShouldBeLessThan(fixture.FirstTaskResponse!.TimeSinceCompleted);
     }
     
     [PublicAPI]

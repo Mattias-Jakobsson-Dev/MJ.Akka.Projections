@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using FluentAssertions;
+using Shouldly;
 using JetBrains.Annotations;
 using Xunit;
 
@@ -12,13 +12,13 @@ public class When_projecting_slower_events_before_faster_events_for_same_id(
     [Fact]
     public void Then_first_task_should_finish()
     {
-        fixture.FirstTaskResponse.Should().NotBeNull();
+        fixture.FirstTaskResponse.ShouldNotBeNull();
     }
 
     [Fact]
     public void Then_second_task_should_finish()
     {
-        fixture.SecondTaskResponse.Should().NotBeNull();
+        fixture.SecondTaskResponse.ShouldNotBeNull();
     }
 
     [Fact]
@@ -27,8 +27,7 @@ public class When_projecting_slower_events_before_faster_events_for_same_id(
         fixture
             .FirstTaskResponse!
             .TimeSinceCompleted
-            .Should()
-            .BeLessThan(fixture
+            .ShouldBeLessThan(fixture
                 .SecondTaskResponse!
                 .TimeSinceStarted);
     }

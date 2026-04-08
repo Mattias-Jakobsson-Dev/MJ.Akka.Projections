@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Akka.Streams;
 using Akka.TestKit.Xunit2;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.Batched;
@@ -55,14 +55,14 @@ public class BatchedStorageTests : global::Akka.TestKit.Xunit2.TestKit
 
         var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
 
-        position.Should().Be(1);
+        position.ShouldBe(1);
 
         var context = await loader.Load(id, projection.GetDefaultContext);
 
-        context.Exists().Should().BeTrue();
+        context.Exists().ShouldBeTrue();
 
-        context.Document!.HandledEvents.Should().HaveCount(1);
+        context.Document!.HandledEvents.Count.ShouldBe(1);
 
-        context.Document!.HandledEvents[0].Should().Be(eventId);
+        context.Document!.HandledEvents[0].ShouldBe(eventId);
     }
 }

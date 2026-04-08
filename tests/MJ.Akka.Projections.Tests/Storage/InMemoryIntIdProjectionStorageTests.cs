@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using FluentAssertions;
+using Shouldly;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage.InMemory;
@@ -44,7 +44,7 @@ public class InMemoryIntIdProjectionStorageTests
 
     protected override Task VerifyContext(InMemoryProjectionContext<SimpleIdContext<int>, TestDocument<int>> loaded)
     {
-        loaded.Document!.HandledEvents.Should().BeEquivalentTo(ImmutableList.Create(_eventId));
+        loaded.Document!.HandledEvents.ShouldBe(ImmutableList.Create(_eventId), ignoreOrder: true);
 
         return Task.CompletedTask;
     }

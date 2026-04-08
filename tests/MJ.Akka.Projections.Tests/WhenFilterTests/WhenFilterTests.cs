@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 using AutoFixture;
-using FluentAssertions;
+using Shouldly;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage.InMemory;
@@ -51,7 +51,7 @@ public class WhenFilterTests
         protected override async Task Then()
         {
             var ctx = await LoadContext(_id);
-            ctx.Document!.Tags.Should().ContainSingle().Which.Should().Be(_matchingTag);
+            ctx.Document!.Tags.ShouldHaveSingleItem().ShouldBe(_matchingTag);
         }
 
         private class Proj(string id, string matchingTag)
@@ -118,11 +118,13 @@ public class WhenFilterTests
         {
             var existingCtx = await LoadContext(_existingId);
             // existing doc: unconditional runs + conditional runs
-            existingCtx.Document!.Tags.Should().Contain("unconditional").And.Contain("conditional");
+            existingCtx.Document!.Tags.ShouldContain("unconditional");
+            existingCtx.Document!.Tags.ShouldContain("conditional");
 
             var newCtx = await LoadContext(_newId);
             // new doc: unconditional runs, conditional skipped (doc didn't exist at load time)
-            newCtx.Document!.Tags.Should().Contain("unconditional").And.NotContain("conditional");
+            newCtx.Document!.Tags.ShouldContain("unconditional");
+            newCtx.Document!.Tags.ShouldNotContain("conditional");
         }
 
         private class Proj(string existingId, string newId)
@@ -186,7 +188,7 @@ public class WhenFilterTests
         protected override async Task Then()
         {
             var ctx = await LoadContext(_id);
-            ctx.Document!.Tags.Should().Equal("A", "B");
+            ctx.Document!.Tags.ShouldBe(new[] { "A", "B" });
         }
 
         private class Proj(string id)
@@ -243,7 +245,7 @@ public class WhenFilterTests
             var ctx = await LoadContext(_id);
             // "skip": filtered skipped, unconditional runs → ["unconditional"]
             // "run":  filtered runs, unconditional runs   → ["unconditional","filtered","unconditional"]
-            ctx.Document!.Tags.Should().Equal("unconditional", "filtered", "unconditional");
+            ctx.Document!.Tags.ShouldBe(new[] { "unconditional", "filtered", "unconditional" });
         }
 
         private class Proj(string id)

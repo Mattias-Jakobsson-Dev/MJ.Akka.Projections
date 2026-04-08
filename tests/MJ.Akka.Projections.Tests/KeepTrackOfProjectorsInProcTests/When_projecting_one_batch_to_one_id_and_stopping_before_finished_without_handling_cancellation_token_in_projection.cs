@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.TestKit.Xunit2;
-using FluentAssertions;
+using Shouldly;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.InProc;
@@ -20,13 +20,13 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_wi
     [Fact]
     public void Then_response_should_be_rejection()
     {
-        fixture.Response.Should().BeOfType<Messages.Reject>();
+        fixture.Response.ShouldBeOfType<Messages.Reject>();
     }
     
     [Fact]
     public void Then_projector_should_still_be_running()
     {
-        fixture.Projector.Should().NotBeNull();
+        fixture.Projector.ShouldNotBeNull();
     }
     
     [PublicAPI]
