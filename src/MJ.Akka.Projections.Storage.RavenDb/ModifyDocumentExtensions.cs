@@ -14,19 +14,31 @@ public static class ModifyDocumentExtensions
 
     public static ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent>
         WhenExists<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            Func<IProjectionFilterSetup<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>,
+                IProjectionFilterSetup<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>>? additionalFilter = null)
         where TIdContext : IProjectionIdContext
         where TDocument : class
         => new SetupEventHandlerForProjectionWithDocument<TIdContext, TDocument, TEvent>(
-            setup.When(f => f.WithDocumentFilter(ctx => ctx.Exists())));
+            setup.When(f =>
+            {
+                var filtered = f.WithDocumentFilter(ctx => ctx.Exists());
+                return additionalFilter != null ? additionalFilter(filtered) : filtered;
+            }));
 
     public static ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent>
         WhenNotExists<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            Func<IProjectionFilterSetup<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>,
+                IProjectionFilterSetup<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>>? additionalFilter = null)
         where TIdContext : IProjectionIdContext
         where TDocument : class
         => new SetupEventHandlerForProjectionWithDocument<TIdContext, TDocument, TEvent>(
-            setup.When(f => f.WithDocumentFilter(ctx => !ctx.Exists())));
+            setup.When(f =>
+            {
+                var filtered = f.WithDocumentFilter(ctx => !ctx.Exists());
+                return additionalFilter != null ? additionalFilter(filtered) : filtered;
+            }));
 
     // -------------------------------------------------------------------------
     // Nullable document (standard path)
