@@ -109,7 +109,6 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
                 if (!handlers.TryGetValue(type, out var handler))
                     continue;
 
-
                 await handler.Handle(evnt, context, position, cancellationToken);
 
                 handled = true;

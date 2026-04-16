@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using Akka.TestKit.Xunit2;
 using AutoFixture;
 using Shouldly;
 using MJ.Akka.Projections.Configuration;
