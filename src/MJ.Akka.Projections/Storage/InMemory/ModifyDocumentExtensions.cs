@@ -46,57 +46,6 @@ public static class ModifyDocumentExtensions
             },
             h => configureHandlers(new SetupEventHandlerForProjectionWithDocument<TId, TDocument, TEvent>(h)));
 
-    // -------------------------------------------------------------------------
-    // ModifyDocument on ISetupHandlerFiltering (convenience — pass-all filter)
-    // -------------------------------------------------------------------------
-
-    public static ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
-        ModifyDocument<TId, TDocument, TEvent>(
-            this ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, TDocument> modify)
-        where TId : notnull
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
-        ModifyDocument<TId, TDocument, TEvent>(
-            this ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, DocumentHandlingMetaData<SimpleIdContext<TId>>, TDocument> modify)
-        where TId : notnull
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
-        ModifyDocument<TId, TDocument, TEvent>(
-            this ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, Task<TDocument>> modify)
-        where TId : notnull
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
-        ModifyDocument<TId, TDocument, TEvent>(
-            this ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, DocumentHandlingMetaData<SimpleIdContext<TId>>, Task<TDocument>> modify)
-        where TId : notnull
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
-        ModifyDocument<TId, TDocument, TEvent>(
-            this ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, CancellationToken, Task<TDocument>> modify)
-        where TId : notnull
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
-        ModifyDocument<TId, TDocument, TEvent>(
-            this ISetupHandlerFiltering<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, DocumentHandlingMetaData<SimpleIdContext<TId>>, CancellationToken, Task<TDocument>> modify)
-        where TId : notnull
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
 
     // -------------------------------------------------------------------------
     // ModifyDocument on ISetupEventHandlerForProjection (nullable document)

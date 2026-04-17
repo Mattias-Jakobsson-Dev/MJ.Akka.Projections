@@ -46,57 +46,6 @@ public static class ModifyDocumentExtensions
             },
             h => configureHandlers(new SetupEventHandlerForProjectionWithDocument<TIdContext, TDocument, TEvent>(h)));
 
-    // -------------------------------------------------------------------------
-    // ModifyDocument on ISetupHandlerFiltering (convenience — pass-all filter)
-    // -------------------------------------------------------------------------
-
-    public static ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
-        ModifyDocument<TIdContext, TDocument, TEvent>(
-            this ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, TDocument> modify)
-        where TIdContext : IProjectionIdContext
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
-        ModifyDocument<TIdContext, TDocument, TEvent>(
-            this ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, DocumentHandlingMetaData<SimpleIdContext<string>>, TDocument> modify)
-        where TIdContext : IProjectionIdContext
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
-        ModifyDocument<TIdContext, TDocument, TEvent>(
-            this ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, Task<TDocument>> modify)
-        where TIdContext : IProjectionIdContext
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
-        ModifyDocument<TIdContext, TDocument, TEvent>(
-            this ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, DocumentHandlingMetaData<SimpleIdContext<string>>, Task<TDocument>> modify)
-        where TIdContext : IProjectionIdContext
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
-        ModifyDocument<TIdContext, TDocument, TEvent>(
-            this ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, CancellationToken, Task<TDocument>> modify)
-        where TIdContext : IProjectionIdContext
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
-
-    public static ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
-        ModifyDocument<TIdContext, TDocument, TEvent>(
-            this ISetupHandlerFiltering<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
-            Func<TEvent, TDocument?, DocumentHandlingMetaData<SimpleIdContext<string>>, CancellationToken, Task<TDocument>> modify)
-        where TIdContext : IProjectionIdContext
-        where TDocument : class
-        => setup.When(f => f, h => h.ModifyDocument(modify));
 
     // -------------------------------------------------------------------------
     // ModifyDocument on ISetupEventHandlerForProjection (nullable document)

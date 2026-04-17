@@ -36,7 +36,7 @@ public class InMemoryTestProjection : InMemoryProjection<string, InMemoryTestPro
     {
         return config
             .On<TestEvent>().WithId(evnt => evnt.DocId)
-            .ModifyDocument((evnt, doc) =>
+            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
             {
                 if (doc == null)
                     return new TestDocument(evnt.DocId, 1);
@@ -45,7 +45,7 @@ public class InMemoryTestProjection : InMemoryProjection<string, InMemoryTestPro
                 {
                     Version = doc.Version + 1
                 };
-            });
+            }));
     }
 
     public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)

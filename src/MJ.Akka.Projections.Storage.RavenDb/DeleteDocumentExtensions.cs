@@ -12,7 +12,7 @@ public static class DeleteDocumentExtensions
             this ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent> setup)
         where TIdContext : IProjectionIdContext
         where TDocument : class
-        => setup.HandleWith((_, context) => context.DeleteDocument());
+        => setup.HandleWith((_, context, _, _) => { context.DeleteDocument(); return Task.CompletedTask; });
 
     public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
         ConditionallyDeleteDocument<TIdContext, TDocument, TEvent>(

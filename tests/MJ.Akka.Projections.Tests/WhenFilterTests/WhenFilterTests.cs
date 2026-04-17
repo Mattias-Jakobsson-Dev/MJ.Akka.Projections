@@ -135,7 +135,7 @@ public class WhenFilterTests
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>> config) =>
                 config
                     .On<TestEvent>().WithId(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
-                    .HandleWith((_, ctx, _, _) =>   // always runs
+                    .When(f => f, h => h.HandleWith((_, ctx, _, _) =>   // always runs
                     {
                         ctx.ModifyDocument(doc =>
                         {
@@ -144,7 +144,7 @@ public class WhenFilterTests
                             return doc;
                         });
                         return Task.CompletedTask;
-                    })
+                    }))
                     .When(f => f.WithDocumentFilter(doc => doc.Exists()), h => h.HandleWith((_, ctx, _, _) =>   // only runs when document already existed at load time
                     {
                         ctx.ModifyDocument(doc =>
@@ -258,11 +258,11 @@ public class WhenFilterTests
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("filtered"); return doc; });
                         return Task.CompletedTask;
                     }))
-                    .HandleWith((_, ctx, _, _) =>   // no When() → always runs
+                    .When(f => f, h => h.HandleWith((_, ctx, _, _) =>   // no When() → always runs
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("unconditional"); return doc; });
                         return Task.CompletedTask;
-                    });
+                    }));
 
             public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition) =>
                 Source.Empty<EventWithPosition>();

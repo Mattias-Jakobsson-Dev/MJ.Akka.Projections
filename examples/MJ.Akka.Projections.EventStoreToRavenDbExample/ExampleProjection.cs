@@ -21,7 +21,7 @@ public class ExampleProjection(ActorSystem actorSystem)
                 new Events.FirstEvent(evnt.Slug, evnt.StringEventId, evnt.StringTestData),
                 new Events.SecondEvent(evnt.Slug, evnt.IntEventId, evnt.IntTestData)))
             .On<Events.FirstEvent>().WithId(evnt => ExampleDocument.BuildId(evnt.Slug))
-            .ModifyDocument((evnt, doc) =>
+            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
             {
                 doc ??= new ExampleDocument
                 {
@@ -32,9 +32,9 @@ public class ExampleProjection(ActorSystem actorSystem)
                 doc.ProjectedEvents = doc.ProjectedEvents.SetItem(evnt.EventId, evnt);
 
                 return doc;
-            })
+            }))
             .On<Events.SecondEvent>().WithId(evnt => ExampleDocument.BuildId(evnt.Slug))
-            .ModifyDocument((evnt, doc) =>
+            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
             {
                 doc ??= new ExampleDocument
                 {
@@ -45,7 +45,7 @@ public class ExampleProjection(ActorSystem actorSystem)
                 doc.ProjectedEvents = doc.ProjectedEvents.SetItem(evnt.EventId, evnt);
 
                 return doc;
-            });
+            }));
     }
 
     public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)

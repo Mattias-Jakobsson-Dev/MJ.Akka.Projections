@@ -38,3 +38,17 @@ public interface ISetupEventHandlerForProjection<TIdContext, out TContext, out T
     ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> HandleWith(
         Func<TEvent, TContext, long?, CancellationToken, Task> handler);
 }
+
+public static class SetupHandlerFilteringExtensions
+{
+    public static ISetupHandlerFiltering<TIdContext, TContext, TEvent> WhenAny<TIdContext, TContext, TEvent>(
+        this ISetupHandlerFiltering<TIdContext, TContext, TEvent> filtering,
+        Func<
+            ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>, 
+            ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>> configureHandlers)
+        where TIdContext : IProjectionIdContext
+        where TContext : IProjectionContext
+    {
+        return filtering.When(x => x, configureHandlers);
+    }
+}

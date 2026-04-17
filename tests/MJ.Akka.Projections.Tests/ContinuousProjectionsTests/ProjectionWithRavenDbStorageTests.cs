@@ -132,7 +132,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 .On<Events<string>.TransformToMultipleEvents>().Transform(evnt =>
                     evnt.Events.OfType<object>().ToImmutableList())
                 .On<Events<string>.FirstEvent>().WithId(x => x.DocId)
-                .ModifyDocument((evnt, doc) =>
+                .WhenAny(h => h.ModifyDocument((evnt, doc) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
 
@@ -144,7 +144,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     doc.AddHandledEvent(evnt.EventId);
 
                     return doc;
-                })
+                }))
                 .On<Events<string>.EventWithFilter>().WithId(x => x.DocId)
                 .When(filter => filter.WithEventFilter(evnt => evnt.Filter()), h => h.ModifyDocument((evnt, doc) =>
                 {
@@ -160,7 +160,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     return doc;
                 }))
                 .On<Events<string>.DelayHandlingWithoutCancellationToken>().WithId(x => x.DocId)
-                .ModifyDocument((evnt, doc) =>
+                .WhenAny(h => h.ModifyDocument((evnt, doc) =>
                 {
                     doc ??= new TestDocument<string>
                     {
@@ -170,9 +170,9 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     doc.AddHandledEvent(evnt.EventId);
 
                     return doc;
-                })
+                }))
                 .On<Events<string>.DelayHandlingWithCancellationToken>().WithId(x => x.DocId)
-                .ModifyDocument(async (evnt, doc, cancellationToken) =>
+                .WhenAny(h => h.ModifyDocument(async (evnt, doc, cancellationToken) =>
                 {
                     await Task.Delay(evnt.Delay, cancellationToken);
                     
@@ -184,9 +184,9 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     doc.AddHandledEvent(evnt.EventId);
 
                     return doc;
-                })
+                }))
                 .On<Events<string>.FailProjection>().WithId(x => x.DocId)
-                .ModifyDocument((evnt, doc) =>
+                .WhenAny(h => h.ModifyDocument((evnt, doc) =>
                 {
                     doc ??= new TestDocument<string>
                     {
@@ -215,9 +215,9 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                         documentFailures[evnt.FailureKey]);
 
                     return doc;
-                })
+                }))
                 .On<Events<string>.EventThatDoesntGetDocumentId>().WithId(_ => null)
-                .ModifyDocument((evnt, doc) =>
+                .WhenAny(h => h.ModifyDocument((evnt, doc) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
 
@@ -229,7 +229,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     doc.AddHandledEvent(evnt.EventId);
 
                     return doc;
-                });
+                }));
         }
         
         public override ILoadProjectionContext<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>>> 

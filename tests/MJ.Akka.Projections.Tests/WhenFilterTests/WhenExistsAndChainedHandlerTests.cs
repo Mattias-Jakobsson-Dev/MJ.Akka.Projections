@@ -70,11 +70,11 @@ public class WhenExistsAndChainedHandlerTests
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>> config) =>
                 config
                     .On<TestEvent>().WithId(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
-                    .HandleWith((_, ctx, _, _) =>
+                    .When(f => f, h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("always"); return doc; });
                         return Task.CompletedTask;
-                    })
+                    }))
                     .WhenExists(h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc!.Tags.Add("exists-only"); return doc; });
@@ -138,11 +138,11 @@ public class WhenExistsAndChainedHandlerTests
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>> config) =>
                 config
                     .On<TestEvent>().WithId(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
-                    .HandleWith((_, ctx, _, _) =>
+                    .When(f => f, h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("always"); return doc; });
                         return Task.CompletedTask;
-                    })
+                    }))
                     .WhenNotExists(h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("new-only"); return doc; });
@@ -191,21 +191,22 @@ public class WhenExistsAndChainedHandlerTests
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>> config) =>
                 config
                     .On<TestEvent>().WithId(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
-                    .HandleWith((_, ctx, _, _) =>
-                    {
-                        ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("A"); return doc; });
-                        return Task.CompletedTask;
-                    })
-                    .HandleWith((_, ctx, _, _) =>
-                    {
-                        ctx.ModifyDocument(doc => { doc!.Tags.Add("B"); return doc; });
-                        return Task.CompletedTask;
-                    })
-                    .HandleWith((_, ctx, _, _) =>
-                    {
-                        ctx.ModifyDocument(doc => { doc!.Tags.Add("C"); return doc; });
-                        return Task.CompletedTask;
-                    });
+                    .When(f => f, h => h
+                        .HandleWith((_, ctx, _, _) =>
+                        {
+                            ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("A"); return doc; });
+                            return Task.CompletedTask;
+                        })
+                        .HandleWith((_, ctx, _, _) =>
+                        {
+                            ctx.ModifyDocument(doc => { doc!.Tags.Add("B"); return doc; });
+                            return Task.CompletedTask;
+                        })
+                        .HandleWith((_, ctx, _, _) =>
+                        {
+                            ctx.ModifyDocument(doc => { doc!.Tags.Add("C"); return doc; });
+                            return Task.CompletedTask;
+                        }));
 
             public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition) =>
                 Source.Empty<EventWithPosition>();
@@ -270,11 +271,11 @@ public class WhenExistsAndChainedHandlerTests
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("B"); return doc; });
                         return Task.CompletedTask;
                     }))
-                    .HandleWith((_, ctx, _, _) =>   // no When() — always runs
+                    .When(f => f, h => h.HandleWith((_, ctx, _, _) =>   // no When() — always runs
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("always"); return doc; });
                         return Task.CompletedTask;
-                    });
+                    }));
 
             public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition) =>
                 Source.Empty<EventWithPosition>();

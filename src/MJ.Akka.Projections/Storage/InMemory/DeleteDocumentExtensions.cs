@@ -12,7 +12,7 @@ public static class DeleteDocumentExtensions
             this ISetupEventHandlerForProjectionWithExistingDocument<TId, TDocument, TEvent> setup)
         where TId : notnull
         where TDocument : class
-        => setup.HandleWith((_, context) => context.DeleteDocument());
+        => setup.HandleWith((_, context, _, _) => { context.DeleteDocument(); return Task.CompletedTask; });
 
     public static ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
         ConditionallyDeleteDocument<TId, TDocument, TEvent>(

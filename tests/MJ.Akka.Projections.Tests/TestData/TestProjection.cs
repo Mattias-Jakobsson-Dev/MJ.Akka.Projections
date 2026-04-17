@@ -56,13 +56,13 @@ public class TestProjection<TId>(
             .On<Events<TId>.TransformToMultipleEvents>().Transform(evnt =>
                 evnt.Events.OfType<object>().ToImmutableList())
             .On<Events<TId>.FirstEvent>().WithId(x => x.DocId)
-            .ModifyDocument((evnt, doc) =>
+            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
                 doc ??= new TestDocument<TId> { Id = evnt.DocId };
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
-            })
+            }))
             .On<Events<TId>.EventWithFilter>().WithId(x => x.DocId)
             .When(filter => filter.WithEventFilter(evnt => evnt.Filter()), h => h.ModifyDocument((evnt, doc) =>
             {
@@ -72,23 +72,23 @@ public class TestProjection<TId>(
                 return doc;
             }))
             .On<Events<TId>.DelayHandlingWithoutCancellationToken>().WithId(x => x.DocId)
-            .ModifyDocument(async (evnt, doc) =>
+            .WhenAny(h => h.ModifyDocument(async (evnt, doc) =>
             {
                 await Task.Delay(evnt.Delay);
                 doc ??= new TestDocument<TId> { Id = evnt.DocId };
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
-            })
+            }))
             .On<Events<TId>.DelayHandlingWithCancellationToken>().WithId(x => x.DocId)
-            .ModifyDocument(async (evnt, doc, cancellationToken) =>
+            .WhenAny(h => h.ModifyDocument(async (evnt, doc, cancellationToken) =>
             {
                 await Task.Delay(evnt.Delay, cancellationToken);
                 doc ??= new TestDocument<TId> { Id = evnt.DocId };
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
-            })
+            }))
             .On<Events<TId>.FailProjection>().WithId(x => x.DocId)
-            .ModifyDocument((evnt, doc) =>
+            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
             {
                 doc ??= new TestDocument<TId> { Id = evnt.DocId };
                 var documentFailures = runFailures.GetOrAdd(evnt.DocId, _ => new Dictionary<string, int>());
@@ -103,15 +103,15 @@ public class TestProjection<TId>(
                 doc.PreviousEventFailures = doc.PreviousEventFailures.SetItem(
                     evnt.EventId, documentFailures[evnt.FailureKey]);
                 return doc;
-            })
+            }))
             .On<Events<TId>.EventThatDoesntGetDocumentId>().WithId(_ => null)
-            .ModifyDocument((evnt, doc) =>
+            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
                 doc ??= new TestDocument<TId> { Id = evnt.DocId };
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
-            });
+            }));
     }
 
     public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
