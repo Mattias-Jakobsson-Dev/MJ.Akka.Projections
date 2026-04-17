@@ -40,7 +40,7 @@ public class TestProjection<TIdContext, TContext, TStorageSetup>(
         return null;
     }
 
-    public ISetupProjectionHandlers<TIdContext, TContext> Configure(ISetupProjection<TIdContext, TContext> config)
+    public ISetupProjection<TIdContext, TContext> Configure(ISetupProjection<TIdContext, TContext> config)
     {
         return projectionToTest.Configure(config);
     }

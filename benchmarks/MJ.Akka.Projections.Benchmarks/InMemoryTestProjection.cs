@@ -31,11 +31,11 @@ public class InMemoryTestProjection : InMemoryProjection<SimpleIdContext<string>
         _events = events.ToImmutableList();
     }
     
-    public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument>> Configure(
+    public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument>> Configure(
         ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument>> config)
     {
         return config
-            .On<TestEvent>(evnt => evnt.DocId)
+            .On<TestEvent>().WithId(evnt => evnt.DocId)
             .ModifyDocument((evnt, doc) =>
             {
                 if (doc == null)

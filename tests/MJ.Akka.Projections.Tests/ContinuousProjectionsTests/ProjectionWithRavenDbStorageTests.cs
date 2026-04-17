@@ -123,15 +123,15 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
     {
         public ConcurrentDictionary<string, Events<string>.IEvent> HandledEvents { get; } = new();
         
-        public override ISetupProjectionHandlers<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>> Configure(
+        public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>> Configure(
             ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>> config)
         {
             var runFailures = new ConcurrentDictionary<string, Dictionary<string, int>>();
 
             return config
-                .TransformUsing<Events<string>.TransformToMultipleEvents>(evnt =>
+                .On<Events<string>.TransformToMultipleEvents>().Transform(evnt =>
                     evnt.Events.OfType<object>().ToImmutableList())
-                .On<Events<string>.FirstEvent>(x => x.DocId)
+                .On<Events<string>.FirstEvent>().WithId(x => x.DocId)
                 .ModifyDocument((evnt, doc) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
@@ -145,10 +145,8 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 
                     return doc;
                 })
-                .On<Events<string>.EventWithFilter>(
-                    x => x.DocId)
-                .When(filter => filter.WithEventFilter(evnt => evnt.Filter()))
-                .ModifyDocument((evnt, doc) =>
+                .On<Events<string>.EventWithFilter>().WithId(x => x.DocId)
+                .When(filter => filter.WithEventFilter(evnt => evnt.Filter()), h => h.ModifyDocument((evnt, doc) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
 
@@ -160,8 +158,8 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     doc.AddHandledEvent(evnt.EventId);
 
                     return doc;
-                })
-                .On<Events<string>.DelayHandlingWithoutCancellationToken>(x => x.DocId)
+                }))
+                .On<Events<string>.DelayHandlingWithoutCancellationToken>().WithId(x => x.DocId)
                 .ModifyDocument((evnt, doc) =>
                 {
                     doc ??= new TestDocument<string>
@@ -173,7 +171,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 
                     return doc;
                 })
-                .On<Events<string>.DelayHandlingWithCancellationToken>(x => x.DocId)
+                .On<Events<string>.DelayHandlingWithCancellationToken>().WithId(x => x.DocId)
                 .ModifyDocument(async (evnt, doc, cancellationToken) =>
                 {
                     await Task.Delay(evnt.Delay, cancellationToken);
@@ -187,7 +185,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 
                     return doc;
                 })
-                .On<Events<string>.FailProjection>(x => x.DocId)
+                .On<Events<string>.FailProjection>().WithId(x => x.DocId)
                 .ModifyDocument((evnt, doc) =>
                 {
                     doc ??= new TestDocument<string>
@@ -218,7 +216,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 
                     return doc;
                 })
-                .On<Events<string>.EventThatDoesntGetDocumentId>(_ => Task.FromResult<SimpleIdContext<string>?>(null))
+                .On<Events<string>.EventThatDoesntGetDocumentId>().WithId(_ => Task.FromResult<SimpleIdContext<string>?>(null))
                 .ModifyDocument((evnt, doc) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);

@@ -31,11 +31,11 @@ public class RavenDbTestProjection : RavenDbProjection<RavenDbTestProjection.Tes
         _events = events.ToImmutableList();
     }
     
-    public override ISetupProjectionHandlers<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> Configure(
+    public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> Configure(
         ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> config)
     {
         return config
-            .On<TestEvent>(evnt => evnt.DocId)
+            .On<TestEvent>().WithId(evnt => evnt.DocId)
             .ModifyDocument((evnt, doc) =>
             {
                 if (doc == null)

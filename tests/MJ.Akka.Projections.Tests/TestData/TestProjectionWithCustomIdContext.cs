@@ -58,7 +58,7 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
             failures);
     }
 
-    public override ISetupProjectionHandlers<TIdContext,
+    public override ISetupProjection<TIdContext,
         InMemoryProjectionContext<TIdContext, TestDocument<TId>>> Configure(
         ISetupProjection<TIdContext, InMemoryProjectionContext<TIdContext, TestDocument<TId>>>
             config)
@@ -66,9 +66,9 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
         var runFailures = new ConcurrentDictionary<TId, Dictionary<string, int>>();
 
         return config
-            .TransformUsing<Events<TId>.TransformToMultipleEvents>(evnt =>
+            .On<Events<TId>.TransformToMultipleEvents>().Transform(evnt =>
                 evnt.Events.OfType<object>().ToImmutableList())
-            .On<Events<TId>.FirstEvent>(x => createContext(x.DocId))
+            .On<Events<TId>.FirstEvent>().WithId(x => createContext(x.DocId))
             .ModifyDocument((evnt, doc) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
@@ -82,10 +82,8 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
 
                 return doc;
             })
-            .On<Events<TId>.EventWithFilter>(
-                x => createContext(x.DocId))
-            .When(filter => filter.WithEventFilter(evnt => evnt.Filter()))
-            .ModifyDocument((evnt, doc) =>
+            .On<Events<TId>.EventWithFilter>().WithId(x => createContext(x.DocId))
+            .When(filter => filter.WithEventFilter(evnt => evnt.Filter()), h => h.ModifyDocument((evnt, doc) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
 
@@ -97,8 +95,8 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
                 doc.AddHandledEvent(evnt.EventId);
 
                 return doc;
-            })
-            .On<Events<TId>.DelayHandlingWithoutCancellationToken>(x => createContext(x.DocId))
+            }))
+            .On<Events<TId>.DelayHandlingWithoutCancellationToken>().WithId(x => createContext(x.DocId))
             .ModifyDocument(async (evnt, doc) =>
             {
                 await Task.Delay(evnt.Delay);
@@ -112,7 +110,7 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
 
                 return doc;
             })
-            .On<Events<TId>.DelayHandlingWithCancellationToken>(x => createContext(x.DocId))
+            .On<Events<TId>.DelayHandlingWithCancellationToken>().WithId(x => createContext(x.DocId))
             .ModifyDocument(async (evnt, doc, cancellationToken) =>
             {
                 await Task.Delay(evnt.Delay, cancellationToken);
@@ -126,7 +124,7 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
 
                 return doc;
             })
-            .On<Events<TId>.FailProjection>(x => createContext(x.DocId))
+            .On<Events<TId>.FailProjection>().WithId(x => createContext(x.DocId))
             .ModifyDocument((evnt, doc) =>
             {
                 doc ??= new TestDocument<TId>
@@ -157,7 +155,7 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
 
                 return doc;
             })
-            .On<Events<TId>.EventThatDoesntGetDocumentId>(_ => Task.FromResult<TIdContext?>(null))
+            .On<Events<TId>.EventThatDoesntGetDocumentId>().WithId(_ => Task.FromResult<TIdContext?>(null))
             .ModifyDocument((evnt, doc) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);

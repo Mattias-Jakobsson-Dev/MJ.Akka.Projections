@@ -183,7 +183,7 @@ public class RavenDbComplexIdContextHandlerVerificationTests(
             .Select((x, i) => new EventWithPosition(x, i + 1))
             .ToImmutableList();
 
-        public override ISetupProjectionHandlers<
+        public override ISetupProjection<
                 ProjectionWithComplexIdContextTests.ComplexIdContext,
                 RavenDbProjectionContext<TestDocument<string>, ProjectionWithComplexIdContextTests.ComplexIdContext>>
             Configure(ISetupProjection<
@@ -191,7 +191,7 @@ public class RavenDbComplexIdContextHandlerVerificationTests(
                 RavenDbProjectionContext<TestDocument<string>, ProjectionWithComplexIdContextTests.ComplexIdContext>> config)
         {
             return config
-                .On<Events<string>.FirstEvent>(_ => idContext)
+                .On<Events<string>.FirstEvent>().WithId(_ => idContext)
                 // First handler: captures the full id context, creates/updates the document
                 .HandleWith((evnt, ctx, _, _) =>
                 {

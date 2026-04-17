@@ -13,14 +13,14 @@ namespace MJ.Akka.Projections.EventStoreToRavenDbExample;
 public class ExampleProjection(ActorSystem actorSystem)
     : RavenDbProjection<ExampleDocument>
 {
-    public override ISetupProjectionHandlers<SimpleIdContext<string>, RavenDbProjectionContext<ExampleDocument, SimpleIdContext<string>>>
+    public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<ExampleDocument, SimpleIdContext<string>>>
         Configure(ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<ExampleDocument, SimpleIdContext<string>>> config)
     {
         return config
-            .TransformUsing<Events.ThirdEvent>(evnt => ImmutableList.Create<object>(
+            .On<Events.ThirdEvent>().Transform(evnt => ImmutableList.Create<object>(
                 new Events.FirstEvent(evnt.Slug, evnt.StringEventId, evnt.StringTestData),
                 new Events.SecondEvent(evnt.Slug, evnt.IntEventId, evnt.IntTestData)))
-            .On<Events.FirstEvent>(evnt => ExampleDocument.BuildId(evnt.Slug))
+            .On<Events.FirstEvent>().WithId(evnt => ExampleDocument.BuildId(evnt.Slug))
             .ModifyDocument((evnt, doc) =>
             {
                 doc ??= new ExampleDocument
@@ -33,7 +33,7 @@ public class ExampleProjection(ActorSystem actorSystem)
 
                 return doc;
             })
-            .On<Events.SecondEvent>(evnt => ExampleDocument.BuildId(evnt.Slug))
+            .On<Events.SecondEvent>().WithId(evnt => ExampleDocument.BuildId(evnt.Slug))
             .ModifyDocument((evnt, doc) =>
             {
                 doc ??= new ExampleDocument

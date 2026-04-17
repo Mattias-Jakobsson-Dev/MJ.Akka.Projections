@@ -59,12 +59,11 @@ public class WhenFilterTests
         {
             public override string Name => nameof(WhenEventFilterPassesHandlerRuns);
 
-            public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
-                    .When(f => f.WithEventFilter(e => e.Tag == matchingTag))
-                    .HandleWith((evnt, ctx, _, _) =>
+                    .On<TestEvent>().WithId(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
+                    .When(f => f.WithEventFilter(e => e.Tag == matchingTag), h => h.HandleWith((evnt, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc =>
                         {
@@ -73,7 +72,7 @@ public class WhenFilterTests
                             return doc;
                         });
                         return Task.CompletedTask;
-                    });
+                    }));
 
             public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition) =>
                 Source.Empty<EventWithPosition>();
@@ -132,10 +131,10 @@ public class WhenFilterTests
         {
             public override string Name => nameof(WhenDocumentFilterFailsHandlerIsSkipped);
 
-            public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
+                    .On<TestEvent>().WithId(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
                     .HandleWith((_, ctx, _, _) =>   // always runs
                     {
                         ctx.ModifyDocument(doc =>
@@ -146,8 +145,7 @@ public class WhenFilterTests
                         });
                         return Task.CompletedTask;
                     })
-                    .When(f => f.WithDocumentFilter(doc => doc.Exists()))
-                    .HandleWith((_, ctx, _, _) =>   // only runs when document already existed at load time
+                    .When(f => f.WithDocumentFilter(doc => doc.Exists()), h => h.HandleWith((_, ctx, _, _) =>   // only runs when document already existed at load time
                     {
                         ctx.ModifyDocument(doc =>
                         {
@@ -155,7 +153,7 @@ public class WhenFilterTests
                             return doc;
                         });
                         return Task.CompletedTask;
-                    });
+                    }));
 
             public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition) =>
                 Source.Empty<EventWithPosition>();
@@ -196,22 +194,20 @@ public class WhenFilterTests
         {
             public override string Name => nameof(TwoWhenHandleWithPairsHaveIndependentFilters);
 
-            public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
-                    .When(f => f.WithEventFilter(e => e.Tag == "alpha"))
-                    .HandleWith((_, ctx, _, _) =>
+                    .On<TestEvent>().WithId(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
+                    .When(f => f.WithEventFilter(e => e.Tag == "alpha"), h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("A"); return doc; });
                         return Task.CompletedTask;
-                    })
-                    .When(f => f.WithEventFilter(e => e.Tag == "beta"))
-                    .HandleWith((_, ctx, _, _) =>
+                    }))
+                    .When(f => f.WithEventFilter(e => e.Tag == "beta"), h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("B"); return doc; });
                         return Task.CompletedTask;
-                    });
+                    }));
 
             public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition) =>
                 Source.Empty<EventWithPosition>();
@@ -253,16 +249,15 @@ public class WhenFilterTests
         {
             public override string Name => nameof(WhenFilterDoesNotBleedIntoNextHandleWith);
 
-            public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
-                    .When(f => f.WithEventFilter(e => e.Tag == "run"))
-                    .HandleWith((_, ctx, _, _) =>
+                    .On<TestEvent>().WithId(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
+                    .When(f => f.WithEventFilter(e => e.Tag == "run"), h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("filtered"); return doc; });
                         return Task.CompletedTask;
-                    })
+                    }))
                     .HandleWith((_, ctx, _, _) =>   // no When() → always runs
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("unconditional"); return doc; });

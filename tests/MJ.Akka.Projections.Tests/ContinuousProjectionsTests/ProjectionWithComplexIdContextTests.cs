@@ -281,7 +281,7 @@ public class ComplexIdContextHandlerVerificationTests(NormalTestKitActorSystem a
         private readonly IAsyncEnumerable<EventWithPosition> _events =
             events.Select((x, i) => new EventWithPosition(x, i + 1)).ToAsyncEnumerable();
 
-        public override ISetupProjectionHandlers<
+        public override ISetupProjection<
                 ProjectionWithComplexIdContextTests.ComplexIdContext,
                 InMemoryProjectionContext<ProjectionWithComplexIdContextTests.ComplexIdContext, TestDocument<string>>>
             Configure(ISetupProjection<
@@ -289,7 +289,7 @@ public class ComplexIdContextHandlerVerificationTests(NormalTestKitActorSystem a
                 InMemoryProjectionContext<ProjectionWithComplexIdContextTests.ComplexIdContext, TestDocument<string>>> config)
         {
             return config
-                .On<Events<string>.FirstEvent>(_ => idContext)
+                .On<Events<string>.FirstEvent>().WithId(_ => idContext)
                 // First HandleWith: captures the id context and initialises/updates the document
                 .HandleWith((evnt, ctx, _, _) =>
                 {

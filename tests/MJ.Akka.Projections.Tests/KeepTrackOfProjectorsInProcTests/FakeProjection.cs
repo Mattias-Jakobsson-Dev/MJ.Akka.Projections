@@ -37,7 +37,7 @@ public class FakeProjection(TimeSpan delay)
         return null;
     }
 
-    public ISetupProjectionHandlers<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>> Configure(
+    public ISetupProjection<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>> Configure(
         ISetupProjection<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>> config)
     {
         return config;

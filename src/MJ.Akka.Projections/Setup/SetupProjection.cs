@@ -6,63 +6,39 @@ namespace MJ.Akka.Projections.Setup;
 internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdContext, TContext>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    private IImmutableDictionary<Type, HandlerBuilder<TIdContext, TContext>> _handlers;
+    private IImmutableDictionary<Type, HandlerFilteringBuilderBase<TIdContext, TContext>> _builders =
+        ImmutableDictionary<Type, HandlerFilteringBuilderBase<TIdContext, TContext>>.Empty;
 
-    private readonly IImmutableDictionary<Type, Func<object, IImmutableList<object>>> _transformers;
+    private IImmutableDictionary<Type, Func<object, IImmutableList<object>>> _transformers =
+        ImmutableDictionary<Type, Func<object, IImmutableList<object>>>.Empty;
 
-    public SetupProjection()
-        : this(
-            ImmutableDictionary<Type, HandlerBuilder<TIdContext, TContext>>.Empty,
-            ImmutableDictionary<Type, Func<object, IImmutableList<object>>>.Empty)
-    {
-    }
+    public ISetupEventRouting<TIdContext, TContext, TEvent> On<TEvent>()
+        => new EventRoutingBuilder<TIdContext, TContext, TEvent>(this);
 
-    private SetupProjection(
-        IImmutableDictionary<Type, HandlerBuilder<TIdContext, TContext>> handlers,
-        IImmutableDictionary<Type, Func<object, IImmutableList<object>>> transformers)
-    {
-        _handlers = handlers;
-        _transformers = transformers;
-    }
-
-    public ISetupProjection<TIdContext, TContext> TransformUsing<TEvent>(
+    internal ISetupProjection<TIdContext, TContext> RegisterTransformer<TEvent>(
         Func<TEvent, IImmutableList<object>> transform)
     {
-        return new SetupProjection<TIdContext, TContext>(
-            _handlers,
-            _transformers.SetItem(typeof(TEvent), evnt => transform((TEvent)evnt)));
-    }
-    
-    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> On<TEvent>(
-        Func<TEvent, TIdContext?> getId)
-    {
-        return On<TEvent>(evnt => Task.FromResult(getId(evnt)));
+        _transformers = _transformers.SetItem(typeof(TEvent), evnt => transform((TEvent)evnt));
+        return this;
     }
 
-    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> On<TEvent>(
+    internal ISetupHandlerFiltering<TIdContext, TContext, TEvent> GetOrCreateHandlerBuilder<TEvent>(
         Func<TEvent, Task<TIdContext?>> getId)
     {
-        var builder = new HandlerBuilder<TIdContext, TContext, TEvent>(
-            getId,
-            ProjectionFilterSetup<TIdContext, TContext, TEvent>.Create().Build(),
-            this);
-        
-        _handlers = _handlers.SetItem(typeof(TEvent), builder);
-        
+        var builder = new HandlerFilteringBuilder<TIdContext, TContext, TEvent>(getId, this);
+        _builders = _builders.SetItem(typeof(TEvent), builder);
         return builder;
     }
 
     public IHandleEventInProjection<TIdContext, TContext> Build()
     {
         return new EventHandler(
-            _handlers.ToImmutableDictionary(
-                x => x.Key,
-                x => x.Value.Build()),
+            _builders.ToImmutableDictionary(x => x.Key, x => x.Value.BuildHandler()),
             _transformers);
     }
 
     private class EventHandler(
-        IImmutableDictionary<Type, HandlerBuilder<TIdContext, TContext>.Handler> handlers,
+        IImmutableDictionary<Type, HandlerFilteringBuilderBase<TIdContext, TContext>.Handler> handlers,
         IImmutableDictionary<Type, Func<object, IImmutableList<object>>> transformers)
         : IHandleEventInProjection<TIdContext, TContext>
     {

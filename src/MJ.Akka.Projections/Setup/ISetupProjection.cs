@@ -4,34 +4,37 @@ using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.Setup;
 
-public interface ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> 
-    : ISetupProjectionHandlers<TIdContext, TContext>
+[PublicAPI]
+public interface ISetupProjection<TIdContext, TContext> 
+    where TIdContext : IProjectionIdContext 
+    where TContext : IProjectionContext
+{
+    ISetupEventRouting<TIdContext, TContext, TEvent> On<TEvent>();
+    
+    IHandleEventInProjection<TIdContext, TContext> Build();
+}
+
+public interface ISetupEventRouting<TIdContext, TContext, TEvent> where TIdContext : IProjectionIdContext
+    where TContext : IProjectionContext
+{
+    ISetupProjection<TIdContext, TContext> Transform(Func<TEvent, IImmutableList<object>> transform);
+    
+    ISetupHandlerFiltering<TIdContext, TContext, TEvent> WithId(Func<TEvent, Task<TIdContext?>> getId);
+}
+
+public interface ISetupHandlerFiltering<TIdContext, TContext, TEvent> : ISetupProjection<TIdContext, TContext>  
     where TIdContext : IProjectionIdContext
     where TContext : IProjectionContext
 {
-    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> When(
-        Func<IProjectionFilterSetup<TIdContext, TContext, TEvent>, IProjectionFilterSetup<TIdContext, TContext, TEvent>> filter);
+    ISetupHandlerFiltering<TIdContext, TContext, TEvent> When(
+        Func<IProjectionFilterSetup<TIdContext, TContext, TEvent>, IProjectionFilterSetup<TIdContext, TContext, TEvent>> filter,
+        Func<ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>, ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>> configureHandlers);
+}
 
+public interface ISetupEventHandlerForProjection<TIdContext, out TContext, out TEvent>
+    where TIdContext : IProjectionIdContext
+    where TContext : IProjectionContext
+{
     ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> HandleWith(
         Func<TEvent, TContext, long?, CancellationToken, Task> handler);
-}
-
-[PublicAPI]
-public interface ISetupProjection<TIdContext, TContext> : ISetupProjectionHandlers<TIdContext, TContext> 
-    where TIdContext : IProjectionIdContext where TContext : IProjectionContext
-{
-    ISetupProjection<TIdContext, TContext> TransformUsing<TEvent>(
-        Func<TEvent, IImmutableList<object>> transform);
-}
-
-public interface ISetupProjectionHandlers<TIdContext, TContext> 
-    where TIdContext : IProjectionIdContext where TContext : IProjectionContext
-{
-    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> On<TEvent>(
-        Func<TEvent, TIdContext?> getId);
-    
-    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> On<TEvent>(
-        Func<TEvent, Task<TIdContext?>> getId);
-    
-    IHandleEventInProjection<TIdContext, TContext> Build();
 }

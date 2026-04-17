@@ -77,21 +77,20 @@ public class WhenExistsAndChainedHandlerTests
         {
             public override string Name => nameof(WhenExistsHandlerOnlyRunsForExistingDocument);
 
-            public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
+                    .On<TestEvent>().WithId(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
                     .HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("always"); return doc; });
                         return Task.CompletedTask;
                     })
-                    .WhenExists()
-                    .HandleWith((_, ctx, _, _) =>
+                    .WhenExists(h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc!.Tags.Add("exists-only"); return doc; });
                         return Task.CompletedTask;
-                    });
+                    }));
 
             public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition) =>
                 Source.Empty<EventWithPosition>();
@@ -146,21 +145,20 @@ public class WhenExistsAndChainedHandlerTests
         {
             public override string Name => nameof(WhenNotExistsHandlerOnlyRunsForNewDocument);
 
-            public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
+                    .On<TestEvent>().WithId(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
                     .HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("always"); return doc; });
                         return Task.CompletedTask;
                     })
-                    .WhenNotExists()
-                    .HandleWith((_, ctx, _, _) =>
+                    .WhenNotExists(h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("new-only"); return doc; });
                         return Task.CompletedTask;
-                    });
+                    }));
 
             public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition) =>
                 Source.Empty<EventWithPosition>();
@@ -200,10 +198,10 @@ public class WhenExistsAndChainedHandlerTests
         {
             public override string Name => nameof(MultipleChainedHandlersExecuteInOrder);
 
-            public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
+                    .On<TestEvent>().WithId(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
                     .HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("A"); return doc; });
@@ -269,22 +267,20 @@ public class WhenExistsAndChainedHandlerTests
         {
             public override string Name => nameof(ChainedHandlersWithMixedFiltersRunSelectively);
 
-            public override ISetupProjectionHandlers<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
                 Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
-                    .When(f => f.WithEventFilter(e => e.Tag == "alpha"))
-                    .HandleWith((_, ctx, _, _) =>
+                    .On<TestEvent>().WithId(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
+                    .When(f => f.WithEventFilter(e => e.Tag == "alpha"), h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("A"); return doc; });
                         return Task.CompletedTask;
-                    })
-                    .When(f => f.WithEventFilter(e => e.Tag == "beta"))
-                    .HandleWith((_, ctx, _, _) =>
+                    }))
+                    .When(f => f.WithEventFilter(e => e.Tag == "beta"), h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("B"); return doc; });
                         return Task.CompletedTask;
-                    })
+                    }))
                     .HandleWith((_, ctx, _, _) =>   // no When() — always runs
                     {
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("always"); return doc; });
@@ -335,10 +331,10 @@ public class WhenExistsAndChainedHandlerTests
         {
             public override string Name => nameof(ComplexIdContextFlowsThroughAllHandlers);
 
-            public override ISetupProjectionHandlers<CompositeIdContext, InMemoryProjectionContext<CompositeIdContext, Doc>>
+            public override ISetupProjection<CompositeIdContext, InMemoryProjectionContext<CompositeIdContext, Doc>>
                 Configure(ISetupProjection<CompositeIdContext, InMemoryProjectionContext<CompositeIdContext, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Tag == tenantId && e.Id == entityId
+                    .On<TestEvent>().WithId(e => e.Tag == tenantId && e.Id == entityId
                         ? new CompositeIdContext(e.Tag, e.Id)
                         : null)
                     // Handler 1 — unconditional; reads composite id via context
@@ -353,8 +349,7 @@ public class WhenExistsAndChainedHandlerTests
                         return Task.CompletedTask;
                     })
                     // Handler 2 — with a When() filter, still receives the same composite id
-                    .When(f => f.WithEventFilter(_ => true))
-                    .HandleWith((_, ctx, _, _) =>
+                    .When(f => f.WithEventFilter(_ => true), h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc =>
                         {
@@ -362,7 +357,7 @@ public class WhenExistsAndChainedHandlerTests
                             return doc;
                         });
                         return Task.CompletedTask;
-                    })
+                    }))
                     // Handler 3 — chained after handler 2, no filter
                     .HandleWith((_, ctx, _, _) =>
                     {
@@ -429,10 +424,10 @@ public class WhenExistsAndChainedHandlerTests
         {
             public override string Name => nameof(ComplexIdContextWithWhenExistsFilterIsCorrect);
 
-            public override ISetupProjectionHandlers<CompositeIdContext, InMemoryProjectionContext<CompositeIdContext, Doc>>
+            public override ISetupProjection<CompositeIdContext, InMemoryProjectionContext<CompositeIdContext, Doc>>
                 Configure(ISetupProjection<CompositeIdContext, InMemoryProjectionContext<CompositeIdContext, Doc>> config) =>
                 config
-                    .On<TestEvent>(e => e.Tag == tenantId && (e.Id == existingEntityId || e.Id == newEntityId)
+                    .On<TestEvent>().WithId(e => e.Tag == tenantId && (e.Id == existingEntityId || e.Id == newEntityId)
                         ? new CompositeIdContext(e.Tag, e.Id)
                         : null)
                     .HandleWith((_, ctx, _, _) =>
@@ -440,12 +435,11 @@ public class WhenExistsAndChainedHandlerTests
                         ctx.ModifyDocument(doc => { doc ??= new Doc(); doc.Tags.Add("always"); return doc; });
                         return Task.CompletedTask;
                     })
-                    .WhenExists()
-                    .HandleWith((_, ctx, _, _) =>
+                    .WhenExists(h => h.HandleWith((_, ctx, _, _) =>
                     {
                         ctx.ModifyDocument(doc => { doc!.Tags.Add("exists-only"); return doc; });
                         return Task.CompletedTask;
-                    });
+                    }));
 
             public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition) =>
                 Source.Empty<EventWithPosition>();

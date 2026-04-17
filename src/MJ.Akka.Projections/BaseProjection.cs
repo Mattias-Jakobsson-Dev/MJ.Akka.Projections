@@ -13,7 +13,7 @@ public abstract class BaseProjection<TIdContext, TContext, TStorageSetup> : IPro
 {
     public virtual TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(30);
     
-    public abstract ISetupProjectionHandlers<TIdContext, TContext> Configure(ISetupProjection<TIdContext, TContext> config);
+    public abstract ISetupProjection<TIdContext, TContext> Configure(ISetupProjection<TIdContext, TContext> config);
     
     public abstract ILoadProjectionContext<TIdContext, TContext> GetLoadProjectionContext(TStorageSetup storageSetup);
 
