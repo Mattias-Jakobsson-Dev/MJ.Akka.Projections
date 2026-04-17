@@ -4,13 +4,13 @@ using Raven.Client.Documents;
 
 namespace MJ.Akka.Projections.Storage.RavenDb;
 
-public class LoadProjectionDataFromRavenDb<TDocument, TIdContext>(IDocumentStore documentStore)
-    : ILoadProjectionContext<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>>
-    where TDocument : class where TIdContext : IProjectionIdContext
+public class LoadProjectionDataFromRavenDb<TDocument>(IDocumentStore documentStore)
+    : ILoadProjectionContext<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>>
+    where TDocument : class
 {
-    public async Task<RavenDbProjectionContext<TDocument, TIdContext>> Load(
-        TIdContext id,
-        Func<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>> getDefaultContext,
+    public async Task<RavenDbProjectionContext<TDocument>> Load(
+        SimpleIdContext<string> id,
+        Func<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>> getDefaultContext,
         CancellationToken cancellationToken = default)
     {
         using var session = documentStore.OpenAsyncSession();
@@ -22,6 +22,6 @@ public class LoadProjectionDataFromRavenDb<TDocument, TIdContext>(IDocumentStore
         
         var metadata = session.Advanced.GetMetadataFor(document).ToImmutableDictionary();
 
-        return new RavenDbProjectionContext<TDocument, TIdContext>(id, document, metadata);
+        return new RavenDbProjectionContext<TDocument>(id, document, metadata);
     }
 }

@@ -35,7 +35,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
             {
                 var id = _fixture.Create<string>();
                 
-                return new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                return new InMemoryProjectionContext<string, TestDocument<string>>(
                     id,
                     new TestDocument<string>
                     {
@@ -74,7 +74,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
             {
                 var id = _fixture.Create<string>();
                 
-                return new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                return new InMemoryProjectionContext<string, TestDocument<string>>(
                     id,
                     new TestDocument<string>
                     {
@@ -115,7 +115,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, id)] =
-                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                        new InMemoryProjectionContext<string, TestDocument<string>>(
                             id,
                             new TestDocument<string>
                             {
@@ -153,7 +153,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, firstId)] =
-                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                        new InMemoryProjectionContext<string, TestDocument<string>>(
                             firstId,
                             new TestDocument<string>
                             {
@@ -167,7 +167,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, secondId)] =
-                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                        new InMemoryProjectionContext<string, TestDocument<string>>(
                             secondId,
                             new TestDocument<string>
                             {
@@ -190,7 +190,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
         
         var projectionName = _fixture.Create<string>();
 
-        var loader = new InMemoryProjectionLoader<SimpleIdContext<string>, TestDocument<string>>(
+        var loader = new InMemoryProjectionLoader<string, TestDocument<string>>(
             id => setup.LoadDocument(new ProjectionContextId(projectionName, id)));
         
         var batchedStorage = new BatchedProjectionStorage(
@@ -212,7 +212,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, firstId)] =
-                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                        new InMemoryProjectionContext<string, TestDocument<string>>(
                             firstId,
                             new TestDocument<string>
                             {
@@ -226,7 +226,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
                 new Dictionary<ProjectionContextId, IProjectionContext>
                 {
                     [new ProjectionContextId(projectionName, secondId)] =
-                        new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+                        new InMemoryProjectionContext<string, TestDocument<string>>(
                             secondId,
                             new TestDocument<string>
                             {
@@ -241,7 +241,7 @@ public class BatchedProjectionStorageTests : global::Akka.TestKit.Xunit2.TestKit
         
         var document = await loader.Load(
             secondId,
-            id => new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(id, null),
+            id => new InMemoryProjectionContext<string, TestDocument<string>>(id, null),
             secondCancellationTokenSource.Token);
 
         document.Exists().ShouldBeTrue();

@@ -8,7 +8,7 @@ using MJ.Akka.Projections.Storage.InMemory;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
-public class InMemoryTestProjection : InMemoryProjection<SimpleIdContext<string>, InMemoryTestProjection.TestDocument>
+public class InMemoryTestProjection : InMemoryProjection<string, InMemoryTestProjection.TestDocument>
 {
     private readonly IImmutableList<TestEvent> _events;
 
@@ -31,8 +31,8 @@ public class InMemoryTestProjection : InMemoryProjection<SimpleIdContext<string>
         _events = events.ToImmutableList();
     }
     
-    public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument>> Configure(
-        ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument>> config)
+    public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, TestDocument>> Configure(
+        ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, TestDocument>> config)
     {
         return config
             .On<TestEvent>().WithId(evnt => evnt.DocId)

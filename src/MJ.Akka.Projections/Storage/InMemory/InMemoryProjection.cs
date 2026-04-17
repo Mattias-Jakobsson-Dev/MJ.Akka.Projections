@@ -3,23 +3,23 @@ using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.Storage.InMemory;
 
-public abstract class InMemoryProjection<TIdContext, TDocument> 
-    : BaseProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, SetupInMemoryStorage>
-    where TIdContext : IProjectionIdContext where TDocument : class
+public abstract class InMemoryProjection<TId, TDocument>
+    : BaseProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, SetupInMemoryStorage>
+    where TDocument : class
 {
-    public override ILoadProjectionContext<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>> GetLoadProjectionContext(
+    public override ILoadProjectionContext<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>> GetLoadProjectionContext(
         SetupInMemoryStorage storageSetup)
     {
-        return new InMemoryProjectionLoader<TIdContext, TDocument>(
+        return new InMemoryProjectionLoader<TId, TDocument>(
             id => storageSetup.LoadDocument(new ProjectionContextId(Name, id)));
     }
-    
-    [PublicAPI]
-    protected virtual TDocument? GetDefaultDocument(TIdContext id) => null;
 
-    public override InMemoryProjectionContext<TIdContext, TDocument> GetDefaultContext(TIdContext id)
+    [PublicAPI]
+    protected virtual TDocument? GetDefaultDocument(SimpleIdContext<TId> id) => null;
+
+    public override InMemoryProjectionContext<TId, TDocument> GetDefaultContext(SimpleIdContext<TId> id)
     {
-        return new InMemoryProjectionContext<TIdContext, TDocument>(
+        return new InMemoryProjectionContext<TId, TDocument>(
             id,
             GetDefaultDocument(id));
     }

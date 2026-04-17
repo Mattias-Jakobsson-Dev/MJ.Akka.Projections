@@ -24,7 +24,7 @@ public abstract class ProjectionSequencerBaseFixture : global::Akka.TestKit.Xuni
             Sys,
             new ProjectionConfiguration<
                 SimpleIdContext<string>, 
-                InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>, 
+                InMemoryProjectionContext<string, TestDocument<string>>, 
                 SetupInMemoryStorage>(
                 projection,
                 storageSetup.CreateProjectionStorage(),
@@ -143,7 +143,7 @@ public abstract class ProjectionSequencerBaseFixture : global::Akka.TestKit.Xuni
     }
     
     public class FakeEventHandler 
-        : IHandleEventInProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>>
+        : IHandleEventInProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, TestDocument<string>>>
     {
         public IImmutableList<object> Transform(object evnt)
         {
@@ -159,7 +159,7 @@ public abstract class ProjectionSequencerBaseFixture : global::Akka.TestKit.Xuni
         }
 
         public Task<bool> Handle(
-            InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>> context, 
+            InMemoryProjectionContext<string, TestDocument<string>> context, 
             object evnt,
             long position, 
             CancellationToken cancellationToken)

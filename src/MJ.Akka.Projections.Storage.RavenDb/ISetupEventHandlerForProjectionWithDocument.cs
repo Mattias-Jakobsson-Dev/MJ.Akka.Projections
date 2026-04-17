@@ -10,7 +10,7 @@ namespace MJ.Akka.Projections.Storage.RavenDb;
 /// </summary>
 [PublicAPI]
 public interface ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent>
-    : ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+    : ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
     where TIdContext : IProjectionIdContext
     where TDocument : class
 {
@@ -22,20 +22,20 @@ public interface ISetupEventHandlerForProjectionWithExistingDocument<TIdContext,
 /// </summary>
 [PublicAPI]
 public interface ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent>
-    : ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+    : ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
     where TIdContext : IProjectionIdContext
     where TDocument : class
 {
 }
 
 internal sealed class SetupEventHandlerForProjectionWithDocument<TIdContext, TDocument, TEvent>(
-    ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> inner)
+    ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> inner)
     : ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent>,
       ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent>
     where TIdContext : IProjectionIdContext
     where TDocument : class
 {
-    public ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> HandleWith(
-        Func<TEvent, RavenDbProjectionContext<TDocument, TIdContext>, long?, CancellationToken, Task> handler)
+    public ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> HandleWith(
+        Func<TEvent, RavenDbProjectionContext<TDocument>, long?, CancellationToken, Task> handler)
         => inner.HandleWith(handler);
 }

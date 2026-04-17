@@ -27,7 +27,7 @@ public class OneTimeProjectionBenchmarks
     
     private ActorSystem ActorSystem { get; set; } = null!;
     private InMemoryTestProjection _projection = null!;
-    private IOneTimeProjection<SimpleIdContext<string>, InMemoryTestProjection.TestDocument> _coordinator = null!;
+    private IOneTimeProjection<string, InMemoryTestProjection.TestDocument> _coordinator = null!;
     
     [IterationSetup]
     public void Setup()

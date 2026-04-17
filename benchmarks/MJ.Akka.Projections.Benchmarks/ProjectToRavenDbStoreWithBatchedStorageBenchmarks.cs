@@ -9,7 +9,7 @@ using Raven.Client.Documents.BulkInsert;
 namespace MJ.Akka.Projections.Benchmarks;
 
 public class ProjectToRavenDbStoreWithBatchedStorageBenchmarks 
-    : BaseProjectionBenchmarks<SimpleIdContext<string>, RavenDbProjectionContext<RavenDbTestProjection.TestDocument, SimpleIdContext<string>>, SetupRavenDbStorage>
+    : BaseProjectionBenchmarks<SimpleIdContext<string>, RavenDbProjectionContext<RavenDbTestProjection.TestDocument>, SetupRavenDbStorage>
 {
     private RavenDbDockerContainerFixture _containerFixture = null!;
     
@@ -44,7 +44,7 @@ public class ProjectToRavenDbStoreWithBatchedStorageBenchmarks
         return new SetupRavenDbStorage(documentStore, new BulkInsertOptions());
     }
 
-    protected override IProjection<SimpleIdContext<string>, RavenDbProjectionContext<RavenDbTestProjection.TestDocument, SimpleIdContext<string>>, SetupRavenDbStorage> 
+    protected override IProjection<SimpleIdContext<string>, RavenDbProjectionContext<RavenDbTestProjection.TestDocument>, SetupRavenDbStorage> 
         CreateProjection(int numberOfEvents, int numberOfDocuments)
     {
         return new RavenDbTestProjection(numberOfEvents, numberOfDocuments);

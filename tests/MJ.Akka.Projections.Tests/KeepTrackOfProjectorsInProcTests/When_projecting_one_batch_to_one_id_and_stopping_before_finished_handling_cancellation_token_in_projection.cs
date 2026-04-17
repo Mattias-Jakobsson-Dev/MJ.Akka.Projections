@@ -48,7 +48,7 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_ha
 
             var projectionConfiguration = new ProjectionConfiguration<
                 SimpleIdContext<string>,
-                InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>,
+                InMemoryProjectionContext<string, TestDocument<string>>,
                 SetupInMemoryStorage>(
                 projection,
                 storageSetup.CreateProjectionStorage(),
@@ -59,7 +59,7 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_ha
                 BatchEventBatchingStrategy.Default,
                 BatchWithinEventPositionBatchingStrategy.Default,
                 projection.Configure(
-                    new SetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>>()).Build());
+                    new SetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, TestDocument<string>>>()).Build());
             
             var projector = await factory.GetProjector(id, projectionConfiguration);
             

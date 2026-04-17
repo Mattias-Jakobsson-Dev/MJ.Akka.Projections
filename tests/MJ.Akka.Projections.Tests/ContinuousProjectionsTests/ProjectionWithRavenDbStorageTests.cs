@@ -19,7 +19,7 @@ namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTestKitActorSystem actorSystemSetup)
     : BaseContinuousProjectionsTests<
             SimpleIdContext<string>,
-            RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>,
+            RavenDbProjectionContext<TestDocument<string>>,
             SetupRavenDbStorage>(actorSystemSetup), IClassFixture<RavenDbFixture>,
         IClassFixture<NormalTestKitActorSystem>
 {
@@ -30,7 +30,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
         return new SetupRavenDbStorage(_documentStore, new BulkInsertOptions());
     }
 
-    protected override IProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>, SetupRavenDbStorage>
+    protected override IProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>>, SetupRavenDbStorage>
         GetProjection(
             IImmutableList<object> events,
             IImmutableList<StorageFailures> storageFailures,
@@ -77,7 +77,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 
     protected override Task VerifyContext(
         SimpleIdContext<string> documentId,
-        RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>> context,
+        RavenDbProjectionContext<TestDocument<string>> context,
         IImmutableList<object> events,
         IProjection projection)
     {
@@ -119,12 +119,12 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
     private class TestProjection(
         IImmutableList<object> events,
         IImmutableList<StorageFailures> storageFailures,
-        long? initialPosition) : RavenDbProjection<TestDocument<string>, SimpleIdContext<string>>
+        long? initialPosition) : RavenDbProjection<TestDocument<string>>
     {
         public ConcurrentDictionary<string, Events<string>.IEvent> HandledEvents { get; } = new();
         
-        public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>> Configure(
-            ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>> config)
+        public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>>> Configure(
+            ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>>> config)
         {
             var runFailures = new ConcurrentDictionary<string, Dictionary<string, int>>();
 
@@ -232,10 +232,10 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 });
         }
         
-        public override ILoadProjectionContext<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>> 
+        public override ILoadProjectionContext<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>>> 
             GetLoadProjectionContext(SetupRavenDbStorage storageSetup)
         {
-            return new LoaderWithStorageFailures<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>, SimpleIdContext<string>>>(
+            return new LoaderWithStorageFailures<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>>>(
                 base.GetLoadProjectionContext(storageSetup),
                 storageFailures);
         }

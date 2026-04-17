@@ -70,7 +70,7 @@ public class When_projecting_three_batches_to_two_ids_with_settings_to_keep_one_
 
             var projectionConfiguration = new ProjectionConfiguration<
                 SimpleIdContext<object>,
-                InMemoryProjectionContext<SimpleIdContext<object>, object>,
+                InMemoryProjectionContext<object, object>,
                 SetupInMemoryStorage>(
                 projection,
                 storageSetup.CreateProjectionStorage(),

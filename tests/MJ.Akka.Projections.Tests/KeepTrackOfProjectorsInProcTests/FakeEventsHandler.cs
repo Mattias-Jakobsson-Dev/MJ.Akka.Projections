@@ -4,7 +4,7 @@ using MJ.Akka.Projections.Storage.InMemory;
 
 namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
 
-public class FakeEventsHandler : IHandleEventInProjection<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>>
+public class FakeEventsHandler : IHandleEventInProjection<SimpleIdContext<object>, InMemoryProjectionContext<object, object>>
 {
     public IImmutableList<object> Transform(object evnt)
     {
@@ -17,7 +17,7 @@ public class FakeEventsHandler : IHandleEventInProjection<SimpleIdContext<object
     }
 
     public Task<bool> Handle(
-        InMemoryProjectionContext<SimpleIdContext<object>, object> context, 
+        InMemoryProjectionContext<object, object> context, 
         object evnt, 
         long position, 
         CancellationToken cancellationToken)

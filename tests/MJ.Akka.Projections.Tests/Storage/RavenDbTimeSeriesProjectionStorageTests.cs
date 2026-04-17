@@ -16,7 +16,7 @@ namespace MJ.Akka.Projections.Tests.Storage;
 public class RavenDbTimeSeriesProjectionStorageTests(RavenDbFixture fixture) 
     : ProjectionStorageTests<
         SimpleIdContext<string>, 
-        RavenDbProjectionContext<RavenDbTimeSeriesProjectionStorageTests.TestDocument, SimpleIdContext<string>>, 
+        RavenDbProjectionContext<RavenDbTimeSeriesProjectionStorageTests.TestDocument>, 
         SetupRavenDbStorage>, IClassFixture<RavenDbFixture>
 {
     private readonly IDocumentStore _documentStore = fixture.OpenDocumentStore();
@@ -28,10 +28,10 @@ public class RavenDbTimeSeriesProjectionStorageTests(RavenDbFixture fixture)
         return new SetupRavenDbStorage(_documentStore, new BulkInsertOptions());
     }
 
-    protected override RavenDbProjectionContext<TestDocument, SimpleIdContext<string>> CreateInsertRequest(
+    protected override RavenDbProjectionContext<TestDocument> CreateInsertRequest(
         SimpleIdContext<string> id)
     {
-        var context = new RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>(
+        var context = new RavenDbProjectionContext<TestDocument>(
             id,
             new TestDocument
             {
@@ -49,22 +49,22 @@ public class RavenDbTimeSeriesProjectionStorageTests(RavenDbFixture fixture)
         return context;
     }
 
-    protected override RavenDbProjectionContext<TestDocument, SimpleIdContext<string>> CreateDeleteRequest(
+    protected override RavenDbProjectionContext<TestDocument> CreateDeleteRequest(
         SimpleIdContext<string> id)
     {
-        return new RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>(
+        return new RavenDbProjectionContext<TestDocument>(
             id,
             null,
             ImmutableDictionary<string, object>.Empty);
     }
 
-    protected override IProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>, SetupRavenDbStorage> 
+    protected override IProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument>, SetupRavenDbStorage> 
         CreateProjection()
     {
         return new TestProjection();
     }
     
-    protected override async Task VerifyContext(RavenDbProjectionContext<TestDocument, SimpleIdContext<string>> loaded)
+    protected override async Task VerifyContext(RavenDbProjectionContext<TestDocument> loaded)
     {
         loaded.Document.ShouldNotBeNull();
         loaded.Document!.HandledEvents.ShouldBe(ImmutableList.Create(_eventId), ignoreOrder: true);
@@ -93,10 +93,10 @@ public class RavenDbTimeSeriesProjectionStorageTests(RavenDbFixture fixture)
         public required IImmutableList<Guid> HandledEvents { get; set; }
     }
     
-    private class TestProjection : RavenDbProjection<TestDocument, SimpleIdContext<string>>
+    private class TestProjection : RavenDbProjection<TestDocument>
     {
-        public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> Configure(
-            ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> config)
+        public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument>> Configure(
+            ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument>> config)
         {
             return config;
         }

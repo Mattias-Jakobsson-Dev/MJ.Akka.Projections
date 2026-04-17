@@ -6,20 +6,19 @@ using MJ.Akka.Projections.ProjectionIds;
 namespace MJ.Akka.Projections.Storage.RavenDb;
 
 [PublicAPI]
-public class RavenDbProjectionContext<TDocument, TIdContext>(
-    TIdContext id,
+public class RavenDbProjectionContext<TDocument>(
+    SimpleIdContext<string> id,
     TDocument? document,
     IImmutableDictionary<string, object> metadata,
     IImmutableDictionary<string, IImmutableList<TimeSeriesRecord>> addedTimeSeries)
-    : ContextWithDocument<TIdContext, TDocument>(id, document), IRavenDbProjectionContext
+    : ContextWithDocument<SimpleIdContext<string>, TDocument>(id, document), IRavenDbProjectionContext
     where TDocument : class
-    where TIdContext : IProjectionIdContext
 {
     private IImmutableDictionary<string, object> _metadata = metadata;
     private IImmutableDictionary<string, IImmutableList<TimeSeriesRecord>> _addedTimeSeries = addedTimeSeries;
 
     public RavenDbProjectionContext(
-        TIdContext id,
+        SimpleIdContext<string> id,
         TDocument? document,
         IImmutableDictionary<string, object> metadata) : this(
         id,
@@ -41,12 +40,12 @@ public class RavenDbProjectionContext<TDocument, TIdContext>(
 
     public override IProjectionContext Freeze()
     {
-        return new RavenDbProjectionContext<TDocument, TIdContext>(Id, Document, _metadata, _addedTimeSeries);
+        return new RavenDbProjectionContext<TDocument>(Id, Document, _metadata, _addedTimeSeries);
     }
 
     public IProjectionContext Reset()
     {
-        return new RavenDbProjectionContext<TDocument, TIdContext>(
+        return new RavenDbProjectionContext<TDocument>(
             Id,
             Document,
             _metadata);
@@ -54,7 +53,7 @@ public class RavenDbProjectionContext<TDocument, TIdContext>(
 
     public override IProjectionContext MergeWith(IProjectionContext later)
     {
-        if (later is RavenDbProjectionContext<TDocument, TIdContext> parsedLater)
+        if (later is RavenDbProjectionContext<TDocument> parsedLater)
         {
             var newMetadata = parsedLater
                 ._metadata.Aggregate(
@@ -66,7 +65,7 @@ public class RavenDbProjectionContext<TDocument, TIdContext>(
                 ._addedTimeSeries
                 .AddRange(_addedTimeSeries);
 
-            return new RavenDbProjectionContext<TDocument, TIdContext>(
+            return new RavenDbProjectionContext<TDocument>(
                 Id,
                 parsedLater.Document,
                 parsedLater.Document != null ? newMetadata : ImmutableDictionary<string, object>.Empty,

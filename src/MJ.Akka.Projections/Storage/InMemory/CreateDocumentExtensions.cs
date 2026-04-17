@@ -8,52 +8,52 @@ namespace MJ.Akka.Projections.Storage.InMemory;
 [PublicAPI]
 public static class CreateDocumentExtensions
 {
-    public static ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent>
-        CreateDocument<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
+    public static ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
+        CreateDocument<TId, TDocument, TEvent>(
+            this ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent> setup,
             Func<TEvent, TDocument> create)
-        where TIdContext : IProjectionIdContext
+        where TId : notnull
         where TDocument : class => setup.CreateDocument((evnt, _) => create(evnt));
 
-    public static ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent>
-        CreateDocument<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
-            Func<TEvent, DocumentHandlingMetaData<TIdContext>, TDocument> create)
-        where TIdContext : IProjectionIdContext
+    public static ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
+        CreateDocument<TId, TDocument, TEvent>(
+            this ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent> setup,
+            Func<TEvent, DocumentHandlingMetaData<SimpleIdContext<TId>>, TDocument> create)
+        where TId : notnull
         where TDocument : class => setup.CreateDocument((evnt, metadata) => Task.FromResult(create(evnt, metadata)));
 
-    public static ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent>
-        CreateDocument<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
+    public static ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
+        CreateDocument<TId, TDocument, TEvent>(
+            this ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent> setup,
             Func<TEvent, Task<TDocument>> create)
-        where TIdContext : IProjectionIdContext
+        where TId : notnull
         where TDocument : class => setup.CreateDocument(async (evnt, _, _) => await create(evnt));
 
-    public static ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent>
-        CreateDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
-        Func<TEvent, DocumentHandlingMetaData<TIdContext>, Task<TDocument>> create)
-        where TIdContext : IProjectionIdContext
+    public static ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
+        CreateDocument<TId, TDocument, TEvent>(
+        this ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent> setup,
+        Func<TEvent, DocumentHandlingMetaData<SimpleIdContext<TId>>, Task<TDocument>> create)
+        where TId : notnull
         where TDocument : class => setup.CreateDocument(async (evnt, metadata, _) => await create(evnt, metadata));
 
-    public static ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent> 
-        CreateDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
+    public static ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> 
+        CreateDocument<TId, TDocument, TEvent>(
+        this ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent> setup,
         Func<TEvent, CancellationToken, Task<TDocument>> create)
-        where TIdContext : IProjectionIdContext
+        where TId : notnull
         where TDocument : class => setup.CreateDocument(async (evnt, _, cancellationToken) => await create(evnt, cancellationToken));
 
-    public static ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent> 
-        CreateDocument<TIdContext, TDocument, TEvent>(
-        this ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent> setup,
-        Func<TEvent, DocumentHandlingMetaData<TIdContext>, CancellationToken, Task<TDocument>> create)
-        where TIdContext : IProjectionIdContext
+    public static ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> 
+        CreateDocument<TId, TDocument, TEvent>(
+        this ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent> setup,
+        Func<TEvent, DocumentHandlingMetaData<SimpleIdContext<TId>>, CancellationToken, Task<TDocument>> create)
+        where TId : notnull
         where TDocument : class
     {
         return setup.HandleWith(async (evnt, context, position, cancellationToken) =>
             context.CreateDocument(await create(
                 evnt, 
-                new DocumentHandlingMetaData<TIdContext>(context.Id, position), 
+                new DocumentHandlingMetaData<SimpleIdContext<TId>>(context.Id, position), 
                 cancellationToken)));
     }
 }

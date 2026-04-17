@@ -7,62 +7,62 @@ namespace MJ.Akka.Projections.Storage.RavenDb;
 [PublicAPI]
 public static class SetMetadataExtensions
 {
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
         SetMetadata<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
             Func<TEvent, MetadataInput> getMetadata)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.SetMetadata((evnt, _, _, _) => Task.FromResult(getMetadata(evnt)));
     
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
         SetMetadata<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-            Func<TEvent, RavenDbProjectionContext<TDocument, TIdContext>, MetadataInput> getMetadata)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, MetadataInput> getMetadata)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.SetMetadata((evnt, context, _, _) => Task.FromResult(getMetadata(evnt, context)));
     
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
         SetMetadata<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-            Func<TEvent, RavenDbProjectionContext<TDocument, TIdContext>, long?, MetadataInput> getMetadata)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, long?, MetadataInput> getMetadata)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.SetMetadata((evnt, context, position, _) => 
         Task.FromResult(getMetadata(evnt, context, position)));
     
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
         SetMetadata<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
             Func<TEvent, Task<MetadataInput>> getMetadata)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.SetMetadata((evnt, _, _, _) => getMetadata(evnt));
     
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
         SetMetadata<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-            Func<TEvent, RavenDbProjectionContext<TDocument, TIdContext>, Task<MetadataInput>> getMetadata)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, Task<MetadataInput>> getMetadata)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.SetMetadata((evnt, context, _, _) => getMetadata(evnt, context));
     
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
         SetMetadata<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-            Func<TEvent, RavenDbProjectionContext<TDocument, TIdContext>, long?, Task<MetadataInput>> getMetadata)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, long?, Task<MetadataInput>> getMetadata)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.SetMetadata((evnt, context, position, _) => 
         getMetadata(evnt, context, position));
     
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent>
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
         SetMetadata<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-            Func<TEvent, RavenDbProjectionContext<TDocument, TIdContext>, CancellationToken, Task<MetadataInput>> getMetadata)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, CancellationToken, Task<MetadataInput>> getMetadata)
         where TIdContext : IProjectionIdContext
         where TDocument : class => setup.SetMetadata((evnt, context, _, cancellationToken) => 
         getMetadata(evnt, context, cancellationToken));
     
-    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> 
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> 
         SetMetadata<TIdContext, TDocument, TEvent>(
-            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, TEvent> setup,
-            Func<TEvent, RavenDbProjectionContext<TDocument, TIdContext>, long?, CancellationToken, Task<MetadataInput>> getMetadata)
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, long?, CancellationToken, Task<MetadataInput>> getMetadata)
         where TIdContext : IProjectionIdContext
         where TDocument : class
     {

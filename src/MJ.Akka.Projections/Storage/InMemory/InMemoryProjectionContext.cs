@@ -3,15 +3,15 @@ using MJ.Akka.Projections.ProjectionIds;
 
 namespace MJ.Akka.Projections.Storage.InMemory;
 
-public class InMemoryProjectionContext<TIdContext, TDocument>(TIdContext id, TDocument? document) 
-    : ContextWithDocument<TIdContext, TDocument>(id, document), IInMemoryProjectionContext
-    where TIdContext : IProjectionIdContext where TDocument : class
+public class InMemoryProjectionContext<TId, TDocument>(SimpleIdContext<TId> id, TDocument? document)
+    : ContextWithDocument<SimpleIdContext<TId>, TDocument>(id, document), IInMemoryProjectionContext
+    where TDocument : class
 {
     object? IInMemoryProjectionContext.Document => Document;
-    
+
     public override IProjectionContext Freeze()
     {
-        return new InMemoryProjectionContext<TIdContext, TDocument>(Id, Document);
+        return new InMemoryProjectionContext<TId, TDocument>(Id, Document);
     }
 }
 

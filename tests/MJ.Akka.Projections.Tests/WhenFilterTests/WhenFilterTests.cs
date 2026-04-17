@@ -30,7 +30,7 @@ public class WhenFilterTests
     // ---------------------------------------------------------------------------
 
     public class WhenEventFilterPassesHandlerRuns(NormalTestKitActorSystem _)
-        : AkkaProjectionsTestKit.ProjectionTestKit<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>, SetupInMemoryStorage>,
+        : AkkaProjectionsTestKit.ProjectionTestKit<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>, SetupInMemoryStorage>,
             IClassFixture<NormalTestKitActorSystem>
     {
         private readonly string _id = Fixture.Create<string>();
@@ -39,7 +39,7 @@ public class WhenFilterTests
         [Fact]
         public void Then_only_matching_events_are_handled() { }
 
-        protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>, SetupInMemoryStorage>
+        protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>, SetupInMemoryStorage>
             GetProjectionToTest() => new Proj(_id, _matchingTag);
 
         protected override IEnumerable<object> When() =>
@@ -55,12 +55,12 @@ public class WhenFilterTests
         }
 
         private class Proj(string id, string matchingTag)
-            : InMemoryProjection<SimpleIdContext<string>, Doc>
+            : InMemoryProjection<string, Doc>
         {
             public override string Name => nameof(WhenEventFilterPassesHandlerRuns);
 
-            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
-                Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>>
+                Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>> config) =>
                 config
                     .On<TestEvent>().WithId(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
                     .When(f => f.WithEventFilter(e => e.Tag == matchingTag), h => h.HandleWith((evnt, ctx, _, _) =>
@@ -84,7 +84,7 @@ public class WhenFilterTests
     // ---------------------------------------------------------------------------
 
     public class WhenDocumentFilterFailsHandlerIsSkipped(NormalTestKitActorSystem _)
-        : AkkaProjectionsTestKit.ProjectionTestKit<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>, SetupInMemoryStorage>,
+        : AkkaProjectionsTestKit.ProjectionTestKit<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>, SetupInMemoryStorage>,
             IClassFixture<NormalTestKitActorSystem>
     {
         private readonly string _existingId = Fixture.Create<string>();
@@ -93,17 +93,17 @@ public class WhenFilterTests
         [Fact]
         public void Then_conditional_handler_only_runs_when_document_condition_holds() { }
 
-        protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>, SetupInMemoryStorage>
+        protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>, SetupInMemoryStorage>
             GetProjectionToTest() => new Proj(_existingId, _newId);
 
         // Seed one document so it already exists; the other starts empty.
-        protected override IImmutableDictionary<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> Given()
+        protected override IImmutableDictionary<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>> Given()
         {
             var existingDoc = new Doc();
             existingDoc.Tags.Add("pre-existing");
-            var ctx = new InMemoryProjectionContext<SimpleIdContext<string>, Doc>(
+            var ctx = new InMemoryProjectionContext<string, Doc>(
                 new SimpleIdContext<string>(_existingId), existingDoc);
-            return ImmutableDictionary<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>.Empty
+            return ImmutableDictionary<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>>.Empty
                 .Add(new SimpleIdContext<string>(_existingId), ctx);
         }
 
@@ -127,12 +127,12 @@ public class WhenFilterTests
         }
 
         private class Proj(string existingId, string newId)
-            : InMemoryProjection<SimpleIdContext<string>, Doc>
+            : InMemoryProjection<string, Doc>
         {
             public override string Name => nameof(WhenDocumentFilterFailsHandlerIsSkipped);
 
-            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
-                Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>>
+                Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>> config) =>
                 config
                     .On<TestEvent>().WithId(e => e.Id == existingId || e.Id == newId ? new SimpleIdContext<string>(e.Id) : null)
                     .HandleWith((_, ctx, _, _) =>   // always runs
@@ -165,7 +165,7 @@ public class WhenFilterTests
     // ---------------------------------------------------------------------------
 
     public class TwoWhenHandleWithPairsHaveIndependentFilters(NormalTestKitActorSystem _)
-        : AkkaProjectionsTestKit.ProjectionTestKit<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>, SetupInMemoryStorage>,
+        : AkkaProjectionsTestKit.ProjectionTestKit<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>, SetupInMemoryStorage>,
             IClassFixture<NormalTestKitActorSystem>
     {
         private readonly string _id = Fixture.Create<string>();
@@ -173,7 +173,7 @@ public class WhenFilterTests
         [Fact]
         public void Then_each_handleWith_uses_its_own_filter() { }
 
-        protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>, SetupInMemoryStorage>
+        protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>, SetupInMemoryStorage>
             GetProjectionToTest() => new Proj(_id);
 
         protected override IEnumerable<object> When() =>
@@ -190,12 +190,12 @@ public class WhenFilterTests
         }
 
         private class Proj(string id)
-            : InMemoryProjection<SimpleIdContext<string>, Doc>
+            : InMemoryProjection<string, Doc>
         {
             public override string Name => nameof(TwoWhenHandleWithPairsHaveIndependentFilters);
 
-            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
-                Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>>
+                Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>> config) =>
                 config
                     .On<TestEvent>().WithId(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
                     .When(f => f.WithEventFilter(e => e.Tag == "alpha"), h => h.HandleWith((_, ctx, _, _) =>
@@ -219,7 +219,7 @@ public class WhenFilterTests
     // ---------------------------------------------------------------------------
 
     public class WhenFilterDoesNotBleedIntoNextHandleWith(NormalTestKitActorSystem _)
-        : AkkaProjectionsTestKit.ProjectionTestKit<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>, SetupInMemoryStorage>,
+        : AkkaProjectionsTestKit.ProjectionTestKit<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>, SetupInMemoryStorage>,
             IClassFixture<NormalTestKitActorSystem>
     {
         private readonly string _id = Fixture.Create<string>();
@@ -227,7 +227,7 @@ public class WhenFilterTests
         [Fact]
         public void Then_filter_only_applies_to_its_own_handleWith() { }
 
-        protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>, SetupInMemoryStorage>
+        protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>, SetupInMemoryStorage>
             GetProjectionToTest() => new Proj(_id);
 
         protected override IEnumerable<object> When() =>
@@ -245,12 +245,12 @@ public class WhenFilterTests
         }
 
         private class Proj(string id)
-            : InMemoryProjection<SimpleIdContext<string>, Doc>
+            : InMemoryProjection<string, Doc>
         {
             public override string Name => nameof(WhenFilterDoesNotBleedIntoNextHandleWith);
 
-            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>>
-                Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, Doc>> config) =>
+            public override ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>>
+                Configure(ISetupProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, Doc>> config) =>
                 config
                     .On<TestEvent>().WithId(e => e.Id == id ? new SimpleIdContext<string>(e.Id) : null)
                     .When(f => f.WithEventFilter(e => e.Tag == "run"), h => h.HandleWith((_, ctx, _, _) =>

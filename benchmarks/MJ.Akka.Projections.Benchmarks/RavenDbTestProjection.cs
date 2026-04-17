@@ -31,8 +31,8 @@ public class RavenDbTestProjection : RavenDbProjection<RavenDbTestProjection.Tes
         _events = events.ToImmutableList();
     }
     
-    public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> Configure(
-        ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument, SimpleIdContext<string>>> config)
+    public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument>> Configure(
+        ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument>> config)
     {
         return config
             .On<TestEvent>().WithId(evnt => evnt.DocId)

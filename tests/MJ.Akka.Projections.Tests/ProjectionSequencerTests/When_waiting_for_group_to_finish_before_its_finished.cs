@@ -46,7 +46,7 @@ public class When_waiting_for_group_to_finish_before_its_finished(
                 Sys,
                 new ProjectionConfiguration<
                     SimpleIdContext<string>, 
-                    InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>, 
+                    InMemoryProjectionContext<string, TestDocument<string>>, 
                     SetupInMemoryStorage>(
                     projection,
                     storageSetup.CreateProjectionStorage(),

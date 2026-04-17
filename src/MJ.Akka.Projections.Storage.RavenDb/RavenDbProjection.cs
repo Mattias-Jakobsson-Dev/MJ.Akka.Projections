@@ -5,30 +5,23 @@ using MJ.Akka.Projections.ProjectionIds;
 namespace MJ.Akka.Projections.Storage.RavenDb;
 
 [PublicAPI]
-public abstract class RavenDbProjection<TDocument> : RavenDbProjection<TDocument, SimpleIdContext<string>>
+public abstract class RavenDbProjection<TDocument>
+    : BaseProjection<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>, SetupRavenDbStorage>
     where TDocument : class
 {
-    protected virtual TDocument? GetDefaultDocument(string id) => base.GetDefaultDocument(id);
-}
-
-[PublicAPI]
-public abstract class RavenDbProjection<TDocument, TIdContext> 
-    : BaseProjection<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>, SetupRavenDbStorage>
-    where TDocument : class where TIdContext : IProjectionIdContext
-{
-    public override ILoadProjectionContext<TIdContext, RavenDbProjectionContext<TDocument, TIdContext>> GetLoadProjectionContext(
+    public override ILoadProjectionContext<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>> GetLoadProjectionContext(
         SetupRavenDbStorage storageSetup)
     {
-        return new LoadProjectionDataFromRavenDb<TDocument, TIdContext>(storageSetup.GetDocumentStore());
+        return new LoadProjectionDataFromRavenDb<TDocument>(storageSetup.GetDocumentStore());
     }
-    
-    protected virtual TDocument? GetDefaultDocument(TIdContext id) => null;
 
-    public override RavenDbProjectionContext<TDocument, TIdContext> GetDefaultContext(TIdContext id)
+    public override RavenDbProjectionContext<TDocument> GetDefaultContext(SimpleIdContext<string> id)
     {
-        return new RavenDbProjectionContext<TDocument, TIdContext>(
-            id,
-            GetDefaultDocument(id),
-            ImmutableDictionary<string, object>.Empty);
+        return new RavenDbProjectionContext<TDocument>(
+             id,
+             GetDefaultDocument(id),
+             ImmutableDictionary<string, object>.Empty);
     }
+
+    protected virtual TDocument? GetDefaultDocument(string id) => null;
 }

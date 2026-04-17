@@ -11,7 +11,7 @@ using MJ.Akka.Projections.Storage.InMemory;
 namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
 
 public class FakeProjection(TimeSpan delay) 
-    : IProjection<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>, SetupInMemoryStorage>
+    : IProjection<SimpleIdContext<object>, InMemoryProjectionContext<object, object>, SetupInMemoryStorage>
 {
     public string Name => GetType().Name;
     
@@ -37,22 +37,22 @@ public class FakeProjection(TimeSpan delay)
         return null;
     }
 
-    public ISetupProjection<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>> Configure(
-        ISetupProjection<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>> config)
+    public ISetupProjection<SimpleIdContext<object>, InMemoryProjectionContext<object, object>> Configure(
+        ISetupProjection<SimpleIdContext<object>, InMemoryProjectionContext<object, object>> config)
     {
         return config;
     }
     
-    public ILoadProjectionContext<SimpleIdContext<object>, InMemoryProjectionContext<SimpleIdContext<object>, object>> GetLoadProjectionContext(
+    public ILoadProjectionContext<SimpleIdContext<object>, InMemoryProjectionContext<object, object>> GetLoadProjectionContext(
         SetupInMemoryStorage storageSetup)
     {
-        return new InMemoryProjectionLoader<SimpleIdContext<object>, object>(
+        return new InMemoryProjectionLoader<object, object>(
             id => storageSetup.LoadDocument(new ProjectionContextId(Name, id)));
     }
 
-    public InMemoryProjectionContext<SimpleIdContext<object>, object> GetDefaultContext(SimpleIdContext<object> id)
+    public InMemoryProjectionContext<object, object> GetDefaultContext(SimpleIdContext<object> id)
     {
-        return new InMemoryProjectionContext<SimpleIdContext<object>, object>(id, null);
+        return new InMemoryProjectionContext<object, object>(id, null);
     }
 
     private class FakeProjector : ReceiveActor

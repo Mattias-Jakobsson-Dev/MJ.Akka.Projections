@@ -9,9 +9,9 @@ namespace MJ.Akka.Projections.Storage.InMemory;
 /// Exposes <c>ModifyDocument</c> overloads where <typeparamref name="TDocument"/> is non-nullable.
 /// </summary>
 [PublicAPI]
-public interface ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent>
-    : ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent>
-    where TIdContext : IProjectionIdContext
+public interface ISetupEventHandlerForProjectionWithExistingDocument<TId, TDocument, TEvent>
+    : ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
+    where TId : notnull
     where TDocument : class
 {
 }
@@ -21,21 +21,21 @@ public interface ISetupEventHandlerForProjectionWithExistingDocument<TIdContext,
 /// Exposes <c>CreateDocument</c> overloads.
 /// </summary>
 [PublicAPI]
-public interface ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent>
-    : ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent>
-    where TIdContext : IProjectionIdContext
+public interface ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent>
+    : ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
+    where TId : notnull
     where TDocument : class
 {
 }
 
-internal sealed class SetupEventHandlerForProjectionWithDocument<TIdContext, TDocument, TEvent>(
-    ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent> inner)
-    : ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent>,
-      ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent>
-    where TIdContext : IProjectionIdContext
+internal sealed class SetupEventHandlerForProjectionWithDocument<TId, TDocument, TEvent>(
+    ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> inner)
+    : ISetupEventHandlerForProjectionWithExistingDocument<TId, TDocument, TEvent>,
+      ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent>
+    where TId : notnull
     where TDocument : class
 {
-    public ISetupEventHandlerForProjection<TIdContext, InMemoryProjectionContext<TIdContext, TDocument>, TEvent> HandleWith(
-        Func<TEvent, InMemoryProjectionContext<TIdContext, TDocument>, long?, CancellationToken, Task> handler)
+    public ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> HandleWith(
+        Func<TEvent, InMemoryProjectionContext<TId, TDocument>, long?, CancellationToken, Task> handler)
         => inner.HandleWith(handler);
 }

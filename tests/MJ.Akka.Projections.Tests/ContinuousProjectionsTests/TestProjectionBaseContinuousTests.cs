@@ -12,7 +12,7 @@ using Xunit;
 namespace MJ.Akka.Projections.Tests.ContinuousProjectionsTests;
 
 public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem actorSystemHandler)
-    : BaseContinuousProjectionsTests<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>, SetupInMemoryStorage>(
+    : BaseContinuousProjectionsTests<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage>(
         actorSystemHandler) 
     where TId : notnull
 {
@@ -88,7 +88,7 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
         return new SetupInMemoryStorage();
     }
 
-    protected override IProjection<SimpleIdContext<TId>, InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>>, SetupInMemoryStorage> 
+    protected override IProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TestDocument<TId>>, SetupInMemoryStorage> 
         GetProjection(
             IImmutableList<object> events,
             IImmutableList<StorageFailures> storageFailures,
@@ -134,7 +134,7 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
 
     protected override Task VerifyContext(
         SimpleIdContext<TId> documentId,
-        InMemoryProjectionContext<SimpleIdContext<TId>, TestDocument<TId>> context,
+        InMemoryProjectionContext<TId, TestDocument<TId>> context,
         IImmutableList<object> events,
         IProjection projection)
     {

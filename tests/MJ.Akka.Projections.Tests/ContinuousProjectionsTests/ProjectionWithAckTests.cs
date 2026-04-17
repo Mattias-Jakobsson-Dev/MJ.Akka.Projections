@@ -13,7 +13,7 @@ public class ProjectionWithAckTests(NormalTestKitActorSystem actorSystemSetup)
 
     protected override IProjection<
         SimpleIdContext<string>,
-        InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>,
+        InMemoryProjectionContext<string, TestDocument<string>>,
         SetupInMemoryStorage> GetProjection(
         IImmutableList<object> events,
         IImmutableList<StorageFailures> storageFailures,

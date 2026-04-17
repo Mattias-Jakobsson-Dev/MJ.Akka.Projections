@@ -13,8 +13,8 @@ namespace MJ.Akka.Projections.EventStoreToRavenDbExample;
 public class ExampleProjection(ActorSystem actorSystem)
     : RavenDbProjection<ExampleDocument>
 {
-    public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<ExampleDocument, SimpleIdContext<string>>>
-        Configure(ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<ExampleDocument, SimpleIdContext<string>>> config)
+    public override ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<ExampleDocument>>
+        Configure(ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<ExampleDocument>> config)
     {
         return config
             .On<Events.ThirdEvent>().Transform(evnt => ImmutableList.Create<object>(

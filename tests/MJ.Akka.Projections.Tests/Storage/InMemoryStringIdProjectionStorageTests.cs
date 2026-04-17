@@ -9,7 +9,7 @@ namespace MJ.Akka.Projections.Tests.Storage;
 
 [PublicAPI]
 public class InMemoryStringIdProjectionStorageTests 
-    : ProjectionStorageTests<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>, SetupInMemoryStorage>
+    : ProjectionStorageTests<SimpleIdContext<string>, InMemoryProjectionContext<string, TestDocument<string>>, SetupInMemoryStorage>
 {
     private readonly string _eventId = Guid.NewGuid().ToString();
     
@@ -18,9 +18,9 @@ public class InMemoryStringIdProjectionStorageTests
         return new SetupInMemoryStorage();
     }
 
-    protected override InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>> CreateInsertRequest(SimpleIdContext<string> id)
+    protected override InMemoryProjectionContext<string, TestDocument<string>> CreateInsertRequest(SimpleIdContext<string> id)
     {
-        return new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+        return new InMemoryProjectionContext<string, TestDocument<string>>(
             id,
             new TestDocument<string>
             {
@@ -29,20 +29,20 @@ public class InMemoryStringIdProjectionStorageTests
             });
     }
 
-    protected override InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>> CreateDeleteRequest(SimpleIdContext<string> id)
+    protected override InMemoryProjectionContext<string, TestDocument<string>> CreateDeleteRequest(SimpleIdContext<string> id)
     {
-        return new InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>(
+        return new InMemoryProjectionContext<string, TestDocument<string>>(
             id,
             null);
     }
     
-    protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>>, SetupInMemoryStorage> 
+    protected override IProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, TestDocument<string>>, SetupInMemoryStorage> 
         CreateProjection()
     {
         return new TestProjection<string>(ImmutableList<object>.Empty, ImmutableList<StorageFailures>.Empty);
     }
 
-    protected override Task VerifyContext(InMemoryProjectionContext<SimpleIdContext<string>, TestDocument<string>> loaded)
+    protected override Task VerifyContext(InMemoryProjectionContext<string, TestDocument<string>> loaded)
     {
         loaded.Document!.HandledEvents.ShouldBe(ImmutableList.Create(_eventId), ignoreOrder: true);
 
