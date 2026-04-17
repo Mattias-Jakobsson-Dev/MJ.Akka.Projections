@@ -7,7 +7,7 @@ internal abstract class HandlerFilteringBuilderBase<TIdContext, TContext>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
     public record Handler(
-        Func<object, Task<TIdContext?>> GetId,
+        Func<object, TIdContext?> GetId,
         Func<object, TContext, long?, CancellationToken, Task> Handle,
         IProjectionFilter<TContext> Filter);
 
@@ -15,7 +15,7 @@ internal abstract class HandlerFilteringBuilderBase<TIdContext, TContext>
 }
 
 internal class HandlerFilteringBuilder<TIdContext, TContext, TEvent>(
-    Func<TEvent, Task<TIdContext?>> getId,
+    Func<TEvent, TIdContext?> getId,
     SetupProjection<TIdContext, TContext> parent)
     : HandlerFilteringBuilderBase<TIdContext, TContext>, ISetupHandlerFiltering<TIdContext, TContext, TEvent>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
@@ -84,6 +84,6 @@ internal class EventRoutingBuilder<TIdContext, TContext, TEvent>(SetupProjection
     public ISetupProjection<TIdContext, TContext> Transform(Func<TEvent, IImmutableList<object>> transform)
         => parent.RegisterTransformer(transform);
 
-    public ISetupHandlerFiltering<TIdContext, TContext, TEvent> WithId(Func<TEvent, Task<TIdContext?>> getId)
+    public ISetupHandlerFiltering<TIdContext, TContext, TEvent> WithId(Func<TEvent, TIdContext?> getId)
         => parent.GetOrCreateHandlerBuilder(getId);
 }

@@ -155,7 +155,7 @@ public class TestProjectionWithCustomIdContext<TIdContext, TId>(
 
                 return doc;
             })
-            .On<Events<TId>.EventThatDoesntGetDocumentId>().WithId(_ => Task.FromResult<TIdContext?>(null))
+            .On<Events<TId>.EventThatDoesntGetDocumentId>().WithId(_ => null)
             .ModifyDocument((evnt, doc) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);

@@ -23,7 +23,7 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
     }
 
     internal ISetupHandlerFiltering<TIdContext, TContext, TEvent> GetOrCreateHandlerBuilder<TEvent>(
-        Func<TEvent, Task<TIdContext?>> getId)
+        Func<TEvent, TIdContext?> getId)
     {
         var builder = new HandlerFilteringBuilder<TIdContext, TContext, TEvent>(getId, this);
         _builders = _builders.SetItem(typeof(TEvent), builder);
@@ -58,16 +58,18 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
             return results;
         }
 
-        public async Task<TIdContext?> GetIdContextFor(object evnt)
+        public Task<TIdContext?> GetIdContextFor(object evnt)
         {
             var typesToCheck = evnt.GetType().GetInheritedTypes();
 
-            return (await Task.WhenAll(from type in typesToCheck
+            var result = (from type in typesToCheck
                     where handlers.ContainsKey(type)
                     let handler = handlers[type]
                     where handler.Filter.FilterEvent(evnt)
-                    select handler.GetId(evnt)))
+                    select handler.GetId(evnt))
                 .FirstOrDefault(x => x != null);
+
+            return Task.FromResult(result);
         }
 
         public async Task<bool> Handle(

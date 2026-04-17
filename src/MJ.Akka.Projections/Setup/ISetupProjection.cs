@@ -19,7 +19,7 @@ public interface ISetupEventRouting<TIdContext, TContext, TEvent> where TIdConte
 {
     ISetupProjection<TIdContext, TContext> Transform(Func<TEvent, IImmutableList<object>> transform);
     
-    ISetupHandlerFiltering<TIdContext, TContext, TEvent> WithId(Func<TEvent, Task<TIdContext?>> getId);
+    ISetupHandlerFiltering<TIdContext, TContext, TEvent> WithId(Func<TEvent, TIdContext?> getId);
 }
 
 public interface ISetupHandlerFiltering<TIdContext, TContext, TEvent> : ISetupProjection<TIdContext, TContext>  

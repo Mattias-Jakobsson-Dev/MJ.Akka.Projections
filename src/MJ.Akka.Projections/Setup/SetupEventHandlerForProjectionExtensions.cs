@@ -6,16 +6,6 @@ namespace MJ.Akka.Projections.Setup;
 [PublicAPI]
 public static class SetupEventHandlerForProjectionExtensions
 {
-    // -------------------------------------------------------------------------
-    // WithId sync overload on ISetupEventRouting
-    // -------------------------------------------------------------------------
-
-    public static ISetupHandlerFiltering<TIdContext, TContext, TEvent> WithId<TIdContext, TContext, TEvent>(
-        this ISetupEventRouting<TIdContext, TContext, TEvent> routing,
-        Func<TEvent, TIdContext?> getId)
-        where TIdContext : IProjectionIdContext
-        where TContext : IProjectionContext
-        => routing.WithId(evnt => Task.FromResult(getId(evnt)));
 
     // -------------------------------------------------------------------------
     // HandleWith convenience overloads on ISetupEventHandlerForProjection

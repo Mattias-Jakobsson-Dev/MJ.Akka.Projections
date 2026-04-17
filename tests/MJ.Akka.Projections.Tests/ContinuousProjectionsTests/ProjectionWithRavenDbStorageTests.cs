@@ -216,7 +216,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 
                     return doc;
                 })
-                .On<Events<string>.EventThatDoesntGetDocumentId>().WithId(_ => Task.FromResult<SimpleIdContext<string>?>(null))
+                .On<Events<string>.EventThatDoesntGetDocumentId>().WithId(_ => null)
                 .ModifyDocument((evnt, doc) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
