@@ -83,6 +83,78 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
         secondContext.Document!.HandledEvents.Count.ShouldBe(2);
     }
     
+    [Fact]
+    public async Task Stopping_projection_mid_flight_cancels_long_running_handler()
+    {
+        using var system = _actorSystemHandler.StartNewActorSystem();
+
+        var documentId = Fixture.Create<TId>();
+
+        // Handler delays for 30 s — far longer than the test timeout — but respects the CancellationToken.
+        var events = ImmutableList.Create<object>(
+            new Events<TId>.DelayHandlingWithCancellationToken(
+                documentId,
+                Fixture.Create<string>(),
+                TimeSpan.FromSeconds(30)));
+
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        var proxy = coordinator.Get(projection.Name)!;
+
+        // Give the handler a moment to start
+        await Task.Delay(TimeSpan.FromMilliseconds(200));
+
+        // Stop should not hang forever — the cancellation token should interrupt the handler
+        var stopTask = proxy.Stop();
+        await stopTask.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task Chained_handlers_for_same_event_execute_in_order()
+    {
+        using var system = _actorSystemHandler.StartNewActorSystem();
+
+        var documentId = Fixture.Create<TId>();
+        var eventId1 = Fixture.Create<string>();
+        var eventId2 = Fixture.Create<string>();
+
+        // Two separate FirstEvent instances (different eventIds) for the same document —
+        // verify they are both handled and in the correct order.
+        var events = ImmutableList.Create<object>(
+            new Events<TId>.FirstEvent(documentId, eventId1),
+            new Events<TId>.FirstEvent(documentId, eventId2));
+
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        var storageWrapper = new TestStorageWrapper.Modifier();
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(ProjectionWaitTime);
+
+        var context = await loader.Load(documentId, projection.GetDefaultContext);
+
+        context.Exists().ShouldBeTrue();
+        context.Document!.HandledEvents.Count.ShouldBe(2);
+        context.Document!.EventHandledOrder[eventId1].ShouldBe(1);
+        context.Document!.EventHandledOrder[eventId2].ShouldBe(2);
+    }
+
     protected override SetupInMemoryStorage CreateStorageSetup()
     {
         return new SetupInMemoryStorage();

@@ -1061,6 +1061,104 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
         await VerifyContext(id, context, ImmutableList.Create(transformedEvent), projection);
     }
 
+    [Fact]
+    public async Task Projecting_event_that_fails_more_times_than_max_restarts_allows()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+
+        // Fails 3 times; only 2 restarts allowed → projection should ultimately fail
+        var events = ImmutableList.Create(GetEventThatFails(id, 3));
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithRestartSettings(
+                        RestartSettings.Create(
+                                TimeSpan.Zero,
+                                TimeSpan.Zero,
+                                1)
+                            .WithMaxRestarts(2, TimeSpan.FromSeconds(10)))
+                    .WithProjection(projection))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await Should.ThrowAsync<Exception>(() =>
+            coordinator.Get(projection.Name)!.WaitForCompletion(Timeout));
+    }
+
+    [Fact]
+    public async Task Stopping_projection_while_processing_completes_without_error()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+
+        var events = ImmutableList.Create(GetTestEvent(id));
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        var proxy = coordinator.Get(projection.Name)!;
+
+        // Stop before or after completion — either way should not throw
+        await proxy.Stop();
+    }
+
+    [Fact]
+    public async Task Projecting_two_projections_concurrently_both_complete()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id1 = Fixture.Create<TIdContext>();
+        var id2 = Fixture.Create<TIdContext>();
+
+        var events1 = ImmutableList.Create(GetTestEvent(id1));
+        var events2 = ImmutableList.Create(GetTestEvent(id2));
+
+        var projection1 = GetProjection(events1, ImmutableList<StorageFailures>.Empty);
+        var projection2 = GetProjection(events2, ImmutableList<StorageFailures>.Empty);
+
+        // If both projections share the same name, running them side-by-side isn't meaningful.
+        // Concrete subclasses that always produce the same name will simply skip this test.
+        if (projection1.Name == projection2.Name)
+            return;
+
+        var storageSetup = CreateStorageSetup();
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection1)
+                    .WithProjection(projection2))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await Task.WhenAll(
+            coordinator.Get(projection1.Name)!.WaitForCompletion(Timeout),
+            coordinator.Get(projection2.Name)!.WaitForCompletion(Timeout));
+
+        var position1 = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection1.Name);
+        var position2 = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection2.Name);
+
+        position1.ShouldBe(1);
+        position2.ShouldBe(1);
+    }
+
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> Configure(
         IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> config)
     {
