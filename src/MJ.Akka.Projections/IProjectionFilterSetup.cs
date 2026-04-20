@@ -11,3 +11,13 @@ public interface IProjectionFilterSetup<TId, TContext, out TEvent>
 
     internal IProjectionFilter<TContext> Build();
 }
+
+[PublicAPI]
+public interface IProjectionFilterSetup<TId, TContext, out TEvent, TData> 
+    where TId : notnull where TContext : IProjectionContext
+{
+    IProjectionFilterSetup<TId, TContext, TEvent, TData> WithEventFilter(Func<TEvent, bool> filter);
+    IProjectionFilterSetup<TId, TContext, TEvent, TData> WithDocumentFilter(Func<TContext, bool> filter);
+
+    internal IProjectionFilter<TContext> Build();
+}

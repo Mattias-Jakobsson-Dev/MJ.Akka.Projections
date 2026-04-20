@@ -132,6 +132,30 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
         return new Events<TId>.EventThatDoesntGetDocumentId(documentId, Fixture.Create<string>());
     }
 
+    protected override object GetEventWithDataForId(SimpleIdContext<TId> documentId, string data)
+    {
+        return new Events<TId>.EventWithDataId(documentId, Fixture.Create<string>(), data);
+    }
+
+    protected override object GetEventWithDataForHandler(SimpleIdContext<TId> documentId, string data)
+    {
+        return new Events<TId>.EventWithDataHandler(documentId, Fixture.Create<string>(), data);
+    }
+
+    protected override object GetEventWithDataForTransform(SimpleIdContext<TId> documentId, string data, IImmutableList<object> transformTo)
+    {
+        return new Events<TId>.EventWithDataTransform(documentId, Fixture.Create<string>(), data, transformTo.OfType<Events<TId>.IEvent>().ToImmutableList());
+    }
+
+    protected override Task VerifyDataContext(
+        SimpleIdContext<TId> documentId,
+        InMemoryProjectionContext<TId, TestDocument<TId>> context,
+        string expectedData)
+    {
+        context.Document!.ReceivedData.ShouldContain(expectedData);
+        return Task.CompletedTask;
+    }
+
     protected override Task VerifyContext(
         SimpleIdContext<TId> documentId,
         InMemoryProjectionContext<TId, TestDocument<TId>> context,

@@ -6,15 +6,14 @@ namespace MJ.Akka.Projections.Tests.KeepTrackOfProjectorsInProcTests;
 
 public class FakeEventsHandler : IHandleEventInProjection<SimpleIdContext<object>, InMemoryProjectionContext<object, object>>
 {
-    public IImmutableList<object> Transform(object evnt)
+    public Task<IImmutableList<object>> Transform(object evnt)
     {
-        return ImmutableList<object>.Empty;
+        return Task.FromResult<IImmutableList<object>>(ImmutableList<object>.Empty);
     }
 
-    public Task<SimpleIdContext<object>?> GetIdContextFor(object evnt)
-    {
-        return Task.FromResult<SimpleIdContext<object>?>(null);
-    }
+    public Task<object> PrepareEvent(object evnt) => Task.FromResult(evnt);
+
+    public SimpleIdContext<object>? GetIdContextFor(object evnt) => null;
 
     public Task<bool> Handle(
         InMemoryProjectionContext<object, object> context, 

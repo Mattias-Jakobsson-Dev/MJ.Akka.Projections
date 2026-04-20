@@ -93,46 +93,58 @@ public class ProjectionSequencer : ReceiveActor
                 IProjectionIdContext? idContext,
                 Task<Messages.IProjectEventsResponse> task)>();
 
-            var eventsWithIds = await Task.WhenAll(cmd
-                .Events
-                .SelectMany(x =>
+            var transformedEventGroups = await Task.WhenAll(cmd.Events.Select(async x =>
+            {
+                var transformed = (await _configuration.TransformEvent(x.Event)).ToList();
+                return (Original: x, Transformed: transformed);
+            }));
+
+            var flattenedEvents = transformedEventGroups.SelectMany(item =>
+            {
+                var x = item.Original;
+                var transformed = item.Transformed;
+
+                if (x is not IEventWithAck originalAck)
+                    return transformed.Select(y => x with { Event = y });
+
+                switch (transformed.Count)
                 {
-                    var transformed = _configuration.TransformEvent(x.Event).ToList();
+                    case 0:
+                        _ = originalAck.Ack(cancellationToken);
+                        return [];
+                    case 1:
+                        return [x with { Event = transformed[0] }];
+                }
 
-                    if (x is not IEventWithAck originalAck)
-                        return transformed.Select(y => x with { Event = y });
+                var remaining = transformed.Count;
+                var nacked = 0;
 
-                    switch (transformed.Count)
-                    {
-                        case 0:
-                            _ = originalAck.Ack(cancellationToken);
-                            return [];
-                        case 1:
-                            return [x with { Event = transformed[0] }];
-                    }
+                return transformed.Select(y => new CountdownAckEvent(y, x.Position, Ack, Nack));
 
-                    var remaining = transformed.Count;
-                    var nacked = 0;
-
-                    return transformed.Select(y => new CountdownAckEvent(y, x.Position, Ack, Nack));
-
-                    Task Nack(Exception error, CancellationToken token)
-                    {
-                        return Interlocked.Exchange(ref nacked, 1) == 0
-                            ? originalAck.Nack(error, token) 
-                            : Task.CompletedTask;
-                    }
-
-                    Task Ack(CancellationToken token)
-                    {
-                        return Interlocked.Decrement(ref remaining) == 0 ? originalAck.Ack(token) : Task.CompletedTask;
-                    }
-                })
-                .Select(async x => new
+                Task Nack(Exception error, CancellationToken token)
                 {
-                    Event = x,
-                    Id = await _configuration.GetIdContextFor(x.Event),
-                    x.Position
+                    return Interlocked.Exchange(ref nacked, 1) == 0
+                        ? originalAck.Nack(error, token) 
+                        : Task.CompletedTask;
+                }
+
+                Task Ack(CancellationToken token)
+                {
+                    return Interlocked.Decrement(ref remaining) == 0 ? originalAck.Ack(token) : Task.CompletedTask;
+                }
+            });
+
+            var eventsWithIds = await Task.WhenAll(flattenedEvents
+                .Select(async x =>
+                {
+                    var preparedEvent = await _configuration.PrepareEvent(x.Event);
+                    var preparedEventWithPosition = x with { Event = preparedEvent };
+                    return new
+                    {
+                        Event = preparedEventWithPosition,
+                        Id = _configuration.GetIdContextFor(preparedEvent),
+                        preparedEventWithPosition.Position
+                    };
                 }));
 
             var groupedEvents = eventsWithIds

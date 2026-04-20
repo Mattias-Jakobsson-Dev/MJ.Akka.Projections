@@ -47,14 +47,19 @@ public class ProjectionConfiguration<TIdContext, TContext, TStorageSetup>(
         return storage.Store(contexts, cancellationToken);
     }
     
-    public override IImmutableList<object> TransformEvent(object evnt)
+    public override Task<IImmutableList<object>> TransformEvent(object evnt)
     {
         return eventsHandler.Transform(evnt);
     }
 
-    public override async Task<IProjectionIdContext?> GetIdContextFor(object evnt)
+    public override Task<object> PrepareEvent(object evnt)
     {
-        return await eventsHandler.GetIdContextFor(evnt);
+        return eventsHandler.PrepareEvent(evnt);
+    }
+
+    public override IProjectionIdContext? GetIdContextFor(object evnt)
+    {
+        return eventsHandler.GetIdContextFor(evnt);
     }
 
     public override Task<bool> HandleEvent(
@@ -116,9 +121,11 @@ public abstract class ProjectionConfiguration
         return _projection.StartSource(fromPosition ?? _projection.GetInitialPosition());
     }
     
-    public abstract IImmutableList<object> TransformEvent(object evnt);
-    
-    public abstract Task<IProjectionIdContext?> GetIdContextFor(object evnt);
+    public abstract Task<IImmutableList<object>> TransformEvent(object evnt);
+
+    public abstract Task<object> PrepareEvent(object evnt);
+
+    public abstract IProjectionIdContext? GetIdContextFor(object evnt);
     
     public abstract Task<bool> HandleEvent(
         IProjectionContext context,

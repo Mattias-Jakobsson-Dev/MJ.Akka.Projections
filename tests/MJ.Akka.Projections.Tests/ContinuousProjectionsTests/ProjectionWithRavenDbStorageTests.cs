@@ -75,6 +75,30 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
         return new Events<string>.EventThatDoesntGetDocumentId(documentId, Fixture.Create<string>());
     }
 
+    protected override object GetEventWithDataForId(SimpleIdContext<string> documentId, string data)
+    {
+        return new Events<string>.EventWithDataId(documentId, Fixture.Create<string>(), data);
+    }
+
+    protected override object GetEventWithDataForHandler(SimpleIdContext<string> documentId, string data)
+    {
+        return new Events<string>.EventWithDataHandler(documentId, Fixture.Create<string>(), data);
+    }
+
+    protected override object GetEventWithDataForTransform(SimpleIdContext<string> documentId, string data, IImmutableList<object> transformTo)
+    {
+        return new Events<string>.EventWithDataTransform(documentId, Fixture.Create<string>(), data, transformTo.OfType<Events<string>.IEvent>().ToImmutableList());
+    }
+
+    protected override Task VerifyDataContext(
+        SimpleIdContext<string> documentId,
+        RavenDbProjectionContext<TestDocument<string>> context,
+        string expectedData)
+    {
+        context.Document!.ReceivedData.ShouldContain(expectedData);
+        return Task.CompletedTask;
+    }
+
     protected override Task VerifyContext(
         SimpleIdContext<string> documentId,
         RavenDbProjectionContext<TestDocument<string>> context,
@@ -229,7 +253,53 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     doc.AddHandledEvent(evnt.EventId);
 
                     return doc;
-                }));
+                }))
+                // WithData: data drives the document id
+                .On<Events<string>.EventWithDataId>()
+                .WithData(evnt => Task.FromResult(evnt.Data))
+                .WithId((evnt, data) =>
+                {
+                    if (data != evnt.Data) throw new Exception($"Data mismatch in GetId: expected '{evnt.Data}', got '{data}'");
+                    return new SimpleIdContext<string>(evnt.DocId);
+                })
+                .WhenAny(h => h.HandleWith((evnt, ctx, data, _, _) =>
+                {
+                    if (data != evnt.Data) throw new Exception($"Data mismatch in HandleWith: expected '{evnt.Data}', got '{data}'");
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                    ctx.ModifyDocument(doc =>
+                    {
+                        doc ??= new TestDocument<string> { Id = evnt.DocId };
+                        doc.AddHandledEvent(evnt.EventId);
+                        doc.ReceivedData = doc.ReceivedData.Add(data);
+                        return doc;
+                    });
+                    return Task.CompletedTask;
+                }))
+                // WithData: data is forwarded to the handler
+                .On<Events<string>.EventWithDataHandler>()
+                .WithData(evnt => Task.FromResult(evnt.Data))
+                .WithId((evnt, _) => new SimpleIdContext<string>(evnt.DocId))
+                .WhenAny(h => h.HandleWith((evnt, ctx, data, _, _) =>
+                {
+                    if (data != evnt.Data) throw new Exception($"Data mismatch in HandleWith: expected '{evnt.Data}', got '{data}'");
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                    ctx.ModifyDocument(doc =>
+                    {
+                        doc ??= new TestDocument<string> { Id = evnt.DocId };
+                        doc.AddHandledEvent(evnt.EventId);
+                        doc.ReceivedData = doc.ReceivedData.Add(data);
+                        return doc;
+                    });
+                    return Task.CompletedTask;
+                }))
+                // WithData: data is used in transform
+                .On<Events<string>.EventWithDataTransform>()
+                .WithData(evnt => Task.FromResult(evnt.Data))
+                .Transform((evnt, data) =>
+                {
+                    if (data != evnt.Data) throw new Exception($"Data mismatch in Transform: expected '{evnt.Data}', got '{data}'");
+                    return evnt.TransformTo.OfType<object>().ToImmutableList();
+                });
         }
         
         public override ILoadProjectionContext<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>>> 

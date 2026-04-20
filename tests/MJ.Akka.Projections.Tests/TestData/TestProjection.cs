@@ -111,7 +111,54 @@ public class TestProjection<TId>(
                 doc ??= new TestDocument<TId> { Id = evnt.DocId };
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
-            }));
+            }))
+            // WithData: data drives the document id
+            .On<Events<TId>.EventWithDataId>()
+            .WithData(evnt => Task.FromResult(evnt.Data))
+            .WithId((evnt, data) =>
+            {
+                // Verify data matches what the event carries
+                if (data != evnt.Data) throw new Exception($"Data mismatch in GetId: expected '{evnt.Data}', got '{data}'");
+                return new SimpleIdContext<TId>(evnt.DocId);
+            })
+            .WhenAny(h => h.HandleWith((evnt, ctx, data, _, _) =>
+            {
+                if (data != evnt.Data) throw new Exception($"Data mismatch in HandleWith: expected '{evnt.Data}', got '{data}'");
+                HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                ctx.ModifyDocument(doc =>
+                {
+                    doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                    doc.AddHandledEvent(evnt.EventId);
+                    doc.ReceivedData = doc.ReceivedData.Add(data);
+                    return doc;
+                });
+                return Task.CompletedTask;
+            }))
+            // WithData: data is forwarded to the handler
+            .On<Events<TId>.EventWithDataHandler>()
+            .WithData(evnt => Task.FromResult(evnt.Data))
+            .WithId((evnt, _) => new SimpleIdContext<TId>(evnt.DocId))
+            .WhenAny(h => h.HandleWith((evnt, ctx, data, _, _) =>
+            {
+                if (data != evnt.Data) throw new Exception($"Data mismatch in HandleWith: expected '{evnt.Data}', got '{data}'");
+                HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                ctx.ModifyDocument(doc =>
+                {
+                    doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                    doc.AddHandledEvent(evnt.EventId);
+                    doc.ReceivedData = doc.ReceivedData.Add(data);
+                    return doc;
+                });
+                return Task.CompletedTask;
+            }))
+            // WithData: data is used in transform
+            .On<Events<TId>.EventWithDataTransform>()
+            .WithData(evnt => Task.FromResult(evnt.Data))
+            .Transform((evnt, data) =>
+            {
+                if (data != evnt.Data) throw new Exception($"Data mismatch in Transform: expected '{evnt.Data}', got '{data}'");
+                return evnt.TransformTo.OfType<object>().ToImmutableList();
+            });
     }
 
     public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)

@@ -69,3 +69,57 @@ internal class ProjectionFilterSetup<TId, TContext, TEvent> : IProjectionFilterS
         }
     }
 }
+
+internal class ProjectionFilterSetupWithData<TId, TContext, TEvent, TData> 
+    : IProjectionFilterSetup<TId, TContext, TEvent, TData>
+    where TId : notnull where TContext : IProjectionContext
+{
+    private readonly Func<TEvent, bool> _eventFilter;
+    private readonly Func<TContext, bool> _resultFilter;
+
+    private ProjectionFilterSetupWithData(
+        Func<TEvent, bool> eventFilter,
+        Func<TContext, bool> resultFilter)
+    {
+        _eventFilter = eventFilter;
+        _resultFilter = resultFilter;
+    }
+
+    public static ProjectionFilterSetupWithData<TId, TContext, TEvent, TData> Create()
+    {
+        return new ProjectionFilterSetupWithData<TId, TContext, TEvent, TData>(
+            _ => true,
+            _ => true);
+    }
+
+    public IProjectionFilterSetup<TId, TContext, TEvent, TData> WithEventFilter(Func<TEvent, bool> filter)
+    {
+        var previousFilter = _eventFilter;
+
+        return new ProjectionFilterSetupWithData<TId, TContext, TEvent, TData>(
+            evnt => filter(evnt) && previousFilter(evnt),
+            _resultFilter);
+    }
+
+    public IProjectionFilterSetup<TId, TContext, TEvent, TData> WithDocumentFilter(Func<TContext, bool> filter)
+    {
+        var previousFilter = _resultFilter;
+
+        return new ProjectionFilterSetupWithData<TId, TContext, TEvent, TData>(
+            _eventFilter,
+            document => filter(document) && previousFilter(document));
+    }
+
+    public IProjectionFilter<TContext> Build()
+    {
+        return new ProjectionFilter(_eventFilter, _resultFilter);
+    }
+
+    private class ProjectionFilter(Func<TEvent, bool> eventFilter, Func<TContext, bool> resultFilter)
+        : IProjectionFilter<TContext>
+    {
+        public bool FilterEvent(object evnt) => eventFilter((TEvent)evnt);
+        public bool FilterResult(TContext context) => resultFilter(context);
+    }
+}
+

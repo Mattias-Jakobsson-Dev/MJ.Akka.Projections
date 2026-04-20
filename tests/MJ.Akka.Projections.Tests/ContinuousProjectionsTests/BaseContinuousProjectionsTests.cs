@@ -951,6 +951,116 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
         context.Exists().ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task Projecting_event_with_data_used_for_getting_id()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+        var expectedData = Fixture.Create<string>();
+
+        var events = ImmutableList.Create(GetEventWithDataForId(id, expectedData));
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.ShouldBe(1);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
+
+        context.Exists().ShouldBeTrue();
+
+        await VerifyDataContext(id, context, expectedData);
+    }
+
+    [Fact]
+    public async Task Projecting_event_with_data_forwarded_to_handler()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+        var expectedData = Fixture.Create<string>();
+
+        var events = ImmutableList.Create(GetEventWithDataForHandler(id, expectedData));
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.ShouldBe(1);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
+
+        context.Exists().ShouldBeTrue();
+
+        await VerifyDataContext(id, context, expectedData);
+    }
+
+    [Fact]
+    public async Task Projecting_event_with_data_used_in_transform()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+        var expectedData = Fixture.Create<string>();
+        var transformedEvent = GetTestEvent(id);
+
+        var events = ImmutableList.Create(
+            GetEventWithDataForTransform(id, expectedData, ImmutableList.Create(transformedEvent)));
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                        .WithProjection(projection))
+                    .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+
+        position.ShouldBe(1);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
+
+        context.Exists().ShouldBeTrue();
+
+        await VerifyContext(id, context, ImmutableList.Create(transformedEvent), projection);
+    }
+
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> Configure(
         IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> config)
     {
@@ -975,6 +1085,14 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
     protected abstract object GetEventThatIsFilteredOut(TIdContext documentId);
     
     protected abstract object GetEventThatDoesntGetDocumentId(TIdContext documentId);
+
+    protected abstract object GetEventWithDataForId(TIdContext documentId, string data);
+
+    protected abstract object GetEventWithDataForHandler(TIdContext documentId, string data);
+
+    protected abstract object GetEventWithDataForTransform(TIdContext documentId, string data, IImmutableList<object> transformTo);
+
+    protected abstract Task VerifyDataContext(TIdContext documentId, TContext context, string expectedData);
 
     protected abstract Task VerifyContext(
         TIdContext documentId,

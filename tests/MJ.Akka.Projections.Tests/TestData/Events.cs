@@ -18,6 +18,15 @@ public static class Events<TId>
     
     public record TransformToMultipleEvents(IImmutableList<IEvent> Events);
 
+    /// <summary>Event where data is used to determine the document id (WithData + WithId).</summary>
+    public record EventWithDataId(TId DocId, string EventId, string Data) : IEvent;
+
+    /// <summary>Event where data is passed to the handler (WithData + WithId + HandleWith).</summary>
+    public record EventWithDataHandler(TId DocId, string EventId, string Data) : IEvent;
+
+    /// <summary>Event where data is used in the transform function (WithData + Transform).</summary>
+    public record EventWithDataTransform(TId DocId, string EventId, string Data, IImmutableList<IEvent> TransformTo) : IEvent;
+
     public record FailProjection(
         TId DocId,
         string EventId,

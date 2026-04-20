@@ -8,9 +8,11 @@ namespace MJ.Akka.Projections;
 public interface IHandleEventInProjection<TIdContext, in TContext> 
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    IImmutableList<object> Transform(object evnt);
+    Task<IImmutableList<object>> Transform(object evnt);
     
-    Task<TIdContext?> GetIdContextFor(object evnt);
+    Task<object> PrepareEvent(object evnt);
+    
+    TIdContext? GetIdContextFor(object evnt);
     
     Task<bool> Handle(
         TContext context,

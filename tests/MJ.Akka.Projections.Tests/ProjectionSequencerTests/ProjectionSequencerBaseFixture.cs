@@ -145,17 +145,19 @@ public abstract class ProjectionSequencerBaseFixture : global::Akka.TestKit.Xuni
     public class FakeEventHandler 
         : IHandleEventInProjection<SimpleIdContext<string>, InMemoryProjectionContext<string, TestDocument<string>>>
     {
-        public IImmutableList<object> Transform(object evnt)
+        public Task<IImmutableList<object>> Transform(object evnt)
         {
-            return ImmutableList.Create(evnt);
+            return Task.FromResult<IImmutableList<object>>(ImmutableList.Create(evnt));
         }
 
-        public Task<SimpleIdContext<string>?> GetIdContextFor(object evnt)
+        public Task<object> PrepareEvent(object evnt) => Task.FromResult(evnt);
+
+        public SimpleIdContext<string>? GetIdContextFor(object evnt)
         {
             if (evnt is Events.DelayProcessingEvent delayEvent)
-                return Task.FromResult<SimpleIdContext<string>?>(new SimpleIdContext<string>(delayEvent.DocumentId));
+                return new SimpleIdContext<string>(delayEvent.DocumentId);
 
-            return Task.FromResult<SimpleIdContext<string>?>(null);
+            return null;
         }
 
         public Task<bool> Handle(
