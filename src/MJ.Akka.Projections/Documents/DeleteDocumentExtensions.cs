@@ -1,21 +1,23 @@
 using JetBrains.Annotations;
 using MJ.Akka.Projections.ProjectionIds;
-using MJ.Akka.Projections.Setup;
 
 namespace MJ.Akka.Projections.Documents;
 
 [PublicAPI]
 public static class DeleteDocumentExtensions
 {
-    public static ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent>
         DeleteDocument<TIdContext, TDocument, TContext, TEvent>(
             this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent> setup)
         where TIdContext : IProjectionIdContext
         where TDocument : class
         where TContext : ContextWithDocument<TIdContext, TDocument>
-        => setup.HandleWith((_, context, _, _) => { context.DeleteDocument(); return Task.CompletedTask; });
+    {
+        var handler = setup.HandleWith((_, context, _, _) => { context.DeleteDocument(); return Task.CompletedTask; });
+        return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent>(handler);
+    }
 
-    public static ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent>
         ConditionallyDeleteDocument<TIdContext, TDocument, TContext, TEvent>(
             this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent> setup,
             Func<TEvent, TContext, bool> condition)
@@ -24,7 +26,7 @@ public static class DeleteDocumentExtensions
         where TContext : ContextWithDocument<TIdContext, TDocument>
         => setup.ConditionallyDeleteDocument((evnt, context, _) => condition(evnt, context));
 
-    public static ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent>
         ConditionallyDeleteDocument<TIdContext, TDocument, TContext, TEvent>(
             this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent> setup,
             Func<TEvent, TContext, long?, bool> condition)
@@ -34,7 +36,7 @@ public static class DeleteDocumentExtensions
         => setup.ConditionallyDeleteDocument((evnt, context, position) =>
             Task.FromResult(condition(evnt, context, position)));
 
-    public static ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent>
         ConditionallyDeleteDocument<TIdContext, TDocument, TContext, TEvent>(
             this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent> setup,
             Func<TEvent, TContext, Task<bool>> condition)
@@ -43,7 +45,7 @@ public static class DeleteDocumentExtensions
         where TContext : ContextWithDocument<TIdContext, TDocument>
         => setup.ConditionallyDeleteDocument(async (evnt, context, _, _) => await condition(evnt, context));
 
-    public static ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent>
         ConditionallyDeleteDocument<TIdContext, TDocument, TContext, TEvent>(
             this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent> setup,
             Func<TEvent, TContext, long?, Task<bool>> condition)
@@ -53,7 +55,7 @@ public static class DeleteDocumentExtensions
         => setup.ConditionallyDeleteDocument(async (evnt, context, position, _) =>
             await condition(evnt, context, position));
 
-    public static ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent>
         ConditionallyDeleteDocument<TIdContext, TDocument, TContext, TEvent>(
             this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent> setup,
             Func<TEvent, TContext, CancellationToken, Task<bool>> condition)
@@ -63,7 +65,7 @@ public static class DeleteDocumentExtensions
         => setup.ConditionallyDeleteDocument(async (evnt, context, _, cancellationToken) =>
             await condition(evnt, context, cancellationToken));
 
-    public static ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent>
         ConditionallyDeleteDocument<TIdContext, TDocument, TContext, TEvent>(
             this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent> setup,
             Func<TEvent, TContext, long?, CancellationToken, Task<bool>> condition)
@@ -71,11 +73,11 @@ public static class DeleteDocumentExtensions
         where TDocument : class
         where TContext : ContextWithDocument<TIdContext, TDocument>
     {
-        return setup.HandleWith(async (evnt, context, position, cancellationToken) =>
+        var handler = setup.HandleWith(async (evnt, context, position, cancellationToken) =>
         {
             if (await condition(evnt, context, position, cancellationToken))
                 context.DeleteDocument();
         });
+        return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent>(handler);
     }
 }
-
