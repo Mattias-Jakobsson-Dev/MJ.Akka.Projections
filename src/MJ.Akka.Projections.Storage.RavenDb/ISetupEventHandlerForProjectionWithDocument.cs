@@ -1,4 +1,5 @@
 using JetBrains.Annotations;
+using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 
@@ -9,9 +10,9 @@ namespace MJ.Akka.Projections.Storage.RavenDb;
 /// Exposes <c>ModifyDocument</c> overloads where <typeparamref name="TDocument"/> is non-nullable.
 /// </summary>
 [PublicAPI]
-public interface ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent>
-    : ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
-    where TIdContext : IProjectionIdContext
+public interface ISetupEventHandlerForProjectionWithExistingDocument<TDocument, TEvent>
+    : ISetupEventHandlerForProjection<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>, TEvent>,
+      ISetupEventHandlerForContextWithExistingDocument<SimpleIdContext<string>, TDocument, RavenDbProjectionContext<TDocument>, TEvent>
     where TDocument : class
 {
 }
@@ -21,21 +22,10 @@ public interface ISetupEventHandlerForProjectionWithExistingDocument<TIdContext,
 /// Exposes <c>CreateDocument</c> overloads.
 /// </summary>
 [PublicAPI]
-public interface ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent>
-    : ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
-    where TIdContext : IProjectionIdContext
+public interface ISetupEventHandlerForProjectionWithoutDocument<TDocument, TEvent>
+    : ISetupEventHandlerForContextWithoutDocument<SimpleIdContext<string>, TDocument, RavenDbProjectionContext<TDocument>, TEvent>
     where TDocument : class
 {
 }
 
-internal sealed class SetupEventHandlerForProjectionWithDocument<TIdContext, TDocument, TEvent>(
-    ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> inner)
-    : ISetupEventHandlerForProjectionWithExistingDocument<TIdContext, TDocument, TEvent>,
-      ISetupEventHandlerForProjectionWithoutDocument<TIdContext, TDocument, TEvent>
-    where TIdContext : IProjectionIdContext
-    where TDocument : class
-{
-    public ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> HandleWith(
-        Func<TEvent, RavenDbProjectionContext<TDocument>, long?, CancellationToken, Task> handler)
-        => inner.HandleWith(handler);
-}
+

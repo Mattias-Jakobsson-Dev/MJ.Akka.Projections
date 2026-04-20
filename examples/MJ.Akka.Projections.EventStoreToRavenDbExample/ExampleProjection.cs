@@ -4,6 +4,7 @@ using Akka.Actor;
 using Akka.Persistence.EventStore.Query;
 using Akka.Persistence.Query;
 using Akka.Streams.Dsl;
+using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage.RavenDb;
@@ -21,27 +22,34 @@ public class ExampleProjection(ActorSystem actorSystem)
                 new Events.FirstEvent(evnt.Slug, evnt.StringEventId, evnt.StringTestData),
                 new Events.SecondEvent(evnt.Slug, evnt.IntEventId, evnt.IntTestData)))
             .On<Events.FirstEvent>().WithId(evnt => ExampleDocument.BuildId(evnt.Slug))
-            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
-            {
-                doc ??= new ExampleDocument
+            .WhenDocumentNotExists(h => h.CreateDocument(evnt => new ExampleDocument
                 {
                     Id = ExampleDocument.BuildId(evnt.Slug),
                     Slug = evnt.Slug
-                };
-
+                })
+                .ModifyDocument((evnt, doc) =>
+                {
+                    doc.ProjectedEvents = doc.ProjectedEvents.SetItem(evnt.EventId, evnt);
+                    return doc;
+                }))
+            .WhenDocumentExists(h => h.ModifyDocument((evnt, doc) =>
+            {
                 doc.ProjectedEvents = doc.ProjectedEvents.SetItem(evnt.EventId, evnt);
-
                 return doc;
             }))
             .On<Events.SecondEvent>().WithId(evnt => ExampleDocument.BuildId(evnt.Slug))
-            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
-            {
-                doc ??= new ExampleDocument
+            .WhenDocumentNotExists(h => h.CreateDocument(evnt => new ExampleDocument
                 {
                     Id = ExampleDocument.BuildId(evnt.Slug),
                     Slug = evnt.Slug
-                };
-
+                })
+                .ModifyDocument((evnt, doc) =>
+                {
+                    doc.ProjectedEvents = doc.ProjectedEvents.SetItem(evnt.EventId, evnt);
+                    return doc;
+                }))
+            .WhenDocumentExists(h => h.ModifyDocument((evnt, doc) =>
+            {
                 doc.ProjectedEvents = doc.ProjectedEvents.SetItem(evnt.EventId, evnt);
 
                 return doc;

@@ -1,4 +1,5 @@
 using JetBrains.Annotations;
+using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 
@@ -10,7 +11,8 @@ namespace MJ.Akka.Projections.Storage.InMemory;
 /// </summary>
 [PublicAPI]
 public interface ISetupEventHandlerForProjectionWithExistingDocument<TId, TDocument, TEvent>
-    : ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
+    : ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>,
+      ISetupEventHandlerForContextWithExistingDocument<SimpleIdContext<TId>, TDocument, InMemoryProjectionContext<TId, TDocument>, TEvent>
     where TId : notnull
     where TDocument : class
 {
@@ -22,20 +24,10 @@ public interface ISetupEventHandlerForProjectionWithExistingDocument<TId, TDocum
 /// </summary>
 [PublicAPI]
 public interface ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent>
-    : ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent>
+    : ISetupEventHandlerForContextWithoutDocument<SimpleIdContext<TId>, TDocument, InMemoryProjectionContext<TId, TDocument>, TEvent>
     where TId : notnull
     where TDocument : class
 {
 }
 
-internal sealed class SetupEventHandlerForProjectionWithDocument<TId, TDocument, TEvent>(
-    ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> inner)
-    : ISetupEventHandlerForProjectionWithExistingDocument<TId, TDocument, TEvent>,
-      ISetupEventHandlerForProjectionWithoutDocument<TId, TDocument, TEvent>
-    where TId : notnull
-    where TDocument : class
-{
-    public ISetupEventHandlerForProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TDocument>, TEvent> HandleWith(
-        Func<TEvent, InMemoryProjectionContext<TId, TDocument>, long?, CancellationToken, Task> handler)
-        => inner.HandleWith(handler);
-}
+

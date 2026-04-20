@@ -5,6 +5,7 @@ using Akka.Streams.Dsl;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
+using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.Storage.InMemory;
 
 namespace MJ.Akka.Projections.Tests.TestData;
@@ -56,41 +57,62 @@ public class TestProjection<TId>(
             .On<Events<TId>.TransformToMultipleEvents>().Transform(evnt =>
                 evnt.Events.OfType<object>().ToImmutableList())
             .On<Events<TId>.FirstEvent>().WithId(x => x.DocId)
-            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
+            .WhenAny(h => h.HandleWith((evnt, _, _, _) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
-                doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                return Task.CompletedTask;
+            }))
+            .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<TId> { Id = evnt.DocId })
+                .ModifyDocument((evnt, doc) =>
+                {
+                    doc.AddHandledEvent(evnt.EventId);
+                    return doc;
+                }))
+            .WhenDocumentExists(h => h.ModifyDocument((evnt, doc) =>
+            {
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
             }))
             .On<Events<TId>.EventWithFilter>().WithId(x => x.DocId)
-            .When(filter => filter.WithEventFilter(evnt => evnt.Filter()), h => h.ModifyDocument((evnt, doc) =>
+            .When(filter => filter.WithEventFilter(evnt => evnt.Filter()), h => h.HandleWith((evnt, _, _, _) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
-                doc ??= new TestDocument<TId> { Id = evnt.DocId };
-                doc.AddHandledEvent(evnt.EventId);
-                return doc;
+                return Task.CompletedTask;
             }))
+            .WhenDocumentNotExists(
+                h => h.CreateDocument(evnt => new TestDocument<TId> { Id = evnt.DocId })
+                      .ModifyDocument((evnt, doc) =>
+                      {
+                          doc.AddHandledEvent(evnt.EventId);
+                          return doc;
+                      }),
+                filter => filter.WithEventFilter(evnt => evnt.Filter()))
+            .WhenDocumentExists(
+                h => h.ModifyDocument((evnt, doc) =>
+                {
+                    doc.AddHandledEvent(evnt.EventId);
+                    return doc;
+                }),
+                filter => filter.WithEventFilter(evnt => evnt.Filter()))
             .On<Events<TId>.DelayHandlingWithoutCancellationToken>().WithId(x => x.DocId)
-            .WhenAny(h => h.ModifyDocument(async (evnt, doc) =>
+            .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<TId> { Id = evnt.DocId }))
+            .WhenDocumentExists(h => h.ModifyDocument(async (evnt, doc) =>
             {
                 await Task.Delay(evnt.Delay);
-                doc ??= new TestDocument<TId> { Id = evnt.DocId };
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
             }))
             .On<Events<TId>.DelayHandlingWithCancellationToken>().WithId(x => x.DocId)
-            .WhenAny(h => h.ModifyDocument(async (evnt, doc, cancellationToken) =>
+            .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<TId> { Id = evnt.DocId }))
+            .WhenDocumentExists(h => h.ModifyDocument(async (evnt, doc, cancellationToken) =>
             {
                 await Task.Delay(evnt.Delay, cancellationToken);
-                doc ??= new TestDocument<TId> { Id = evnt.DocId };
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
             }))
             .On<Events<TId>.FailProjection>().WithId(x => x.DocId)
-            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
+            .WhenAny(h => h.HandleWith((evnt, _, _, _) =>
             {
-                doc ??= new TestDocument<TId> { Id = evnt.DocId };
                 var documentFailures = runFailures.GetOrAdd(evnt.DocId, _ => new Dictionary<string, int>());
                 documentFailures.TryAdd(evnt.FailureKey, 0);
                 if (documentFailures[evnt.FailureKey] < evnt.ConsecutiveFailures)
@@ -99,16 +121,36 @@ public class TestProjection<TId>(
                     throw evnt.FailWith;
                 }
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                return Task.CompletedTask;
+            }))
+            .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<TId> { Id = evnt.DocId })
+                .ModifyDocument((evnt, doc) =>
+                {
+                    doc.AddHandledEvent(evnt.EventId);
+                    return doc;
+                }))
+            .WhenDocumentExists(h => h.ModifyDocument((evnt, doc) =>
+            {
+                var documentFailures = runFailures.GetOrAdd(evnt.DocId, _ => new Dictionary<string, int>());
                 doc.AddHandledEvent(evnt.EventId);
                 doc.PreviousEventFailures = doc.PreviousEventFailures.SetItem(
-                    evnt.EventId, documentFailures[evnt.FailureKey]);
+                    evnt.EventId, documentFailures.GetValueOrDefault(evnt.FailureKey, 0));
                 return doc;
             }))
             .On<Events<TId>.EventThatDoesntGetDocumentId>().WithId(_ => null)
-            .WhenAny(h => h.ModifyDocument((evnt, doc) =>
+            .WhenAny(h => h.HandleWith((evnt, _, _, _) =>
             {
                 HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
-                doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                return Task.CompletedTask;
+            }))
+            .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<TId> { Id = evnt.DocId })
+                .ModifyDocument((evnt, doc) =>
+                {
+                    doc.AddHandledEvent(evnt.EventId);
+                    return doc;
+                }))
+            .WhenDocumentExists(h => h.ModifyDocument((evnt, doc) =>
+            {
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
             }))

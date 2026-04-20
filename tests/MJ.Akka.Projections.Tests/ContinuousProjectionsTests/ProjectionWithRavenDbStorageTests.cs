@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using Akka;
 using Akka.Streams.Dsl;
 using AutoFixture;
+using MJ.Akka.Projections.Documents;
 using Shouldly;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
@@ -87,7 +88,11 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
 
     protected override object GetEventWithDataForTransform(SimpleIdContext<string> documentId, string data, IImmutableList<object> transformTo)
     {
-        return new Events<string>.EventWithDataTransform(documentId, Fixture.Create<string>(), data, transformTo.OfType<Events<string>.IEvent>().ToImmutableList());
+        return new Events<string>.EventWithDataTransform(
+            documentId,
+            Fixture.Create<string>(),
+            data,
+            transformTo.OfType<Events<string>.IEvent>().ToImmutableList());
     }
 
     protected override Task VerifyDataContext(
@@ -156,67 +161,61 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 .On<Events<string>.TransformToMultipleEvents>().Transform(evnt =>
                     evnt.Events.OfType<object>().ToImmutableList())
                 .On<Events<string>.FirstEvent>().WithId(x => x.DocId)
-                .WhenAny(h => h.ModifyDocument((evnt, doc) =>
+                .WhenAny(h => h.HandleWith((evnt, _, _, _) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
-
-                    doc ??= new TestDocument<string>
+                    return Task.CompletedTask;
+                }))
+                .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<string> { Id = evnt.DocId })
+                    .ModifyDocument((evnt, doc) =>
                     {
-                        Id = evnt.DocId
-                    };
-
+                        doc.AddHandledEvent(evnt.EventId);
+                        return doc;
+                    }))
+                .WhenDocumentExists(h => h.ModifyDocument((evnt, doc) =>
+                {
                     doc.AddHandledEvent(evnt.EventId);
-
                     return doc;
                 }))
                 .On<Events<string>.EventWithFilter>().WithId(x => x.DocId)
-                .When(filter => filter.WithEventFilter(evnt => evnt.Filter()), h => h.ModifyDocument((evnt, doc) =>
+                .When(filter => filter.WithEventFilter(evnt => evnt.Filter()), h => h.HandleWith((evnt, _, _, _) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
-
-                    doc ??= new TestDocument<string>
-                    {
-                        Id = evnt.DocId
-                    };
-
-                    doc.AddHandledEvent(evnt.EventId);
-
-                    return doc;
+                    return Task.CompletedTask;
                 }))
-                .On<Events<string>.DelayHandlingWithoutCancellationToken>().WithId(x => x.DocId)
-                .WhenAny(h => h.ModifyDocument((evnt, doc) =>
-                {
-                    doc ??= new TestDocument<string>
+                .WhenDocumentNotExists(
+                    h => h.CreateDocument(evnt => new TestDocument<string> { Id = evnt.DocId })
+                          .ModifyDocument((evnt, doc) =>
+                          {
+                              doc.AddHandledEvent(evnt.EventId);
+                              return doc;
+                          }),
+                    filter => filter.WithEventFilter(evnt => evnt.Filter()))
+                .WhenDocumentExists(
+                    h => h.ModifyDocument((evnt, doc) =>
                     {
-                        Id = evnt.DocId
-                    };
-
+                        doc.AddHandledEvent(evnt.EventId);
+                        return doc;
+                    }),
+                    filter => filter.WithEventFilter(evnt => evnt.Filter()))
+                .On<Events<string>.DelayHandlingWithoutCancellationToken>().WithId(x => x.DocId)
+                .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<string> { Id = evnt.DocId }))
+                .WhenDocumentExists(h => h.ModifyDocument((evnt, doc) =>
+                {
                     doc.AddHandledEvent(evnt.EventId);
-
                     return doc;
                 }))
                 .On<Events<string>.DelayHandlingWithCancellationToken>().WithId(x => x.DocId)
-                .WhenAny(h => h.ModifyDocument(async (evnt, doc, cancellationToken) =>
+                .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<string> { Id = evnt.DocId }))
+                .WhenDocumentExists(h => h.ModifyDocument(async (evnt, doc, cancellationToken) =>
                 {
-                    await Task.Delay(evnt.Delay, cancellationToken);
-                    
-                    doc ??= new TestDocument<string>
-                    {
-                        Id = evnt.DocId
-                    };
-
+                    await Task.Delay((int)evnt.Delay.TotalMilliseconds, cancellationToken);
                     doc.AddHandledEvent(evnt.EventId);
-
                     return doc;
                 }))
                 .On<Events<string>.FailProjection>().WithId(x => x.DocId)
-                .WhenAny(h => h.ModifyDocument((evnt, doc) =>
+                .WhenAny(h => h.HandleWith((evnt, _, _, _) =>
                 {
-                    doc ??= new TestDocument<string>
-                    {
-                        Id = evnt.DocId
-                    };
-
                     var documentFailures = runFailures.GetOrAdd(
                         evnt.DocId,
                         _ => new Dictionary<string, int>());
@@ -226,80 +225,76 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                     if (documentFailures[evnt.FailureKey] < evnt.ConsecutiveFailures)
                     {
                         documentFailures[evnt.FailureKey]++;
-
                         throw evnt.FailWith;
                     }
 
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                    return Task.CompletedTask;
+                }))
+                .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<string> { Id = evnt.DocId })
+                    .ModifyDocument((evnt, doc) =>
+                    {
+                        doc.AddHandledEvent(evnt.EventId);
+                        return doc;
+                    }))
+                .WhenDocumentExists(h => h.ModifyDocument((evnt, doc) =>
+                {
+                    var documentFailures = runFailures.GetOrAdd(
+                        evnt.DocId,
+                        _ => new Dictionary<string, int>());
 
                     doc.AddHandledEvent(evnt.EventId);
-
                     doc.PreviousEventFailures = doc.PreviousEventFailures.SetItem(
                         evnt.EventId,
-                        documentFailures[evnt.FailureKey]);
-
+                        documentFailures.GetValueOrDefault(evnt.FailureKey, 0));
                     return doc;
                 }))
                 .On<Events<string>.EventThatDoesntGetDocumentId>().WithId(_ => null)
-                .WhenAny(h => h.ModifyDocument((evnt, doc) =>
+                .WhenAny(h => h.HandleWith((evnt, _, _, _) =>
                 {
                     HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
-
-                    doc ??= new TestDocument<string>
+                    return Task.CompletedTask;
+                }))
+                .WhenDocumentNotExists(h => h.CreateDocument(evnt => new TestDocument<string> { Id = evnt.DocId })
+                    .ModifyDocument((evnt, doc) =>
                     {
-                        Id = evnt.DocId
-                    };
-
+                        doc.AddHandledEvent(evnt.EventId);
+                        return doc;
+                    }))
+                .WhenDocumentExists(h => h.ModifyDocument((evnt, doc) =>
+                {
                     doc.AddHandledEvent(evnt.EventId);
-
                     return doc;
                 }))
-                // WithData: data drives the document id
                 .On<Events<string>.EventWithDataId>()
                 .WithData(evnt => Task.FromResult(evnt.Data))
-                .WithId((evnt, data) =>
-                {
-                    if (data != evnt.Data) throw new Exception($"Data mismatch in GetId: expected '{evnt.Data}', got '{data}'");
-                    return new SimpleIdContext<string>(evnt.DocId);
-                })
+                .WithId((evnt, _) => evnt.DocId)
                 .WhenAny(h => h.HandleWith((evnt, ctx, data, _, _) =>
                 {
-                    if (data != evnt.Data) throw new Exception($"Data mismatch in HandleWith: expected '{evnt.Data}', got '{data}'");
-                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
                     ctx.ModifyDocument(doc =>
                     {
                         doc ??= new TestDocument<string> { Id = evnt.DocId };
-                        doc.AddHandledEvent(evnt.EventId);
                         doc.ReceivedData = doc.ReceivedData.Add(data);
                         return doc;
                     });
                     return Task.CompletedTask;
                 }))
-                // WithData: data is forwarded to the handler
                 .On<Events<string>.EventWithDataHandler>()
                 .WithData(evnt => Task.FromResult(evnt.Data))
-                .WithId((evnt, _) => new SimpleIdContext<string>(evnt.DocId))
+                .WithId((evnt, _) => evnt.DocId)
                 .WhenAny(h => h.HandleWith((evnt, ctx, data, _, _) =>
                 {
-                    if (data != evnt.Data) throw new Exception($"Data mismatch in HandleWith: expected '{evnt.Data}', got '{data}'");
-                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
                     ctx.ModifyDocument(doc =>
                     {
                         doc ??= new TestDocument<string> { Id = evnt.DocId };
-                        doc.AddHandledEvent(evnt.EventId);
                         doc.ReceivedData = doc.ReceivedData.Add(data);
                         return doc;
                     });
                     return Task.CompletedTask;
                 }))
-                // WithData: data is used in transform
                 .On<Events<string>.EventWithDataTransform>()
                 .WithData(evnt => Task.FromResult(evnt.Data))
-                .Transform((evnt, data) =>
-                {
-                    if (data != evnt.Data) throw new Exception($"Data mismatch in Transform: expected '{evnt.Data}', got '{data}'");
-                    return evnt.TransformTo.OfType<object>().ToImmutableList();
-                });
+                .Transform((evnt, _) => evnt.TransformTo.OfType<object>().ToImmutableList());
         }
         
         public override ILoadProjectionContext<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>>> 
