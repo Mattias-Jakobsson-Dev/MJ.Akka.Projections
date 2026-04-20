@@ -38,9 +38,9 @@ public class OrderProjection : RavenDbProjection<OrderDocument>
         Configure(ISetupProjection<SimpleIdContext<string>, RavenDbProjectionContext<OrderDocument, SimpleIdContext<string>>> config)
     {
         return config
-            .On<OrderPlaced>(e => e.OrderId)
+            .On<OrderPlaced>().WithId(e => e.OrderId)
                 .CreateDocument(e => new OrderDocument { Id = e.OrderId, Status = "Placed" })
-            .On<OrderShipped>(e => e.OrderId)
+            .On<OrderShipped>().WithId(e => e.OrderId)
                 .ModifyDocument((e, doc) => doc! with { Status = "Shipped" });
     }
 
@@ -96,25 +96,58 @@ Inside `Configure`, chain calls to build the handler pipeline:
 ```csharp
 config
     // Map an event to a document id
-    .On<MyEvent>(e => e.Id)
+    .On<MyEvent>().WithId(e => e.Id)
         // Option A – mutate the document (RavenDb / InMemory helpers)
         .ModifyDocument((evnt, doc) => doc! with { Name = evnt.Name })
         // Option B – full async handler
-        .HandleWith(async (evnt, context, position, ct) =>
+        .WhenAny(h => h.HandleWith(async (evnt, context, position, ct) =>
         {
             context.Document!.Name = evnt.Name;
-        })
+        }))
 
     // Transform one event into multiple before routing
-    .TransformUsing<OriginalEvent>(e =>
+    .On<OriginalEvent>().Transform(e =>
         ImmutableList.Create<object>(new DerivedEvent(e.Id), new AnotherEvent(e.Id)))
 
-    // Filter: only handle events that match a condition
-    .On<MyEvent>(e => e.Id, filter => filter.Where(e => e.IsRelevant))
-        .HandleWith(...)
+    // Filter: only run handlers when a condition is met
+    .On<MyEvent>().WithId(e => e.Id)
+        .When(filter => filter.WithEventFilter(e => e.IsRelevant), h => h.HandleWith(...))
 ```
 
 Multiple `.HandleWith` calls on the same `.On<>` chain execute **in order**.
+
+### Fetching external data with `WithData`
+
+Sometimes routing or handling an event requires data that isn't in the event itself — for example, looking up a related document in a database. Use `.WithData` to fetch that data **once per event**; it is then carried alongside the event through `WithId` and into the handler, so no extra round-trips occur.
+
+```csharp
+config
+    .On<OrderShipped>()
+    .WithData(async evnt => await orderRepository.LoadAsync(evnt.OrderId))
+    .WithId((evnt, order) => new SimpleIdContext<string>(order.CustomerId))  // data available here
+    .WhenAny(h => h.HandleWith(async (evnt, ctx, order, position, ct) =>    // and here
+    {
+        ctx.ModifyDocument(doc =>
+        {
+            doc ??= new CustomerDocument { Id = order.CustomerId };
+            doc.ShippedOrders = doc.ShippedOrders.Add(evnt.OrderId);
+            return doc;
+        });
+    }))
+```
+
+You can also use the fetched data inside **`Transform`** to decide which derived events to produce:
+
+```csharp
+config
+    .On<OrderPlaced>()
+    .WithData(async evnt => await catalogService.GetProductAsync(evnt.ProductId))
+    .Transform((evnt, product) => product.RequiresWarehouseUpdate
+        ? ImmutableList.Create<object>(new WarehouseReservation(evnt.OrderId, product.Sku))
+        : ImmutableList<object>.Empty)
+```
+
+**How it works:** `getData` is called exactly once per event, immediately after the transform/flatten step. The result is bundled into an internal envelope that travels through the routing and handler stages — no caching or repeated fetches.
 
 ### RavenDB-specific helpers
 
@@ -256,10 +289,12 @@ ActorSystem.Projections(...)
                     Reads last position → materialises Source<EventWithPosition>
                     Groups events via IEventBatchingStrategy
                     └── ProjectionSequencer (ReceiveActor)
-                            Serialises events per id, parallelises across ids
+                            Transform events → flatten
+                            PrepareEvent (fetches WithData payload, wraps in envelope)
+                            Route by id, serialise per id, parallelise across ids
                             └── DocumentProjection (ReceiveActor, one per id)
                                     Loads context from storage
-                                    Runs registered handlers
+                                    Runs registered handlers (unwraps envelope if present)
                                     Saves updated context
                                     Advances stream position via IEventPositionBatchingStrategy
 ```
