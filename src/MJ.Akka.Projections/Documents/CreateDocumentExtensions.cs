@@ -67,4 +67,70 @@ public static class CreateDocumentExtensions
                 cancellationToken)));
         return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent>(handler);
     }
+
+    // -------------------------------------------------------------------------
+    // TData CreateDocument overloads (WithData path)
+    // -------------------------------------------------------------------------
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        CreateDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithoutDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, TDocument> create)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+        => setup.CreateDocument((evnt, data, _) => create(evnt, data));
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        CreateDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithoutDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, DocumentHandlingMetaData<TIdContext>, TDocument> create)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+        => setup.CreateDocument((evnt, data, metadata) => Task.FromResult(create(evnt, data, metadata)));
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        CreateDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithoutDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, Task<TDocument>> create)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+        => setup.CreateDocument(async (evnt, data, _, _) => await create(evnt, data));
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        CreateDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithoutDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, DocumentHandlingMetaData<TIdContext>, Task<TDocument>> create)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+        => setup.CreateDocument(async (evnt, data, metadata, _) => await create(evnt, data, metadata));
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        CreateDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithoutDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, CancellationToken, Task<TDocument>> create)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+        => setup.CreateDocument(async (evnt, data, _, cancellationToken) => await create(evnt, data, cancellationToken));
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        CreateDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithoutDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, DocumentHandlingMetaData<TIdContext>, CancellationToken, Task<TDocument>> create)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+    {
+        var handler = setup.HandleWith(async (evnt, context, data, position, cancellationToken) =>
+            context.CreateDocument(await create(
+                evnt,
+                data,
+                new DocumentHandlingMetaData<TIdContext>(context.Id, position),
+                cancellationToken)));
+        return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent, TData>(handler);
+    }
 }

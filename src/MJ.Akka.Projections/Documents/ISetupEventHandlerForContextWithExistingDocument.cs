@@ -17,3 +17,14 @@ public interface ISetupEventHandlerForContextWithExistingDocument<TIdContext, TD
     where TDocument : class
     where TContext : ContextWithDocument<TIdContext, TDocument>;
 
+/// <summary>
+/// Generic marker interface for "WhenExists" handlers on any context that extends
+/// <see cref="ContextWithDocument{TIdContext,TDocument}"/> with additional fetched data of type <typeparamref name="TData"/>.
+/// </summary>
+[PublicAPI]
+public interface ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, out TContext, out TEvent, out TData>
+    : ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData>
+    where TIdContext : IProjectionIdContext
+    where TDocument : class
+    where TContext : ContextWithDocument<TIdContext, TDocument>;
+

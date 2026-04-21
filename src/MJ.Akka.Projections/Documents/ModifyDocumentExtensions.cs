@@ -92,4 +92,90 @@ public static class ModifyDocumentExtensions
             ctx.ModifyDocument(doc => modify(evnt, doc!, new DocumentHandlingMetaData<TIdContext>(ctx.Id, position), ct)));
         return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent>(handler);
     }
+
+    // -------------------------------------------------------------------------
+    // TData ModifyDocument overloads (WithData path)
+    // -------------------------------------------------------------------------
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        ModifyDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, TDocument, TDocument> modify)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+    {
+        var handler = setup.HandleWith((evnt, ctx, data, _, _) =>
+        {
+            ctx.ModifyDocument(doc => modify(evnt, data, doc!));
+            return Task.CompletedTask;
+        });
+        return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent, TData>(handler);
+    }
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        ModifyDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, TDocument, Task<TDocument>> modify)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+    {
+        var handler = setup.HandleWith((evnt, ctx, data, _, _) => ctx.ModifyDocument(doc => modify(evnt, data, doc!)));
+        return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent, TData>(handler);
+    }
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        ModifyDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, TDocument, CancellationToken, Task<TDocument>> modify)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+    {
+        var handler = setup.HandleWith((evnt, ctx, data, _, ct) => ctx.ModifyDocument(doc => modify(evnt, data, doc!, ct)));
+        return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent, TData>(handler);
+    }
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        ModifyDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, TDocument, DocumentHandlingMetaData<TIdContext>, TDocument> modify)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+    {
+        var handler = setup.HandleWith((evnt, ctx, data, position, _) =>
+        {
+            ctx.ModifyDocument(doc => modify(evnt, data, doc!, new DocumentHandlingMetaData<TIdContext>(ctx.Id, position)));
+            return Task.CompletedTask;
+        });
+        return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent, TData>(handler);
+    }
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        ModifyDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, TDocument, DocumentHandlingMetaData<TIdContext>, Task<TDocument>> modify)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+    {
+        var handler = setup.HandleWith((evnt, ctx, data, position, _) =>
+            ctx.ModifyDocument(doc => modify(evnt, data, doc!, new DocumentHandlingMetaData<TIdContext>(ctx.Id, position))));
+        return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent, TData>(handler);
+    }
+
+    public static ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
+        ModifyDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+            this ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData> setup,
+            Func<TEvent, TData, TDocument, DocumentHandlingMetaData<TIdContext>, CancellationToken, Task<TDocument>> modify)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+        where TContext : ContextWithDocument<TIdContext, TDocument>
+    {
+        var handler = setup.HandleWith((evnt, ctx, data, position, ct) =>
+            ctx.ModifyDocument(doc => modify(evnt, data, doc!, new DocumentHandlingMetaData<TIdContext>(ctx.Id, position), ct)));
+        return new SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent, TData>(handler);
+    }
 }

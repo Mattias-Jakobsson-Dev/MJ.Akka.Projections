@@ -16,3 +16,15 @@ internal sealed class SetupEventHandlerForContextWithDocument<TIdContext, TDocum
         => inner.HandleWith(handler);
 }
 
+internal sealed class SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent, TData>(
+    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> inner)
+    : ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>,
+      ISetupEventHandlerForContextWithoutDocument<TIdContext, TDocument, TContext, TEvent, TData>
+    where TIdContext : IProjectionIdContext
+    where TDocument : class
+    where TContext : ContextWithDocument<TIdContext, TDocument>
+{
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> HandleWith(
+        Func<TEvent, TContext, TData, long?, CancellationToken, Task> handler)
+        => inner.HandleWith(handler);
+}

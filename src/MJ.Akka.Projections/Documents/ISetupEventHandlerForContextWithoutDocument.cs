@@ -19,3 +19,15 @@ public interface ISetupEventHandlerForContextWithoutDocument<TIdContext, TDocume
 {
 }
 
+/// <summary>
+/// Generic marker interface for "WhenNotExists" handlers on any context that extends
+/// <see cref="ContextWithDocument{TIdContext,TDocument}"/> with additional fetched data of type <typeparamref name="TData"/>.
+/// </summary>
+[PublicAPI]
+public interface ISetupEventHandlerForContextWithoutDocument<TIdContext, TDocument, out TContext, out TEvent, out TData>
+    : ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData>
+    where TIdContext : IProjectionIdContext
+    where TDocument : class
+    where TContext : ContextWithDocument<TIdContext, TDocument>
+{
+}

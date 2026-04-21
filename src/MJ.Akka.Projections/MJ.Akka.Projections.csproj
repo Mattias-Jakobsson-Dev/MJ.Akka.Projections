@@ -11,7 +11,7 @@
     <PropertyGroup>
         <Copyright>Copyright © 2025 Mattias Jakobsson</Copyright>
         <Authors>Mattias Jakobsson</Authors>
-        <Version>0.32.0</Version>
+        <Version>0.33.0</Version>
         <PackageProjectUrl>
             https://github.com/Mattias-Jakobsson-Dev/MJ.Akka.Projections
         </PackageProjectUrl>
