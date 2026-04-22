@@ -24,7 +24,7 @@
 
     <ItemGroup>
       <PackageReference Include="Akka.Cluster.Sharding" Version="1.5.65" />
-        <PackageReference Include="JetBrains.Annotations" Version="2025.2.0">
+        <PackageReference Include="JetBrains.Annotations" Version="2025.2.4">
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
     </ItemGroup>
