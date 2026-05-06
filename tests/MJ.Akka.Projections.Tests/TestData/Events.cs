@@ -34,6 +34,18 @@ public static class Events<TId>
         int ConsecutiveFailures,
         Exception FailWith) : IEvent;
 
+    /// <summary>
+    /// When handled, stashes itself so it is reprocessed later, then records that it was stashed on the document.
+    /// The first time it is processed it calls Stash(); on replay (StashedEventId set) it records the unstashed event.
+    /// </summary>
+    public record StashEvent(TId DocId, string EventId) : IEvent;
+
+    /// <summary>
+    /// When handled, requests that <paramref name="NumberToUnstash"/> (or all if null) stashed events are replayed
+    /// right after this batch.
+    /// </summary>
+    public record UnstashEvent(TId DocId, string EventId, uint? NumberToUnstash = null) : IEvent;
+
     public interface IEvent
     {
         TId DocId { get; }

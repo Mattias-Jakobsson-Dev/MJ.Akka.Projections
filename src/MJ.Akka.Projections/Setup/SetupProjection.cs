@@ -117,6 +117,7 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
             TContext context,
             object evnt,
             long position,
+            ProjectionStashContext stashContext,
             CancellationToken cancellationToken)
         {
             // Unwrap envelope for type lookup, but pass the full envelope to the handler
@@ -130,7 +131,7 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
                 if (!handlers.TryGetValue(type, out var handler))
                     continue;
 
-                await handler.Handle(evnt, context, position, cancellationToken);
+                await handler.Handle(evnt, context, position, stashContext, cancellationToken);
 
                 handled = true;
             }

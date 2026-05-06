@@ -19,6 +19,11 @@ public class ProjectionTestStorageSetup(ConcurrentDictionary<ProjectionContextId
     {
         return new InMemoryPositionStorage();
     }
+
+    public IProjectionStashStorage CreateStashStorage()
+    {
+        return new InMemoryProjectionStashStorage();
+    }
     
     private class ProjectionTestStorage(ConcurrentDictionary<ProjectionContextId, IProjectionContext> storage) 
         : IProjectionStorage

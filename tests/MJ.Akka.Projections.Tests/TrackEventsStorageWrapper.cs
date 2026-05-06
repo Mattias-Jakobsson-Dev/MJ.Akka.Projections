@@ -18,6 +18,11 @@ public class TrackEventsStorageWrapper(ConcurrentBag<string> storedEvents, IStor
     {
         return innerSetup.CreatePositionStorage();
     }
+
+    public IProjectionStashStorage CreateStashStorage()
+    {
+        return innerSetup.CreateStashStorage();
+    }
     
     private class Storage(ConcurrentBag<string> storedEvents, IProjectionStorage innerStorage) : IProjectionStorage
     {

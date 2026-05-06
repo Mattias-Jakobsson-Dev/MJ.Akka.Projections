@@ -24,6 +24,11 @@ internal sealed class InstrumentedStorageModifier : IModifyStorage
         {
             return new InstrumentedPositionStorage(inner.CreatePositionStorage());
         }
+
+        public IProjectionStashStorage CreateStashStorage()
+        {
+            return inner.CreateStashStorage();
+        }
     }
 }
 

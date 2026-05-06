@@ -35,6 +35,11 @@ public static class StorageModifierExtensions
         {
             return positionStorage;
         }
+
+        public IProjectionStashStorage CreateStashStorage()
+        {
+            return innerSetup.CreateStashStorage();
+        }
     }
     
     private class ChangePositionStorageModifier(IProjectionPositionStorage positionStorage) : IModifyStorage

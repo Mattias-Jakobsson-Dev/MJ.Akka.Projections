@@ -3,7 +3,10 @@ using Raven.Client.Documents.BulkInsert;
 
 namespace MJ.Akka.Projections.Storage.RavenDb;
 
-public class SetupRavenDbStorage(IDocumentStore documentStore, BulkInsertOptions insertOptions) : IStorageSetup
+public class SetupRavenDbStorage(
+    IDocumentStore documentStore,
+    BulkInsertOptions insertOptions,
+    TimeSpan? stashInProcessTimeout = null) : IStorageSetup
 {
     public IProjectionStorage CreateProjectionStorage()
     {
@@ -13,6 +16,11 @@ public class SetupRavenDbStorage(IDocumentStore documentStore, BulkInsertOptions
     public IProjectionPositionStorage CreatePositionStorage()
     {
         return new RavenDbProjectionPositionStorage(documentStore);
+    }
+
+    public IProjectionStashStorage CreateStashStorage()
+    {
+        return new RavenDbProjectionStashStorage(documentStore, stashInProcessTimeout);
     }
     
     internal IDocumentStore GetDocumentStore()

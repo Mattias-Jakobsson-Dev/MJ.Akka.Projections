@@ -179,6 +179,91 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
             new Exception("Projection failed"));
     }
 
+    [Fact]
+    public async Task Stashed_event_is_replayed_after_unstash_trigger()
+    {
+        using var system = _actorSystemHandler.StartNewActorSystem();
+
+        var documentId = Fixture.Create<TId>();
+        var stashEventId = Fixture.Create<string>();
+        var unstashEventId = Fixture.Create<string>();
+
+        // StashEvent is stashed on first encounter; UnstashEvent triggers unstash-all
+        var events = ImmutableList.Create<object>(
+            new Events<TId>.StashEvent(documentId, stashEventId),
+            new Events<TId>.UnstashEvent(documentId, unstashEventId));
+
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(ProjectionWaitTime);
+        // Allow any pending batched storage writes for the unstash replay to flush
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+        var context = await loader.Load(documentId, projection.GetDefaultContext);
+
+        context.Exists().ShouldBeTrue();
+
+        // The stash event was stashed the first time
+        context.Document!.StashedEvents.ShouldContain(stashEventId);
+
+        // The unstash event was handled
+        context.Document!.HandledEvents.ShouldContain(unstashEventId);
+
+        // The stash event was replayed from the stash and recorded as unstashed
+        context.Document!.UnstashedEvents.ShouldContain(stashEventId);
+        context.Document!.HandledEvents.ShouldContain(stashEventId);
+    }
+
+    [Fact]
+    public async Task Multiple_stashed_events_are_all_replayed_after_unstash_trigger()
+    {
+        using var system = _actorSystemHandler.StartNewActorSystem();
+
+        var documentId = Fixture.Create<TId>();
+        var stashEventId1 = Fixture.Create<string>();
+        var stashEventId2 = Fixture.Create<string>();
+        var unstashEventId = Fixture.Create<string>();
+
+        var events = ImmutableList.Create<object>(
+            new Events<TId>.StashEvent(documentId, stashEventId1),
+            new Events<TId>.StashEvent(documentId, stashEventId2),
+            new Events<TId>.UnstashEvent(documentId, unstashEventId));
+
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(ProjectionWaitTime);
+        // Allow any pending batched storage writes for the unstash replay to flush
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+        var context = await loader.Load(documentId, projection.GetDefaultContext);
+
+        context.Exists().ShouldBeTrue();
+        context.Document!.StashedEvents.Count.ShouldBe(2);
+        context.Document!.UnstashedEvents.Count.ShouldBe(2);
+        context.Document!.UnstashedEvents.ShouldContain(stashEventId1);
+        context.Document!.UnstashedEvents.ShouldContain(stashEventId2);
+    }
+
     protected override object GetTestEvent(SimpleIdContext<TId> documentId)
     {
         return new Events<TId>.FirstEvent(documentId, Fixture.Create<string>());

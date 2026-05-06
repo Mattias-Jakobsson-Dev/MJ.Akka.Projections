@@ -24,4 +24,9 @@ public class AddBatchedProjectionStorage(
     {
         return innerSetup.CreatePositionStorage();
     }
+
+    public IProjectionStashStorage CreateStashStorage()
+    {
+        return innerSetup.CreateStashStorage();
+    }
 }

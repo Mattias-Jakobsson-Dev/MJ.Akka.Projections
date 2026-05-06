@@ -99,6 +99,12 @@ internal sealed class RavenDbDocumentHandlerWrapper<TDocument, TEvent>(
     public ISetupEventHandlerForProjection<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>, TEvent> HandleWith(
         Func<TEvent, RavenDbProjectionContext<TDocument>, long?, CancellationToken, Task> handler)
         => inner.HandleWith(handler);
+
+    public ISetupEventHandlerForProjection<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>, TEvent> Stash()
+        => inner.Stash();
+
+    public ISetupEventHandlerForProjection<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>, TEvent> UnStash(uint? numberOfMessages = null)
+        => inner.UnStash(numberOfMessages);
 }
 
 internal sealed class RavenDbDocumentHandlerWrapper<TDocument, TEvent, TData>(
@@ -110,4 +116,10 @@ internal sealed class RavenDbDocumentHandlerWrapper<TDocument, TEvent, TData>(
     public ISetupEventHandlerForProjection<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>, TEvent, TData> HandleWith(
         Func<TEvent, RavenDbProjectionContext<TDocument>, TData, long?, CancellationToken, Task> handler)
         => inner.HandleWith(handler);
+
+    public ISetupEventHandlerForProjection<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>, TEvent, TData> Stash()
+        => inner.Stash();
+
+    public ISetupEventHandlerForProjection<SimpleIdContext<string>, RavenDbProjectionContext<TDocument>, TEvent, TData> UnStash(uint? numberOfMessages = null)
+        => inner.UnStash(numberOfMessages);
 }

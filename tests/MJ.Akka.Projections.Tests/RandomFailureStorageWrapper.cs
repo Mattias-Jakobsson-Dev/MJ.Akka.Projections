@@ -14,6 +14,11 @@ public class RandomFailureStorageWrapper(int failurePercentage, IStorageSetup in
     {
         return innerStorage.CreatePositionStorage();
     }
+
+    public IProjectionStashStorage CreateStashStorage()
+    {
+        return innerStorage.CreateStashStorage();
+    }
     
     private class Storage(int failurePercentage, IProjectionStorage innerStorage) : IProjectionStorage
     {

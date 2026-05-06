@@ -69,6 +69,7 @@ public class When_projecting_two_batches_to_two_ids_with_settings_to_keep_one_pr
                 storageSetup.CreateProjectionStorage(),
                 projection.GetLoadProjectionContext(storageSetup),
                 new InMemoryPositionStorage(),
+                storageSetup.CreateStashStorage(),
                 factory,
                 null,
                 BatchEventBatchingStrategy.Default, 

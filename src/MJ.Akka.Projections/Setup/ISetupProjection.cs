@@ -57,6 +57,10 @@ public interface ISetupEventHandlerForProjection<TIdContext, out TContext, out T
 {
     ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> HandleWith(
         Func<TEvent, TContext, long?, CancellationToken, Task> handler);
+
+    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> Stash();
+    
+    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> UnStash(uint? numberOfMessages = null);
 }
 
 public interface ISetupEventHandlerForProjection<TIdContext, out TContext, out TEvent, out TData>
@@ -65,6 +69,10 @@ public interface ISetupEventHandlerForProjection<TIdContext, out TContext, out T
 {
     ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> HandleWith(
         Func<TEvent, TContext, TData, long?, CancellationToken, Task> handler);
+    
+    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> Stash();
+    
+    ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> UnStash(uint? numberOfMessages = null);
 }
 
 public static class SetupHandlerFilteringExtensions

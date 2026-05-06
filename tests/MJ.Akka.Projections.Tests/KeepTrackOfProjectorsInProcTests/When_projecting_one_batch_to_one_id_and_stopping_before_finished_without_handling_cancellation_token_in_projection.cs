@@ -54,6 +54,7 @@ public class When_projecting_one_batch_to_one_id_and_stopping_before_finished_wi
                 storageSetup.CreateProjectionStorage(),
                 projection.GetLoadProjectionContext(storageSetup),
                 new InMemoryPositionStorage(),
+                storageSetup.CreateStashStorage(),
                 factory,
                 null,
                 BatchEventBatchingStrategy.Default,

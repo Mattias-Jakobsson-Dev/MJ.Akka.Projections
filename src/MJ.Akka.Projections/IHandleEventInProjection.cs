@@ -5,7 +5,7 @@ using MJ.Akka.Projections.ProjectionIds;
 namespace MJ.Akka.Projections;
 
 [PublicAPI]
-public interface IHandleEventInProjection<TIdContext, in TContext> 
+public interface IHandleEventInProjection<out TIdContext, in TContext> 
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
     Task<IImmutableList<object>> Transform(object evnt);
@@ -18,5 +18,6 @@ public interface IHandleEventInProjection<TIdContext, in TContext>
         TContext context,
         object evnt,
         long position,
+        ProjectionStashContext stashContext,
         CancellationToken cancellationToken);
 }

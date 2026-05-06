@@ -4,4 +4,5 @@ public interface IStorageSetup
 {
     IProjectionStorage CreateProjectionStorage();
     IProjectionPositionStorage CreatePositionStorage();
+    IProjectionStashStorage CreateStashStorage();
 }

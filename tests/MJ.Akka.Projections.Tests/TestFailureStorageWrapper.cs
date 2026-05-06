@@ -15,6 +15,11 @@ public class TestFailureStorageWrapper(IStorageSetup innerSetup, IImmutableList<
     {
         return innerSetup.CreatePositionStorage();
     }
+
+    public IProjectionStashStorage CreateStashStorage()
+    {
+        return innerSetup.CreateStashStorage();
+    }
     
     private class FailStorage(
         IProjectionStorage innerStorage,

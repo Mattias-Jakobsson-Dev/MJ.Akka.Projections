@@ -12,6 +12,7 @@ public class ProjectionConfiguration<TIdContext, TContext, TStorageSetup>(
     IProjectionStorage storage,
     ILoadProjectionContext<TIdContext, TContext> loadStorage,
     IProjectionPositionStorage positionStorage,
+    IProjectionStashStorage stashStorage,
     IKeepTrackOfProjectors projectorFactory,
     RestartSettings? restartSettings,
     IEventBatchingStrategy projectionEventBatchingStrategy,
@@ -20,6 +21,7 @@ public class ProjectionConfiguration<TIdContext, TContext, TStorageSetup>(
     : ProjectionConfiguration(
         projection,
         positionStorage,
+        stashStorage,
         projectorFactory,
         restartSettings,
         projectionEventBatchingStrategy,
@@ -66,12 +68,14 @@ public class ProjectionConfiguration<TIdContext, TContext, TStorageSetup>(
         IProjectionContext context,
         object evnt,
         long position,
+        ProjectionStashContext stashContext,
         CancellationToken cancellationToken)
     {
         return eventsHandler.Handle(
             (TContext)context,
             evnt, 
             position,
+            stashContext,
             cancellationToken);
     }
 }
@@ -83,6 +87,7 @@ public abstract class ProjectionConfiguration
     internal ProjectionConfiguration(
         IProjection projection,
         IProjectionPositionStorage positionStorage,
+        IProjectionStashStorage stashStorage,
         IKeepTrackOfProjectors projectorFactory,
         RestartSettings? restartSettings,
         IEventBatchingStrategy projectionEventBatchingStrategy,
@@ -90,6 +95,7 @@ public abstract class ProjectionConfiguration
     {
         _projection = projection;
         PositionStorage = positionStorage;
+        StashStorage = stashStorage;
         ProjectorFactory = projectorFactory;
         RestartSettings = restartSettings;
         ProjectionEventBatchingStrategy = projectionEventBatchingStrategy;
@@ -98,6 +104,7 @@ public abstract class ProjectionConfiguration
     
     public string Name => _projection.Name;
     public IProjectionPositionStorage PositionStorage { get; }
+    public IProjectionStashStorage StashStorage { get; }
     public IKeepTrackOfProjectors ProjectorFactory { get; }
     public RestartSettings? RestartSettings { get; }
     public IEventBatchingStrategy ProjectionEventBatchingStrategy { get; }
@@ -131,5 +138,6 @@ public abstract class ProjectionConfiguration
         IProjectionContext context,
         object evnt,
         long position,
+        ProjectionStashContext stashContext,
         CancellationToken cancellationToken);
 }

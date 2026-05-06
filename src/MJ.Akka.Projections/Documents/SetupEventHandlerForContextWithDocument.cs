@@ -14,6 +14,12 @@ internal sealed class SetupEventHandlerForContextWithDocument<TIdContext, TDocum
     public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> HandleWith(
         Func<TEvent, TContext, long?, CancellationToken, Task> handler)
         => inner.HandleWith(handler);
+
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> Stash()
+        => inner.Stash();
+
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> UnStash(uint? numberOfMessages = null)
+        => inner.UnStash(numberOfMessages);
 }
 
 internal sealed class SetupEventHandlerForContextWithDocument<TIdContext, TDocument, TContext, TEvent, TData>(
@@ -27,4 +33,10 @@ internal sealed class SetupEventHandlerForContextWithDocument<TIdContext, TDocum
     public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> HandleWith(
         Func<TEvent, TContext, TData, long?, CancellationToken, Task> handler)
         => inner.HandleWith(handler);
+
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> Stash()
+        => inner.Stash();
+
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> UnStash(uint? numberOfMessages = null)
+        => inner.UnStash(numberOfMessages);
 }

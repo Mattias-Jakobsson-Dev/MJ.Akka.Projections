@@ -30,6 +30,7 @@ public abstract class ProjectionSequencerBaseFixture : global::Akka.TestKit.Xuni
                 storageSetup.CreateProjectionStorage(),
                 projection.GetLoadProjectionContext(storageSetup),
                 new InMemoryPositionStorage(),
+                storageSetup.CreateStashStorage(),
                 new TestProjectionFactory(),
                 null,
                 BatchEventBatchingStrategy.Default,
@@ -163,7 +164,8 @@ public abstract class ProjectionSequencerBaseFixture : global::Akka.TestKit.Xuni
         public Task<bool> Handle(
             InMemoryProjectionContext<string, TestDocument<string>> context, 
             object evnt,
-            long position, 
+            long position,
+            ProjectionStashContext stashContext,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(false);

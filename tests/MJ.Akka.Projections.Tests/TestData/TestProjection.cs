@@ -52,6 +52,8 @@ public class TestProjection<TId>(
         ISetupProjection<SimpleIdContext<TId>, InMemoryProjectionContext<TId, TestDocument<TId>>> config)
     {
         var runFailures = new ConcurrentDictionary<TId, Dictionary<string, int>>();
+        // Track which StashEvent ids have already been stashed once (so replay is treated as unstash)
+        var stashedOnce = new ConcurrentDictionary<string, bool>();
 
         return config
             .On<Events<TId>.TransformToMultipleEvents>().Transform(evnt =>
@@ -73,6 +75,52 @@ public class TestProjection<TId>(
                 doc.AddHandledEvent(evnt.EventId);
                 return doc;
             }))
+            // StashEvent: on first encounter stash it and record; on replay record as unstashed
+            .On<Events<TId>.StashEvent>().WithId(x => x.DocId)
+            // First encounter: filter passes (not yet in stashedOnce), record + stash
+            .When(
+                filter => filter.WithEventFilter(evnt => !stashedOnce.ContainsKey(evnt.EventId)),
+                h => h
+                    .HandleWith((evnt, ctx, _, _) =>
+                    {
+                        stashedOnce.TryAdd(evnt.EventId, true);
+                        ctx.ModifyDocument(doc =>
+                        {
+                            doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                            doc.StashedEvents = doc.StashedEvents.Add(evnt.EventId);
+                            return doc;
+                        });
+                        return Task.CompletedTask;
+                    })
+                    .Stash())
+            // Replay: filter passes (already in stashedOnce), record as unstashed
+            .When(
+                filter => filter.WithEventFilter(evnt => stashedOnce.ContainsKey(evnt.EventId)),
+                h => h.HandleWith((evnt, ctx, _, _) =>
+                {
+                    ctx.ModifyDocument(doc =>
+                    {
+                        doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                        doc.AddHandledEvent(evnt.EventId);
+                        doc.UnstashedEvents = doc.UnstashedEvents.Add(evnt.EventId);
+                        return doc;
+                    });
+                    return Task.CompletedTask;
+                }))
+            // UnstashEvent: record it was processed, then trigger unstash of all stashed events
+            .On<Events<TId>.UnstashEvent>().WithId(x => x.DocId)
+            .WhenAny(h => h
+                .HandleWith((evnt, ctx, _, _) =>
+                {
+                    ctx.ModifyDocument(doc =>
+                    {
+                        doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                        doc.AddHandledEvent(evnt.EventId);
+                        return doc;
+                    });
+                    return Task.CompletedTask;
+                })
+                .UnStash())
             .On<Events<TId>.EventWithFilter>().WithId(x => x.DocId)
             .When(filter => filter.WithEventFilter(evnt => evnt.Filter()), h => h.HandleWith((evnt, _, _, _) =>
             {

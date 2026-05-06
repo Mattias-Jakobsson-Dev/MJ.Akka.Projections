@@ -52,6 +52,7 @@ public class When_waiting_for_group_to_finish_before_its_finished(
                     storageSetup.CreateProjectionStorage(),
                     projection.GetLoadProjectionContext(storageSetup),
                     new InMemoryPositionStorage(),
+                    storageSetup.CreateStashStorage(),
                     new ProjectionSequencerBaseFixture.TestProjectionFactory(),
                     null,
                     BatchEventBatchingStrategy.Default,

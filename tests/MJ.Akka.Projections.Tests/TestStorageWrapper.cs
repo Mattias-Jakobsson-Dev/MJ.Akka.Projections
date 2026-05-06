@@ -20,6 +20,11 @@ public class TestStorageWrapper(IStorageSetup innerSetup) : IStorageSetup
 
         return _positionStorage;
     }
+
+    public IProjectionStashStorage CreateStashStorage()
+    {
+        return innerSetup.CreateStashStorage();
+    }
     
     public IProjectionStorage ProjectionStorage => 
         _projectionStorage ?? throw new InvalidOperationException("Projection storage not created yet.");

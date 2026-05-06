@@ -39,6 +39,7 @@ public static class ProjectionSetupConfigurationExtensions
                             storageSetup.CreateProjectionStorage(),
                             projection.GetLoadProjectionContext(conf.StorageSetup),
                             storageSetup.CreatePositionStorage(),
+                            storageSetup.CreateStashStorage(),
                             conf.ProjectorFactory,
                             configuredProjection.RestartSettings,
                             configuredProjection.EventBatchingStrategy!,

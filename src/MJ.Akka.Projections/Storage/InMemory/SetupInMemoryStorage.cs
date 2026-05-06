@@ -16,6 +16,11 @@ public class SetupInMemoryStorage : IStorageSetup
         return new InMemoryPositionStorage();
     }
 
+    public IProjectionStashStorage CreateStashStorage()
+    {
+        return new InMemoryProjectionStashStorage();
+    }
+
     internal ReadOnlyMemory<byte>? LoadDocument(ProjectionContextId id)
     {
         if (!_documents.TryGetValue(id, out var value))

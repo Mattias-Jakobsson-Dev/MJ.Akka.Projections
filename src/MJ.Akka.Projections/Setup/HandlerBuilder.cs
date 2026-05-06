@@ -10,7 +10,7 @@ internal abstract class HandlerFilteringBuilderBase<TIdContext, TContext>
         Func<object, Task<object>> PrepareEvent,
         Func<object, TIdContext?> GetId,
         Func<object, Task<IImmutableList<object>>>? Transform,
-        Func<object, TContext, long?, CancellationToken, Task> Handle,
+        Func<object, TContext, long?, ProjectionStashContext, CancellationToken, Task> Handle,
         IProjectionFilter<TContext> Filter);
 
     public abstract Handler BuildHandler();
@@ -22,7 +22,7 @@ internal class HandlerFilteringBuilder<TIdContext, TContext, TEvent>(
     : HandlerFilteringBuilderBase<TIdContext, TContext>, ISetupHandlerFiltering<TIdContext, TContext, TEvent>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    private readonly List<(IProjectionFilter<TContext> Filter, List<Func<TEvent, TContext, long?, CancellationToken, Task>> Handlers)> _groups = [];
+    private readonly List<(IProjectionFilter<TContext> Filter, List<Func<TEvent, TContext, long?, ProjectionStashContext, CancellationToken, Task>> Handlers)> _groups = [];
 
     public ISetupEventRouting<TIdContext, TContext, TNewEvent> On<TNewEvent>()
         => parent.On<TNewEvent>();
@@ -50,7 +50,7 @@ internal class HandlerFilteringBuilder<TIdContext, TContext, TEvent>(
             Task.FromResult,
             evnt => getId((TEvent)evnt),
             null,
-            async (evnt, context, position, cancellationToken) =>
+            async (evnt, context, position, stashContext, cancellationToken) =>
             {
                 var shouldRun = groups
                     .Select(g => g.Filter.FilterEvent(evnt) && g.Filter.FilterResult(context))
@@ -60,7 +60,7 @@ internal class HandlerFilteringBuilder<TIdContext, TContext, TEvent>(
                 {
                     if (!shouldRun[i]) continue;
                     foreach (var handler in groups[i].Handlers)
-                        await handler((TEvent)evnt, context, position, cancellationToken);
+                        await handler((TEvent)evnt, context, position, stashContext, cancellationToken);
                 }
             },
             passAllFilter);
@@ -74,7 +74,7 @@ internal class HandlerFilteringBuilderWithData<TIdContext, TContext, TEvent, TDa
     : HandlerFilteringBuilderBase<TIdContext, TContext>, ISetupHandlerFiltering<TIdContext, TContext, TEvent, TData>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    private readonly List<(IProjectionFilter<TContext> Filter, List<Func<TEvent, TContext, TData, long?, CancellationToken, Task>> Handlers)> _groups = [];
+    private readonly List<(IProjectionFilter<TContext> Filter, List<Func<TEvent, TContext, TData, long?, ProjectionStashContext, CancellationToken, Task>> Handlers)> _groups = [];
 
     public ISetupEventRouting<TIdContext, TContext, TNewEvent> On<TNewEvent>()
         => parent.On<TNewEvent>();
@@ -113,7 +113,7 @@ internal class HandlerFilteringBuilderWithData<TIdContext, TContext, TEvent, TDa
             },
             null,
             // Handle: unwrap the envelope; both original event and data are available
-            async (evnt, context, position, cancellationToken) =>
+            async (evnt, context, position, stashContext, cancellationToken) =>
             {
                 var e = (EventEnvelope<TData>)evnt;
 
@@ -125,7 +125,7 @@ internal class HandlerFilteringBuilderWithData<TIdContext, TContext, TEvent, TDa
                 {
                     if (!shouldRun[i]) continue;
                     foreach (var handler in groups[i].Handlers)
-                        await handler((TEvent)e.OriginalEvent, context, e.Data, position, cancellationToken);
+                        await handler((TEvent)e.OriginalEvent, context, e.Data, position, stashContext, cancellationToken);
                 }
             },
             passAllFilter);
@@ -136,12 +136,32 @@ internal class EventHandlerSetup<TIdContext, TContext, TEvent>
     : ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    public List<Func<TEvent, TContext, long?, CancellationToken, Task>> Handlers { get; } = [];
+    public List<Func<TEvent, TContext, long?, ProjectionStashContext, CancellationToken, Task>> Handlers { get; } = [];
 
     public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> HandleWith(
         Func<TEvent, TContext, long?, CancellationToken, Task> handler)
     {
-        Handlers.Add(handler);
+        Handlers.Add((evnt, ctx, pos, _, ct) => handler(evnt, ctx, pos, ct));
+        return this;
+    }
+
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> Stash()
+    {
+        Handlers.Add((_, _, _, stashCtx, _) =>
+        {
+            stashCtx.RequestStash();
+            return Task.CompletedTask;
+        });
+        return this;
+    }
+
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> UnStash(uint? numberOfMessages = null)
+    {
+        Handlers.Add((_, _, _, stashCtx, _) =>
+        {
+            stashCtx.RequestUnstash(numberOfMessages);
+            return Task.CompletedTask;
+        });
         return this;
     }
 }
@@ -150,12 +170,32 @@ internal class EventHandlerSetupWithData<TIdContext, TContext, TEvent, TData>
     : ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    public List<Func<TEvent, TContext, TData, long?, CancellationToken, Task>> Handlers { get; } = [];
+    public List<Func<TEvent, TContext, TData, long?, ProjectionStashContext, CancellationToken, Task>> Handlers { get; } = [];
 
     public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> HandleWith(
         Func<TEvent, TContext, TData, long?, CancellationToken, Task> handler)
     {
-        Handlers.Add(handler);
+        Handlers.Add((evnt, ctx, data, pos, _, ct) => handler(evnt, ctx, data, pos, ct));
+        return this;
+    }
+
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> Stash()
+    {
+        Handlers.Add((_, _, _, _, stashCtx, _) =>
+        {
+            stashCtx.RequestStash();
+            return Task.CompletedTask;
+        });
+        return this;
+    }
+
+    public ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> UnStash(uint? numberOfMessages = null)
+    {
+        Handlers.Add((_, _, _, _, stashCtx, _) =>
+        {
+            stashCtx.RequestUnstash(numberOfMessages);
+            return Task.CompletedTask;
+        });
         return this;
     }
 }

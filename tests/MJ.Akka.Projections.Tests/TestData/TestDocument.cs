@@ -11,6 +11,8 @@ public class TestDocument<TId>
     public IImmutableDictionary<string, int> EventHandledOrder { get; set; } = ImmutableDictionary<string, int>.Empty;
     public IImmutableDictionary<string, int> PreviousEventFailures { get; set; } = ImmutableDictionary<string, int>.Empty;
     public IImmutableList<string> ReceivedData { get; set; } = ImmutableList<string>.Empty;
+    public IImmutableList<string> StashedEvents { get; set; } = ImmutableList<string>.Empty;
+    public IImmutableList<string> UnstashedEvents { get; set; } = ImmutableList<string>.Empty;
 
     public void AddHandledEvent(string eventId)
     {

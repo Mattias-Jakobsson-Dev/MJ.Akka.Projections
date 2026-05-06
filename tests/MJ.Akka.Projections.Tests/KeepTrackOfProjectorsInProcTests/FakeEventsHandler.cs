@@ -18,7 +18,8 @@ public class FakeEventsHandler : IHandleEventInProjection<SimpleIdContext<object
     public Task<bool> Handle(
         InMemoryProjectionContext<object, object> context, 
         object evnt, 
-        long position, 
+        long position,
+        ProjectionStashContext stashContext,
         CancellationToken cancellationToken)
     {
         return Task.FromResult(false);
