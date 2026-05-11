@@ -14,8 +14,8 @@ public class RavenDbProjectionContext<TDocument>(
     : ContextWithDocument<SimpleIdContext<string>, TDocument>(id, document), IRavenDbProjectionContext
     where TDocument : class
 {
-    private IImmutableDictionary<string, object> _metadata = metadata;
-    private IImmutableDictionary<string, IImmutableList<TimeSeriesRecord>> _addedTimeSeries = addedTimeSeries;
+    protected IImmutableDictionary<string, object> Metadata = metadata;
+    protected IImmutableDictionary<string, IImmutableList<TimeSeriesRecord>> AddedTimeSeries = addedTimeSeries;
 
     public RavenDbProjectionContext(
         SimpleIdContext<string> id,
@@ -30,17 +30,17 @@ public class RavenDbProjectionContext<TDocument>(
 
     public void SetMetadata(string key, object value)
     {
-        _metadata = _metadata.SetItem(key, value);
+        Metadata = Metadata.SetItem(key, value);
     }
 
     public object? GetMetadata(string key)
     {
-        return _metadata.GetValueOrDefault(key);
+        return Metadata.GetValueOrDefault(key);
     }
 
     public override IProjectionContext Freeze()
     {
-        return new RavenDbProjectionContext<TDocument>(Id, Document, _metadata, _addedTimeSeries);
+        return new RavenDbProjectionContext<TDocument>(Id, Document, Metadata, AddedTimeSeries);
     }
 
     public virtual IProjectionContext Reset()
@@ -48,7 +48,7 @@ public class RavenDbProjectionContext<TDocument>(
         return new RavenDbProjectionContext<TDocument>(
             Id,
             Document,
-            _metadata);
+            Metadata);
     }
 
     public override IProjectionContext MergeWith(IProjectionContext later)
@@ -56,14 +56,14 @@ public class RavenDbProjectionContext<TDocument>(
         if (later is RavenDbProjectionContext<TDocument> parsedLater)
         {
             var newMetadata = parsedLater
-                ._metadata.Aggregate(
-                    _metadata,
+                .Metadata.Aggregate(
+                    Metadata,
                     (current, item) => current
                         .SetItem(item.Key, item.Value));
 
             var newTimeSeries = parsedLater
-                ._addedTimeSeries
-                .AddRange(_addedTimeSeries);
+                .AddedTimeSeries
+                .AddRange(AddedTimeSeries);
 
             return new RavenDbProjectionContext<TDocument>(
                 Id,
@@ -79,18 +79,18 @@ public class RavenDbProjectionContext<TDocument>(
 
     public void AddTimeSeries(TimeSeriesInput input)
     {
-        _addedTimeSeries = _addedTimeSeries.SetItem(
+        AddedTimeSeries = AddedTimeSeries.SetItem(
             input.Name,
-            _addedTimeSeries.TryGetValue(input.Name, out var current)
+            AddedTimeSeries.TryGetValue(input.Name, out var current)
                 ? current.Add(new TimeSeriesRecord(input.Timestamp, input.Values, input.Tag))
                 : ImmutableList.Create(new TimeSeriesRecord(input.Timestamp, input.Values, input.Tag)));
     }
 
     object? IRavenDbProjectionContext.Document => Document;
-    IImmutableDictionary<string, object> IRavenDbProjectionContext.Metadata => _metadata;
+    IImmutableDictionary<string, object> IRavenDbProjectionContext.Metadata => Metadata;
 
     IImmutableDictionary<string, IImmutableList<TimeSeriesRecord>> IRavenDbProjectionContext.AddedTimeSeries =>
-        _addedTimeSeries;
+        AddedTimeSeries;
 
     public string GetDocumentId()
     {
