@@ -43,7 +43,7 @@ public class RavenDbProjectionContext<TDocument>(
         return new RavenDbProjectionContext<TDocument>(Id, Document, _metadata, _addedTimeSeries);
     }
 
-    public IProjectionContext Reset()
+    public virtual IProjectionContext Reset()
     {
         return new RavenDbProjectionContext<TDocument>(
             Id,
