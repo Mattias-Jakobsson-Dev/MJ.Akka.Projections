@@ -98,7 +98,7 @@ public class RavenDbProjectionContext<TDocument>(
     }
 }
 
-internal interface IRavenDbProjectionContext : IResettableProjectionContext
+public interface IRavenDbProjectionContext : IResettableProjectionContext
 {
     object? Document { get; }
     IImmutableDictionary<string, object> Metadata { get; }
