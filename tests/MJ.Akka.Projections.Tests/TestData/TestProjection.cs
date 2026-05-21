@@ -7,6 +7,7 @@ using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.Storage.InMemory;
+using MJ.Akka.Projections;
 
 namespace MJ.Akka.Projections.Tests.TestData;
 
@@ -251,15 +252,14 @@ public class TestProjection<TId>(
             });
     }
 
-    public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
-    {
-        return Source.From(() => events)
-            .SelectAsync(1, async evnt =>
-            {
-                if (fromPosition.HasValue && evnt.Position <= fromPosition && evnt is IEventWithAck eventWithAck)
-                    await eventWithAck.Ack(CancellationToken.None);
-                return evnt;
-            })
-            .Where(x => fromPosition == null || x.Position > fromPosition);
-    }
+    public override Task<IProjectionEventSource> GetSource() =>
+        Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(fromPosition =>
+            Source.From(() => events)
+                .SelectAsync(1, async evnt =>
+                {
+                    if (fromPosition.HasValue && evnt.Position <= fromPosition && evnt is IEventWithAck eventWithAck)
+                        await eventWithAck.Ack(CancellationToken.None);
+                    return evnt;
+                })
+                .Where(x => fromPosition == null || x.Position > fromPosition)));
 }

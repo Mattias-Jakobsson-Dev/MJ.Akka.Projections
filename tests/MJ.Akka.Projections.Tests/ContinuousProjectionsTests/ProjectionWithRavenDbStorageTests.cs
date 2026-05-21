@@ -11,6 +11,7 @@ using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.RavenDb;
 using MJ.Akka.Projections.Tests.Storage;
 using MJ.Akka.Projections.Tests.TestData;
+using MJ.Akka.Projections;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;
 using Xunit;
@@ -305,13 +306,11 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 storageFailures);
         }
         
-        public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
-        {
-            return Source.From(events
+        public override Task<IProjectionEventSource> GetSource() =>
+            Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(fromPosition => Source.From(events
                 .Select((x, i) => new EventWithPosition(x, i + 1))
                 .Where(x => fromPosition == null || x.Position > fromPosition)
-                .ToImmutableList());
-        }
+                .ToImmutableList())));
 
         public override long? GetInitialPosition()
         {

@@ -10,6 +10,7 @@ using JetBrains.Annotations;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.InMemory;
+using MJ.Akka.Projections;
 using Xunit;
 using Source = Akka.Streams.Dsl.Source;
 
@@ -194,9 +195,7 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
             return config;
         }
         
-        public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
-        {
-            return Source.From(ImmutableList<EventWithPosition>.Empty);
-        }
+        public override Task<IProjectionEventSource> GetSource() =>
+            Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.From(ImmutableList<EventWithPosition>.Empty)));
     }
 }

@@ -6,6 +6,7 @@ using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage.RavenDb;
+using MJ.Akka.Projections;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
@@ -41,11 +42,9 @@ public class RavenDbTestProjection : RavenDbProjection<RavenDbTestProjection.Tes
             .WhenDocumentExists(h => h.ModifyDocument((_, doc) => doc with { Version = doc.Version + 1 }));
     }
 
-    public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
-    {
-        return Source.From(_events
-            .Select((evnt, index) => new EventWithPosition(evnt, index + 1)));
-    }
+    public override Task<IProjectionEventSource> GetSource() =>
+        Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.From(_events
+            .Select((evnt, index) => new EventWithPosition(evnt, index + 1)))));
     
     [PublicAPI]
     public record TestDocument(string DocId, int Version);

@@ -6,6 +6,7 @@ using Shouldly;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
+using MJ.Akka.Projections;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;
 using Xunit;
@@ -101,9 +102,7 @@ public class RavenDbTimeSeriesProjectionStorageTests(RavenDbFixture fixture)
             return config;
         }
 
-        public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
-        {
-            return Source.From(ImmutableList<EventWithPosition>.Empty);
-        }
+        public override Task<IProjectionEventSource> GetSource() =>
+            Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.From(ImmutableList<EventWithPosition>.Empty)));
     }
 }

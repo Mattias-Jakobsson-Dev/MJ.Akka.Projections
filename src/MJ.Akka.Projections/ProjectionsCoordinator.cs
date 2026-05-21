@@ -71,6 +71,8 @@ public class ProjectionsCoordinator : ReceiveActor
 
             var self = Self;
 
+            var source = await _configuration.GetSource();
+
             _killSwitch = MaybeCreateRestartSource(() =>
                 {
                     _logger.Info("Starting projection source for {0} from {1}", _configuration.Name, latestPosition);
@@ -82,12 +84,10 @@ public class ProjectionsCoordinator : ReceiveActor
                     var cancellation = new CancellationTokenSource();
                     
                     _sequencer.Reset(cancellation.Token);
-                    
-                    var source = _configuration.StartSource(latestPosition);
 
                     var flow = _configuration
                         .ProjectionEventBatchingStrategy
-                        .Get(source)
+                        .Get(source.Start(latestPosition ?? _configuration.GetProjection().GetInitialPosition()))
                         .Select(x =>
                             new ProjectionSequencer.Commands.StartProjecting(x))
                         .Ask<ProjectionSequencer.Responses.StartProjectingResponse>(

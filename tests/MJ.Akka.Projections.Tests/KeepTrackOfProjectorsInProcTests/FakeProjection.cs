@@ -17,9 +17,14 @@ public class FakeProjection(TimeSpan delay)
     
     public TimeSpan ProjectionTimeout { get; } = TimeSpan.FromSeconds(5);
 
-    public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
+    public Task<IProjectionEventSource> GetSource()
     {
-        return Source.From(ImmutableList<EventWithPosition>.Empty);
+        return Task.FromResult<IProjectionEventSource>(new SimpleEventSource(_ => Source.From(ImmutableList<EventWithPosition>.Empty)));
+    }
+
+    private sealed class SimpleEventSource(Func<long?, Source<EventWithPosition, NotUsed>> startSource) : IProjectionEventSource
+    {
+        public Source<EventWithPosition, NotUsed> Start(long? fromPosition) => startSource(fromPosition);
     }
 
     public Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier)

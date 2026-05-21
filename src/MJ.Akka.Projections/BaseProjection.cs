@@ -1,6 +1,4 @@
-using Akka;
 using Akka.Actor;
-using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Configuration;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
@@ -18,9 +16,9 @@ public abstract class BaseProjection<TIdContext, TContext, TStorageSetup> : IPro
     public abstract ILoadProjectionContext<TIdContext, TContext> GetLoadProjectionContext(TStorageSetup storageSetup);
 
     public abstract TContext GetDefaultContext(TIdContext id);
-
-    public abstract Source<EventWithPosition, NotUsed> StartSource(long? fromPosition);
     
+    public abstract Task<IProjectionEventSource> GetSource();
+
     public virtual Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier)
     {
         return ProjectionsCoordinator.Init(configSupplier);

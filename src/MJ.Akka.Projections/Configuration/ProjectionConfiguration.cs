@@ -1,7 +1,5 @@
 using System.Collections.Immutable;
-using Akka;
 using Akka.Streams;
-using Akka.Streams.Dsl;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Storage;
 
@@ -123,9 +121,9 @@ public abstract class ProjectionConfiguration
         IImmutableDictionary<ProjectionContextId, IProjectionContext> contexts,
         CancellationToken cancellationToken = default);
     
-    public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
+    public Task<IProjectionEventSource> GetSource()
     {
-        return _projection.StartSource(fromPosition ?? _projection.GetInitialPosition());
+        return _projection.GetSource();
     }
     
     public abstract Task<IImmutableList<object>> TransformEvent(object evnt);

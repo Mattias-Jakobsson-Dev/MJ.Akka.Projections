@@ -18,11 +18,19 @@ public class TestProjection<TIdContext, TContext, TStorageSetup>(
     public string Name => projectionToTest.Name;
     public TimeSpan ProjectionTimeout => projectionToTest.ProjectionTimeout;
     
-    public Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
+    public Task<IProjectionEventSource> GetSource()
     {
-        return Source.FromEnumerator(() => events
-            .Select((evnt, index) => new EventWithPosition(evnt, index))
-            .GetEnumerator());
+        return Task.FromResult<IProjectionEventSource>(new TestProjectionEventSource(events));
+    }
+
+    private class TestProjectionEventSource(object[] events) : IProjectionEventSource
+    {
+        public Source<EventWithPosition, NotUsed> Start(long? fromPosition)
+        {
+            return Source.FromEnumerator(() => events
+                .Select((evnt, index) => new EventWithPosition(evnt, index))
+                .GetEnumerator());
+        }
     }
 
     public Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier)

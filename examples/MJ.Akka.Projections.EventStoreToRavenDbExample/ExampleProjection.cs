@@ -56,14 +56,22 @@ public class ExampleProjection(ActorSystem actorSystem)
             }));
     }
 
-    public override Source<EventWithPosition, NotUsed> StartSource(long? fromPosition)
+    public override Task<IProjectionEventSource> GetSource()
     {
-        return PersistenceQuery.Get(actorSystem)
-            .ReadJournalFor<EventStoreReadJournal>(
-                actorSystem.Settings.Config.GetString("akka.persistence.query.plugin"))
-            .CurrentAllEvents(fromPosition.HasValue ? Offset.Sequence(fromPosition.Value) : Offset.NoOffset())
-            .Select(evnt => new EventWithPosition(
-                evnt.Event,
-                evnt.Offset is Sequence seq ? seq.Value : null));
+        return Task.FromResult<IProjectionEventSource>(new ExampleProjectionEventSource(actorSystem));
+    }
+
+    private class ExampleProjectionEventSource(ActorSystem actorSystem) : IProjectionEventSource
+    {
+        public Source<EventWithPosition, NotUsed> Start(long? fromPosition)
+        {
+            return PersistenceQuery.Get(actorSystem)
+                .ReadJournalFor<EventStoreReadJournal>(
+                    actorSystem.Settings.Config.GetString("akka.persistence.query.plugin"))
+                .CurrentAllEvents(fromPosition.HasValue ? Offset.Sequence(fromPosition.Value) : Offset.NoOffset())
+                .Select(evnt => new EventWithPosition(
+                    evnt.Event,
+                    evnt.Offset is Sequence seq ? seq.Value : null));
+        }
     }
 }
