@@ -17,6 +17,9 @@ public static class ActorSystemExtensions
     {
         return actorSystem.Projections(
             configure,
-            new SetupRavenDbStorage(documentStore, insertOptions ?? new BulkInsertOptions()));
+            new SetupRavenDbStorage(documentStore, insertOptions ?? new BulkInsertOptions
+            {
+                SkipOverwriteIfUnchanged = true
+            }));
     }
 }
