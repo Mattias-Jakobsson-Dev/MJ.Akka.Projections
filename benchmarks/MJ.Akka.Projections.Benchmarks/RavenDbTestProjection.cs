@@ -1,12 +1,10 @@
 using System.Collections.Immutable;
-using Akka;
 using Akka.Streams.Dsl;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage.RavenDb;
-using MJ.Akka.Projections;
 
 namespace MJ.Akka.Projections.Benchmarks;
 
@@ -43,7 +41,7 @@ public class RavenDbTestProjection : RavenDbProjection<RavenDbTestProjection.Tes
     }
 
     public override Task<IProjectionEventSource> GetSource() =>
-        Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.From(_events
+        Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource((_, _) => Source.From(_events
             .Select((evnt, index) => new EventWithPosition(evnt, index + 1)))));
     
     [PublicAPI]

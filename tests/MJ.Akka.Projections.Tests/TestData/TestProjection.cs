@@ -1,13 +1,11 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using Akka;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Documents;
 using MJ.Akka.Projections.Storage.InMemory;
-using MJ.Akka.Projections;
 
 namespace MJ.Akka.Projections.Tests.TestData;
 
@@ -253,7 +251,7 @@ public class TestProjection<TId>(
     }
 
     public override Task<IProjectionEventSource> GetSource() =>
-        Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(fromPosition =>
+        Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource((fromPosition, _) =>
             Source.From(() => events)
                 .SelectAsync(1, async evnt =>
                 {

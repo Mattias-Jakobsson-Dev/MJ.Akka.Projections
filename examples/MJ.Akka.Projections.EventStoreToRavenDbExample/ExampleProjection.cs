@@ -63,7 +63,7 @@ public class ExampleProjection(ActorSystem actorSystem)
 
     private class ExampleProjectionEventSource(ActorSystem actorSystem) : IProjectionEventSource
     {
-        public Source<EventWithPosition, NotUsed> Start(long? fromPosition)
+        public Source<EventWithPosition, NotUsed> Start(long? fromPosition, CancellationToken cancellationToken)
         {
             return PersistenceQuery.Get(actorSystem)
                 .ReadJournalFor<EventStoreReadJournal>(

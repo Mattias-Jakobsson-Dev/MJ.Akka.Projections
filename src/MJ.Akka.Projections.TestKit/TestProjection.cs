@@ -25,7 +25,7 @@ public class TestProjection<TIdContext, TContext, TStorageSetup>(
 
     private class TestProjectionEventSource(object[] events) : IProjectionEventSource
     {
-        public Source<EventWithPosition, NotUsed> Start(long? fromPosition)
+        public Source<EventWithPosition, NotUsed> Start(long? fromPosition, CancellationToken cancellationToken)
         {
             return Source.FromEnumerator(() => events
                 .Select((evnt, index) => new EventWithPosition(evnt, index))

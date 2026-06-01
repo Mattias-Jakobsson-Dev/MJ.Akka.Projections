@@ -1,9 +1,7 @@
 using System.Collections.Immutable;
-using Akka;
 using Akka.Streams.Dsl;
 using AutoFixture;
 using Shouldly;
-using MJ.Akka.Projections;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage.InMemory;
@@ -82,7 +80,8 @@ public class WhenExistsAndChainedHandlerTests
                         return Task.CompletedTask;
                     }));
 
-            public override Task<IProjectionEventSource> GetSource() => Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.Empty<EventWithPosition>()));
+            public override Task<IProjectionEventSource> GetSource() => Task.FromResult<IProjectionEventSource>(
+                new SimpleProjectionEventSource((_, _) => Source.Empty<EventWithPosition>()));
         }
     }
 
@@ -149,7 +148,8 @@ public class WhenExistsAndChainedHandlerTests
                         return Task.CompletedTask;
                     }));
 
-            public override Task<IProjectionEventSource> GetSource() => Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.Empty<EventWithPosition>()));
+            public override Task<IProjectionEventSource> GetSource() => Task.FromResult<IProjectionEventSource>(
+                new SimpleProjectionEventSource((_, _) => Source.Empty<EventWithPosition>()));
         }
     }
 
@@ -207,7 +207,8 @@ public class WhenExistsAndChainedHandlerTests
                             return Task.CompletedTask;
                         }));
 
-            public override Task<IProjectionEventSource> GetSource() => Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.Empty<EventWithPosition>()));
+            public override Task<IProjectionEventSource> GetSource() => Task.FromResult<IProjectionEventSource>(
+                new SimpleProjectionEventSource((_, _) => Source.Empty<EventWithPosition>()));
         }
     }
 
@@ -275,7 +276,8 @@ public class WhenExistsAndChainedHandlerTests
                         return Task.CompletedTask;
                     }));
 
-            public override Task<IProjectionEventSource> GetSource() => Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.Empty<EventWithPosition>()));
+            public override Task<IProjectionEventSource> GetSource() => Task.FromResult<IProjectionEventSource>(
+                new SimpleProjectionEventSource((_, _) => Source.Empty<EventWithPosition>()));
         }
     }
 

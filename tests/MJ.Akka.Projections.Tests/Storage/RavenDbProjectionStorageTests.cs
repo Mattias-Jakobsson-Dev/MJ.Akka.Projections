@@ -1,12 +1,10 @@
 using System.Collections.Immutable;
-using Akka;
 using Akka.Streams.Dsl;
 using Shouldly;
 using MJ.Akka.Projections.Storage.RavenDb;
 using JetBrains.Annotations;
 using MJ.Akka.Projections.ProjectionIds;
 using MJ.Akka.Projections.Setup;
-using MJ.Akka.Projections;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;
 using Xunit;
@@ -84,6 +82,7 @@ public class RavenDbProjectionStorageTests(RavenDbFixture fixture)
         }
 
         public override Task<IProjectionEventSource> GetSource() =>
-            Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.From(ImmutableList<EventWithPosition>.Empty)));
+            Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(
+                (_, _) => Source.From(ImmutableList<EventWithPosition>.Empty)));
     }
 }

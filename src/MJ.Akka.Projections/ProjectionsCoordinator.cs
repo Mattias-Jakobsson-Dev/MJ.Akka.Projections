@@ -87,7 +87,9 @@ public class ProjectionsCoordinator : ReceiveActor
 
                     var flow = _configuration
                         .ProjectionEventBatchingStrategy
-                        .Get(source.Start(latestPosition ?? _configuration.GetProjection().GetInitialPosition()))
+                        .Get(source.Start(
+                            latestPosition ?? _configuration.GetProjection().GetInitialPosition(),
+                            cancellation.Token))
                         .Select(x =>
                             new ProjectionSequencer.Commands.StartProjecting(x))
                         .Ask<ProjectionSequencer.Responses.StartProjectingResponse>(

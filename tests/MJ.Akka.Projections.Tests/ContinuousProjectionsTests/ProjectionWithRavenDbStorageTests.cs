@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using Akka;
 using Akka.Streams.Dsl;
 using AutoFixture;
 using MJ.Akka.Projections.Documents;
@@ -11,7 +10,6 @@ using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.RavenDb;
 using MJ.Akka.Projections.Tests.Storage;
 using MJ.Akka.Projections.Tests.TestData;
-using MJ.Akka.Projections;
 using Raven.Client.Documents;
 using Raven.Client.Documents.BulkInsert;
 using Xunit;
@@ -307,7 +305,7 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
         }
         
         public override Task<IProjectionEventSource> GetSource() =>
-            Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(fromPosition => Source.From(events
+            Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource((fromPosition, _) => Source.From(events
                 .Select((x, i) => new EventWithPosition(x, i + 1))
                 .Where(x => fromPosition == null || x.Position > fromPosition)
                 .ToImmutableList())));

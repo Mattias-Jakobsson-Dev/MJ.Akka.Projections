@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using Akka;
 using Akka.Actor;
 using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Configuration;
@@ -19,12 +18,8 @@ public class FakeProjection(TimeSpan delay)
 
     public Task<IProjectionEventSource> GetSource()
     {
-        return Task.FromResult<IProjectionEventSource>(new SimpleEventSource(_ => Source.From(ImmutableList<EventWithPosition>.Empty)));
-    }
-
-    private sealed class SimpleEventSource(Func<long?, Source<EventWithPosition, NotUsed>> startSource) : IProjectionEventSource
-    {
-        public Source<EventWithPosition, NotUsed> Start(long? fromPosition) => startSource(fromPosition);
+        return Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource((_, _) 
+            => Source.From(ImmutableList<EventWithPosition>.Empty)));
     }
 
     public Props CreateCoordinatorProps(ISupplyProjectionConfigurations configSupplier)

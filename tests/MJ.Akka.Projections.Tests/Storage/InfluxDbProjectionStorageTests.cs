@@ -1,6 +1,4 @@
 using System.Collections.Immutable;
-using Akka;
-using Akka.Streams.Dsl;
 using MJ.Akka.Projections.Storage.InfluxDb;
 using Shouldly;
 using InfluxDB.Client;
@@ -10,7 +8,6 @@ using JetBrains.Annotations;
 using MJ.Akka.Projections.Setup;
 using MJ.Akka.Projections.Storage;
 using MJ.Akka.Projections.Storage.InMemory;
-using MJ.Akka.Projections;
 using Xunit;
 using Source = Akka.Streams.Dsl.Source;
 
@@ -196,6 +193,7 @@ public class InfluxDbProjectionStorageTests(InfluxDbDockerContainerFixture fixtu
         }
         
         public override Task<IProjectionEventSource> GetSource() =>
-            Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource(_ => Source.From(ImmutableList<EventWithPosition>.Empty)));
+            Task.FromResult<IProjectionEventSource>(new SimpleProjectionEventSource((_, _) 
+                => Source.From(ImmutableList<EventWithPosition>.Empty)));
     }
 }
