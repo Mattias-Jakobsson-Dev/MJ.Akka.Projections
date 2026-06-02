@@ -223,7 +223,21 @@ public class DocumentProjection : ReceiveActor, IWithStash
 
             activity?.SetStatus(ActivityStatusCode.Ok);
 
-            return new ProjectionResponse(projectedContext, new Messages.Acknowledge(result), unstashedEvents, newUnstashToken);
+            return new ProjectionResponse(projectedContext, new Messages.Acknowledge(result), unstashedEvents,
+                newUnstashToken);
+        }
+        catch (OperationCanceledException e)
+        {
+            if (!eventsWithAck.IsEmpty)
+            {
+                await Task.WhenAll(eventsWithAck
+                    .Select(x => x.Nack(e, cancellationToken)));
+            }
+
+            if (unstashToken != null)
+                await _configuration.StashStorage.NackUnstash(unstashToken, cancellationToken);
+
+            return new ProjectionResponse(null, new Messages.Reject(e), ImmutableList<EventWithPosition>.Empty, null);
         }
         catch (Exception e)
         {
