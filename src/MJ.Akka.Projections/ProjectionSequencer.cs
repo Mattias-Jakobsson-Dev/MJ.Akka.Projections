@@ -47,6 +47,7 @@ public class ProjectionSequencer : ReceiveActor
 
     private readonly ProjectionConfiguration _configuration;
     private readonly ILoggingAdapter _logger;
+    private readonly int _maxConcurrency;
 
     private IKeepTrackOfProjectors _projectorFactory;
 
@@ -55,12 +56,20 @@ public class ProjectionSequencer : ReceiveActor
             TaskCompletionSource<Messages.IProjectEventsResponse>
             task)>> _queues = new();
 
+    private readonly Queue<(
+        IProjectionIdContext id,
+        ImmutableList<EventWithPosition> events,
+        TaskCompletionSource<Messages.IProjectEventsResponse> promise)> _globalPendingQueue = new();
+
+    private int _activeRunCount;
+
     public ProjectionSequencer(ProjectionConfiguration configuration)
     {
         _logger = Context.GetLogger();
         
         _configuration = configuration;
         _projectorFactory = configuration.ProjectorFactory;
+        _maxConcurrency = configuration.ProjectionEventBatchingStrategy.GetParallelism();
 
         Become(NotStarted);
     }
@@ -86,12 +95,6 @@ public class ProjectionSequencer : ReceiveActor
         ReceiveAsync<Commands.StartProjecting>(async cmd =>
         {
             var self = Self;
-            
-            var tasks = new List<(
-                Guid groupId,
-                Guid taskId,
-                IProjectionIdContext? idContext,
-                Task<Messages.IProjectEventsResponse> task)>();
 
             var transformedEventGroups = await Task.WhenAll(cmd.Events.Select(async x =>
             {
@@ -161,16 +164,28 @@ public class ProjectionSequencer : ReceiveActor
                     TaskId = Guid.NewGuid()
                 });
 
+            var allTasks = new List<(
+                Guid groupId,
+                Guid taskId,
+                IProjectionIdContext? idContext,
+                Task<Messages.IProjectEventsResponse> task)>();
+
             foreach (var chunk in groupedEvents
                          .Chunk(_configuration.ProjectionEventBatchingStrategy.GetParallelism()))
             {
                 var groupId = Guid.NewGuid();
 
+                var chunkTasks = new List<(
+                    Guid groupId,
+                    Guid taskId,
+                    IProjectionIdContext? idContext,
+                    Task<Messages.IProjectEventsResponse> task)>();
+
                 foreach (var groupedEvent in chunk)
                 {
                     if (groupedEvent.Id == null)
                     {
-                        tasks.Add((
+                        chunkTasks.Add((
                             groupId,
                             groupedEvent.TaskId,
                             groupedEvent.Id,
@@ -183,11 +198,25 @@ public class ProjectionSequencer : ReceiveActor
                     {
                         _inprogressIds.Add(groupedEvent.Id);
 
-                        tasks.Add((
-                            groupId, 
-                            groupedEvent.TaskId, 
-                            groupedEvent.Id, 
-                            Run(groupedEvent.Id, groupedEvent.Events, cancellationToken)));
+                        if (_activeRunCount < _maxConcurrency)
+                        {
+                            _activeRunCount++;
+
+                            chunkTasks.Add((
+                                groupId,
+                                groupedEvent.TaskId,
+                                groupedEvent.Id,
+                                Run(groupedEvent.Id, groupedEvent.Events, cancellationToken)));
+                        }
+                        else
+                        {
+                            var promise = new TaskCompletionSource<Messages.IProjectEventsResponse>(
+                                TaskCreationOptions.RunContinuationsAsynchronously);
+
+                            _globalPendingQueue.Enqueue((groupedEvent.Id, groupedEvent.Events, promise));
+
+                            chunkTasks.Add((groupId, groupedEvent.TaskId, groupedEvent.Id, promise.Task));
+                        }
                     }
                     else
                     {
@@ -209,22 +238,24 @@ public class ProjectionSequencer : ReceiveActor
                             1,
                             new KeyValuePair<string, object?>("projection.name", _configuration.Name));
 
-                        tasks.Add((groupId, groupedEvent.TaskId, groupedEvent.Id, promise.Task));
+                        chunkTasks.Add((groupId, groupedEvent.TaskId, groupedEvent.Id, promise.Task));
                     }
                 }
 
+                allTasks.AddRange(chunkTasks);
+
                 _inProcessGroups[groupId] = WaitingGroup.NewGroup(
-                    tasks.Select(x => x.taskId).ToImmutableList());
+                    chunkTasks.Select(x => x.taskId).ToImmutableList());
 
                 ProjectionDiagnostics.ActiveGroups.Add(
                     1,
                     new KeyValuePair<string, object?>("projection.name", _configuration.Name));
 
                 ProjectionDiagnostics.ActiveTasks.Add(
-                    tasks.Count,
+                    chunkTasks.Count,
                     new KeyValuePair<string, object?>("projection.name", _configuration.Name));
 
-                foreach (var task in tasks)
+                foreach (var task in chunkTasks)
                 {
 #pragma warning disable CS4014 // This is intentional, we want the continuations to run without awaiting the tasks here
                     task
@@ -256,7 +287,7 @@ public class ProjectionSequencer : ReceiveActor
                 }
             }
 
-            Sender.Tell(new Responses.StartProjectingResponse(tasks.ToImmutableList()));
+            Sender.Tell(new Responses.StartProjectingResponse(allTasks.ToImmutableList()));
         });
 
         Receive<Commands.WaitForGroupToFinish>(cmd =>
@@ -331,6 +362,11 @@ public class ProjectionSequencer : ReceiveActor
                     item.task.TrySetResult(new Messages.Reject(new Exception("Projection was stopped")));
                 }
             }
+
+            while (_globalPendingQueue.TryDequeue(out var pending))
+            {
+                pending.promise.TrySetResult(new Messages.Reject(new Exception("Projection was stopped")));
+            }
             
             var projectors = await Task.WhenAll(_inprogressIds
                 .Select(id => _projectorFactory.GetProjector(id, _configuration)));
@@ -350,6 +386,10 @@ public class ProjectionSequencer : ReceiveActor
             _inProcessGroups.Clear();
             
             _queues.Clear();
+            
+            _globalPendingQueue.Clear();
+            
+            _activeRunCount = 0;
         }
     }
 
@@ -394,6 +434,7 @@ public class ProjectionSequencer : ReceiveActor
                         }
                     }, cancellationToken);
 
+                // Slot stays occupied – the same ID continues processing.
                 return;
             }
 
@@ -401,6 +442,31 @@ public class ProjectionSequencer : ReceiveActor
         }
 
         _inprogressIds.Remove(id);
+
+        // Free the concurrency slot and start the next globally-pending task if any.
+        _activeRunCount--;
+        StartNextFromGlobalPending(cancellationToken);
+    }
+
+    private void StartNextFromGlobalPending(CancellationToken cancellationToken)
+    {
+        while (_globalPendingQueue.Count > 0 && _activeRunCount < _maxConcurrency)
+        {
+            if (!_globalPendingQueue.TryDequeue(out var pending))
+                break;
+
+            _activeRunCount++;
+
+            Run(pending.id, pending.events, cancellationToken)
+                .ContinueWith(result =>
+                {
+                    if (result.IsCompletedSuccessfully)
+                        pending.promise.TrySetResult(result.Result);
+                    else
+                        pending.promise.TrySetException(
+                            result.Exception ?? new Exception("Failed projecting events"));
+                }, cancellationToken);
+        }
     }
 
     private async Task<Messages.IProjectEventsResponse> Run(
