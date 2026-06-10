@@ -89,6 +89,20 @@ internal static class ProjectionDiagnostics
             unit: "ms",
             description: "Duration of storing the latest position to position storage.");
 
+    // ── WithData metrics ─────────────────────────────────────────────────────
+
+    internal static readonly Histogram<double> WithDataFetchDuration =
+        Meter.CreateHistogram<double>(
+            "projection.withdata.fetch.duration",
+            unit: "ms",
+            description: "Duration of the getData call made by a WithData step, in milliseconds.");
+
+    internal static readonly Counter<long> WithDataFetchFailures =
+        Meter.CreateCounter<long>(
+            "projection.withdata.fetch.failures",
+            unit: "{failures}",
+            description: "Number of failures thrown by a WithData getData call.");
+
     // ── UpDownCounters ────────────────────────────────────────────────────────
 
     internal static readonly UpDownCounter<long> ActiveGroups =

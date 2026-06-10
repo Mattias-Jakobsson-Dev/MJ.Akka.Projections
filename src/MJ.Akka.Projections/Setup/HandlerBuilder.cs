@@ -102,8 +102,27 @@ internal class HandlerFilteringBuilderWithData<TIdContext, TContext, TEvent, TDa
             // PrepareEvent: fetch data once, pack it into an envelope that travels with the event
             async rawEvnt =>
             {
-                var data = await getData((TEvent)rawEvnt);
-                return new EventEnvelope<TData>(rawEvnt, data);
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var eventType = rawEvnt.GetType().Name;
+                try
+                {
+                    var data = await getData((TEvent)rawEvnt);
+                    return new EventEnvelope<TData>(rawEvnt, data);
+                }
+                catch
+                {
+                    ProjectionDiagnostics.WithDataFetchFailures.Add(
+                        1,
+                        new KeyValuePair<string, object?>("event.type", eventType));
+                    throw;
+                }
+                finally
+                {
+                    sw.Stop();
+                    ProjectionDiagnostics.WithDataFetchDuration.Record(
+                        sw.Elapsed.TotalMilliseconds,
+                        new KeyValuePair<string, object?>("event.type", eventType));
+                }
             },
             // GetId: unwrap the envelope and use the data that was already fetched
             evnt =>

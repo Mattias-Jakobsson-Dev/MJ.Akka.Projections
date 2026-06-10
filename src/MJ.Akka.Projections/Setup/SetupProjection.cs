@@ -28,7 +28,27 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
     {
         _transformers = _transformers.SetItem(typeof(TEvent), async evnt =>
         {
-            var data = await getData((TEvent)evnt);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var eventType = evnt.GetType().Name;
+            TData data;
+            try
+            {
+                data = await getData((TEvent)evnt);
+            }
+            catch
+            {
+                ProjectionDiagnostics.WithDataFetchFailures.Add(
+                    1,
+                    new KeyValuePair<string, object?>("event.type", eventType));
+                throw;
+            }
+            finally
+            {
+                sw.Stop();
+                ProjectionDiagnostics.WithDataFetchDuration.Record(
+                    sw.Elapsed.TotalMilliseconds,
+                    new KeyValuePair<string, object?>("event.type", eventType));
+            }
             return transform((TEvent)evnt, data);
         });
         return this;

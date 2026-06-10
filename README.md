@@ -301,6 +301,88 @@ ActorSystem.Projections(...)
 
 ---
 
+## OpenTelemetry
+
+The `MJ.Akka.Projections.OpenTelemetry` package adds zero-code-change observability to any projection system. It uses the standard .NET `ActivitySource` / `Meter` primitives so you can export to any OTEL-compatible backend (Prometheus, Jaeger, OTLP, …).
+
+### Installation
+
+```
+dotnet add package MJ.Akka.Projections.OpenTelemetry
+```
+
+### Wiring up
+
+#### 1. Enable instrumentation on the projection builder
+
+Call `.WithOpenTelemetry()` when constructing the projection system. This wraps the position storage with latency-recording decorators and activates all metric / trace emission:
+
+```csharp
+IProjectionsCoordinator coordinator = await actorSystem
+    .Projections(config => config
+        .WithProjection(new OrderProjection(actorSystem))
+        .WithOpenTelemetry(),   // ← add this
+        storageSetup)
+    .Start();
+```
+
+#### 2. Register with the OpenTelemetry SDK
+
+Use the convenience extension methods when configuring your OTEL pipeline:
+
+```csharp
+// Tracing
+services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing
+        .AddMJAkkaProjectionsInstrumentation()   // registers ActivitySource
+        .AddOtlpExporter())
+
+// Metrics
+    .WithMetrics(metrics => metrics
+        .AddMJAkkaProjectionsInstrumentation()   // registers Meter
+        .AddPrometheusExporter());
+```
+
+Or register the names manually if you prefer:
+
+```csharp
+tracerProviderBuilder.AddSource(ProjectionInstrumentation.ActivitySourceName);
+meterProviderBuilder.AddMeter(ProjectionInstrumentation.MeterName);
+```
+
+Both `ActivitySourceName` and `MeterName` are `"MJ.Akka.Projections"`.
+
+---
+
+### Emitted telemetry
+
+#### Traces
+
+| Span name | Description |
+|---|---|
+| `projection.handle_event` | One span per per-document event-handling cycle. Tagged with `projection.name` and the document id. |
+
+#### Metrics
+
+All metrics are tagged with `projection.name` where applicable.
+
+| Metric name | Type | Unit | Description |
+|---|---|---|---|
+| `projection.events.processed` | Counter | `{events}` | Total events successfully processed. |
+| `projection.events.failed` | Counter | `{events}` | Total events that failed processing. |
+| `projection.restarts` | Counter | `{restarts}` | Number of times the projection source has been restarted. |
+| `projection.position` | ObservableGauge | `{events}` | Latest committed event position for each projection. |
+| `projection.event_handling.duration` | Histogram | `ms` | Duration of a per-document event-handling cycle. |
+| `projection.position_storage.load.duration` | Histogram | `ms` | Duration of loading the latest position from storage. |
+| `projection.position_storage.store.duration` | Histogram | `ms` | Duration of storing the latest position to storage. |
+| `projection.withdata.fetch.duration` | Histogram | `ms` | Duration of each `WithData` `getData` call (tagged with `event.type`). |
+| `projection.withdata.fetch.failures` | Counter | `{failures}` | Number of failures thrown by a `WithData` `getData` call (tagged with `event.type`). |
+| `projection.groups.active` | UpDownCounter | `{groups}` | In-flight projection groups in the sequencer. |
+| `projection.tasks.active` | UpDownCounter | `{tasks}` | In-flight projection tasks in the sequencer. |
+| `projection.queue.depth` | UpDownCounter | `{batches}` | Event batches waiting in per-id sequencer queues. |
+
+---
+
 ## Custom Storage
 
 Implement `IStorageSetup` to plug in any storage backend:
