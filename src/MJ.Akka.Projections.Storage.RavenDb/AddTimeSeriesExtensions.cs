@@ -80,4 +80,83 @@ public static class AddTimeSeriesExtensions
             context.AddTimeSeries(timeSeriesInput);
         });
     }
+
+    // --- Multiple time series overloads ---
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
+        AddTimeSeries<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, IEnumerable<TimeSeriesInput>> getTimeSeries)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class =>
+        setup.AddTimeSeries((evnt, _, _, _) => Task.FromResult(getTimeSeries(evnt)));
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
+        AddTimeSeries<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, IEnumerable<TimeSeriesInput>> getTimeSeries)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class =>
+        setup.AddTimeSeries((evnt, context, _, _) => Task.FromResult(getTimeSeries(evnt, context)));
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
+        AddTimeSeries<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, DocumentHandlingMetaData<SimpleIdContext<string>>, IEnumerable<TimeSeriesInput>> getTimeSeries)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class =>
+        setup.AddTimeSeries((evnt, context, metadata, _) => Task.FromResult(getTimeSeries(evnt, context, metadata)));
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
+        AddTimeSeries<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, Task<IEnumerable<TimeSeriesInput>>> getTimeSeries)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class =>
+        setup.AddTimeSeries((evnt, _, _, _) => getTimeSeries(evnt));
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
+        AddTimeSeries<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, Task<IEnumerable<TimeSeriesInput>>> getTimeSeries)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class =>
+        setup.AddTimeSeries((evnt, context, _, _) => getTimeSeries(evnt, context));
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
+        AddTimeSeries<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, DocumentHandlingMetaData<SimpleIdContext<string>>, Task<IEnumerable<TimeSeriesInput>>> getTimeSeries)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class =>
+        setup.AddTimeSeries((evnt, context, metadata, _) => getTimeSeries(evnt, context, metadata));
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
+        AddTimeSeries<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, CancellationToken, Task<IEnumerable<TimeSeriesInput>>> getTimeSeries)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class =>
+        setup.AddTimeSeries((evnt, context, _, cancellationToken) => getTimeSeries(evnt, context, cancellationToken));
+
+    public static ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent>
+        AddTimeSeries<TIdContext, TDocument, TEvent>(
+            this ISetupEventHandlerForProjection<TIdContext, RavenDbProjectionContext<TDocument>, TEvent> setup,
+            Func<TEvent, RavenDbProjectionContext<TDocument>, DocumentHandlingMetaData<SimpleIdContext<string>>, CancellationToken, Task<IEnumerable<TimeSeriesInput>>>
+                getTimeSeries)
+        where TIdContext : IProjectionIdContext
+        where TDocument : class
+    {
+        return setup.HandleWith(async (evnt, context, position, cancellationToken) =>
+        {
+            var timeSeriesInputs = await getTimeSeries(
+                evnt,
+                context,
+                new DocumentHandlingMetaData<SimpleIdContext<string>>(context.Id, position),
+                cancellationToken);
+
+            foreach (var input in timeSeriesInputs)
+                context.AddTimeSeries(input);
+        });
+    }
 }
