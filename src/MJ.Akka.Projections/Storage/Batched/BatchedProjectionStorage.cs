@@ -28,16 +28,26 @@ internal class BatchedProjectionStorage : IProjectionStorage
                 parallelism,
                 async writes =>
                 {
-                    var cancelledWrite = writes
-                        .Where(x => x.CancellationToken.IsCancellationRequested)
+                    var writesWithCancellationStatus = writes
+                        .Select(x => new
+                        {
+                            IsCancelled = x.CancellationToken.IsCancellationRequested,
+                            Write = x
+                        })
+                        .ToImmutableList();
+                    
+                    var cancelledWrite = writesWithCancellationStatus
+                        .Where(x => x.IsCancelled)
+                        .Select(x => x.Write)
                         .Aggregate(
                             PendingWrite.Empty,
                             (current, pending) => current.MergeWith(pending));
 
                     cancelledWrite.Fail(new OperationCanceledException("Write was cancelled"));
 
-                    var write = writes
-                        .Where(x => !x.CancellationToken.IsCancellationRequested)
+                    var write = writesWithCancellationStatus
+                        .Where(x => !x.IsCancelled)
+                        .Select(x => x.Write)
                         .Aggregate(
                             PendingWrite.Empty,
                             (current, pending) => current.MergeWith(pending));
