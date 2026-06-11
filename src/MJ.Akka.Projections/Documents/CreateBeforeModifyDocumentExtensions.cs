@@ -384,7 +384,7 @@ public static class CreateBeforeModifyDocumentExtensions
         TEvent>(
         ISetupEventHandlerForProjection<TIdContext, TContext, TEvent> inner,
         bool documentWasCreated) 
-        : ISetupEventHandlerForProjection<TIdContext, TContext, TEvent>
+        : ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent>
         where TIdContext : IProjectionIdContext
         where TDocument : class
         where TContext : ContextWithDocument<TIdContext, TDocument>
@@ -417,7 +417,7 @@ public static class CreateBeforeModifyDocumentExtensions
         TData>(
         ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData> inner,
         bool documentWasCreated) 
-        : ISetupEventHandlerForProjection<TIdContext, TContext, TEvent, TData>
+        : ISetupEventHandlerForContextWithExistingDocument<TIdContext, TDocument, TContext, TEvent, TData>
         where TIdContext : IProjectionIdContext
         where TDocument : class
         where TContext : ContextWithDocument<TIdContext, TDocument>
