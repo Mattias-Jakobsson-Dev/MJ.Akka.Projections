@@ -205,6 +205,40 @@ public abstract class StashStorageTests
         afterAck2.ShouldBeEmpty(); // still in-process for id2
     }
 
+    // ── Document / record cleanup after full ack ────────────────────────────
+
+    [Fact]
+    public async Task AckUnstash_all_events_leaves_stash_permanently_empty()
+    {
+        var storage = GetStorage();
+        var id = NewId();
+
+        await storage.Stash(id, Events(1, 2, 3));
+        var (_, token) = await storage.Unstash(id);
+        await storage.AckUnstash(token);
+
+        // Stash is gone; a subsequent unstash must return nothing
+        var (afterAck, _) = await storage.Unstash(id);
+        afterAck.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task After_full_ack_new_events_can_be_stashed_again()
+    {
+        var storage = GetStorage();
+        var id = NewId();
+
+        await storage.Stash(id, Events(1, 2));
+        var (_, token) = await storage.Unstash(id);
+        await storage.AckUnstash(token);
+
+        // Re-stash new events and verify they are returned correctly
+        await storage.Stash(id, Events(10, 20));
+        var (events, _) = await storage.Unstash(id);
+        events.Count.ShouldBe(2);
+        events.Select(e => e.Position).ShouldBe([10, 20]);
+    }
+
     // ── In-process timeout / expiry ──────────────────────────────────────────
 
     [Fact]

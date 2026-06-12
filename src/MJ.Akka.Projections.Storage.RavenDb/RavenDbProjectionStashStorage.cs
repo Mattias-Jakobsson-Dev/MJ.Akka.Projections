@@ -93,6 +93,9 @@ public class RavenDbProjectionStashStorage(
         if (stash.InProcessCount == 0)
             stash.InProcessClaimedAt = null;
 
+        if (stash.Events.Count == 0)
+            session.Delete(stash);
+
         await session.SaveChangesAsync(cancellationToken);
     }
 
