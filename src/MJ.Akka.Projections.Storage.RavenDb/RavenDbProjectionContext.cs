@@ -53,28 +53,42 @@ public class RavenDbProjectionContext<TDocument>(
 
     public override IProjectionContext MergeWith(IProjectionContext later)
     {
-        if (later is RavenDbProjectionContext<TDocument> parsedLater)
-        {
-            var newMetadata = parsedLater
-                .Metadata.Aggregate(
-                    Metadata,
-                    (current, item) => current
-                        .SetItem(item.Key, item.Value));
+        if (later is not RavenDbProjectionContext<TDocument> parsedLater) 
+            return later;
+        
+        var allMetadataKeys = Metadata.Keys.Union(parsedLater.Metadata.Keys);
+        var newMetadata = allMetadataKeys.Aggregate(
+            ImmutableDictionary<string, object>.Empty,
+            (current, key) =>
+            {
+                var value = parsedLater.Metadata.TryGetValue(key, out var laterValue)
+                    ? laterValue
+                    : Metadata[key];
+                return current.Add(key, value);
+            });
 
-            var newTimeSeries = parsedLater
-                .AddedTimeSeries
-                .AddRange(AddedTimeSeries);
+        var allTimeSeriesKeys = AddedTimeSeries.Keys.Union(parsedLater.AddedTimeSeries.Keys);
+        var newTimeSeries = allTimeSeriesKeys.Aggregate(
+            ImmutableDictionary<string, IImmutableList<TimeSeriesRecord>>.Empty,
+            (current, key) =>
+            {
+                var laterList = parsedLater.AddedTimeSeries.TryGetValue(key, out var l)
+                    ? l
+                    : ImmutableList<TimeSeriesRecord>.Empty;
+                var earlierList = AddedTimeSeries.TryGetValue(key, out var e)
+                    ? e
+                    : ImmutableList<TimeSeriesRecord>.Empty;
+                var combined = laterList.AddRange(earlierList).Distinct().ToImmutableList();
+                return current.Add(key, combined);
+            });
 
-            return new RavenDbProjectionContext<TDocument>(
-                Id,
-                parsedLater.Document,
-                parsedLater.Document != null ? newMetadata : ImmutableDictionary<string, object>.Empty,
-                parsedLater.Document != null
-                    ? newTimeSeries
-                    : ImmutableDictionary<string, IImmutableList<TimeSeriesRecord>>.Empty);
-        }
-
-        return later;
+        return new RavenDbProjectionContext<TDocument>(
+            Id,
+            parsedLater.Document,
+            parsedLater.Document != null ? newMetadata : ImmutableDictionary<string, object>.Empty,
+            parsedLater.Document != null
+                ? newTimeSeries
+                : ImmutableDictionary<string, IImmutableList<TimeSeriesRecord>>.Empty);
     }
 
     public void AddTimeSeries(TimeSeriesInput input)

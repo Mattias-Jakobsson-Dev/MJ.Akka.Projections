@@ -42,7 +42,7 @@ public class InfluxDbTimeSeriesContext : IResettableProjectionContext
         {
             return new InfluxDbTimeSeriesContext(
                 Id,
-                Operations.AddRange(parsedLater.Operations));
+                Operations.AddRange(parsedLater.Operations).Distinct().ToImmutableList());
         }
 
         return later;
