@@ -64,7 +64,7 @@ public class RavenDbProjectionContext<TDocument>(
                 var value = parsedLater.Metadata.TryGetValue(key, out var laterValue)
                     ? laterValue
                     : Metadata[key];
-                return current.Add(key, value);
+                return current.SetItem(key, value);
             });
 
         var allTimeSeriesKeys = AddedTimeSeries.Keys.Union(parsedLater.AddedTimeSeries.Keys);
@@ -79,7 +79,7 @@ public class RavenDbProjectionContext<TDocument>(
                     ? e
                     : ImmutableList<TimeSeriesRecord>.Empty;
                 var combined = laterList.AddRange(earlierList).Distinct().ToImmutableList();
-                return current.Add(key, combined);
+                return current.SetItem(key, combined);
             });
 
         return new RavenDbProjectionContext<TDocument>(
