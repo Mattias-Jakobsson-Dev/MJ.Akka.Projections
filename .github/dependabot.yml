@@ -9,6 +9,10 @@ updates:
     labels:
       - "dependencies"
       - "nuget"
+    groups:
+      akka:
+        patterns:
+          - "Akka*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
