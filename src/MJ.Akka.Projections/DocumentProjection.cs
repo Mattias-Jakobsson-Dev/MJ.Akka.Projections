@@ -89,19 +89,43 @@ public class DocumentProjection : ReceiveActor, IWithStash
         });
     }
 
-    private void ProcessingEvents(IProjectionIdContext id, IActorRef from, CancellationTokenSource cancellation)
+    private void ProcessingEvents(
+        IProjectionIdContext id,
+        IActorRef from,
+        CancellationTokenSource cancellation,
+        Messages.IProjectEventsResponse? pendingOriginalResponse = null)
     {
         Receive<Commands.ProjectEvents>(_ => { Stash.Stash(); });
 
         Receive<ProjectionResponse>(cmd =>
         {
-            from.Tell(cmd.Response);
+            var responseToReport = pendingOriginalResponse ?? cmd.Response;
 
-            // Inject unstashed events as the next batch right after current stashed items
-            if (!cmd.UnstashedEvents.IsEmpty)
+            if (cmd is { IsSuccess: true, ProjectedContext: not null } && !cmd.UnstashedEvents.IsEmpty)
             {
-                Self.Tell(new Commands.ProjectEvents(id, cmd.UnstashedEvents, cmd.UnstashToken));
+                var newCancellation = new CancellationTokenSource();
+
+                // Strip IEventWithAck from the unstashed events: they were already acked
+                // during their original processing; re-acking them here (e.g. semaphore-based
+                // back-pressure in tests or production) would cause double-release errors.
+                var strippedEvents = cmd.UnstashedEvents
+                    .Select(e => new EventWithPosition(e.Event, e.Position))
+                    .ToImmutableList();
+
+                StartProjectingEvents(
+                        id,
+                        () => Task.FromResult(cmd.ProjectedContext),
+                        strippedEvents,
+                        cmd.UnstashToken,
+                        newCancellation.Token)
+                    .PipeTo(Self);
+
+                Become(() => ProcessingEvents(id, from, newCancellation, responseToReport));
+                return;
             }
+
+            var finalResponse = cmd.IsSuccess ? responseToReport : cmd.Response;
+            from.Tell(finalResponse);
 
             Stash.UnstashAll();
 
@@ -213,7 +237,6 @@ public class DocumentProjection : ReceiveActor, IWithStash
                     .Select(x => x.Ack(cancellationToken)));
             }
 
-            // Ack the unstash token for the events we just successfully processed
             if (unstashToken != null)
                 await _configuration.StashStorage.AckUnstash(unstashToken, cancellationToken);
 
