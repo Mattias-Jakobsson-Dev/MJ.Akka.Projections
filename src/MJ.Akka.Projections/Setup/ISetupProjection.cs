@@ -18,7 +18,7 @@ public interface ISetupEventRouting<TIdContext, TContext, TEvent> : ISetupProjec
     where TIdContext : IProjectionIdContext
     where TContext : IProjectionContext
 {
-    ISetupEventRouting<TIdContext, TContext, TEvent> Transform(Func<TEvent, IImmutableList<object>> transform);
+    ISetupEventRouting<TIdContext, TContext, TEvent> Transform(Func<TEvent, Task<IImmutableList<object>>> transform);
     
     ISetupHandlerFiltering<TIdContext, TContext, TEvent> WithId(Func<TEvent, TIdContext?> getId);
     
@@ -29,7 +29,7 @@ public interface ISetupEventRouting<TIdContext, TContext, TEvent, TData> : ISetu
     where TIdContext : IProjectionIdContext
     where TContext : IProjectionContext
 {
-    ISetupEventRouting<TIdContext, TContext, TEvent, TData> Transform(Func<TEvent, TData, IImmutableList<object>> transform);
+    ISetupEventRouting<TIdContext, TContext, TEvent, TData> Transform(Func<TEvent, TData, Task<IImmutableList<object>>> transform);
     
     ISetupHandlerFiltering<TIdContext, TContext, TEvent, TData> WithId(Func<TEvent, TData, TIdContext?> getId);
 }

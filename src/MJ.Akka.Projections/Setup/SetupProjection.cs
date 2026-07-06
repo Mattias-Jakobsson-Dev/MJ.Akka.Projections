@@ -16,15 +16,15 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
         => new EventRoutingBuilder<TIdContext, TContext, TEvent>(this);
 
     internal ISetupProjection<TIdContext, TContext> RegisterTransformer<TEvent>(
-        Func<TEvent, IImmutableList<object>> transform)
+        Func<TEvent, Task<IImmutableList<object>>> transform)
     {
-        _transformers = _transformers.SetItem(typeof(TEvent), evnt => Task.FromResult(transform((TEvent)evnt)));
+        _transformers = _transformers.SetItem(typeof(TEvent), evnt => transform((TEvent)evnt));
         return this;
     }
 
     internal ISetupProjection<TIdContext, TContext> RegisterTransformerWithData<TEvent, TData>(
         Func<TEvent, Task<TData>> getData,
-        Func<TEvent, TData, IImmutableList<object>> transform)
+        Func<TEvent, TData, Task<IImmutableList<object>>> transform)
     {
         _transformers = _transformers.SetItem(typeof(TEvent), async evnt =>
         {
@@ -49,7 +49,7 @@ internal class SetupProjection<TIdContext, TContext> : ISetupProjection<TIdConte
                     sw.Elapsed.TotalMilliseconds,
                     new KeyValuePair<string, object?>("event.type", eventType));
             }
-            return transform((TEvent)evnt, data);
+            return await transform((TEvent)evnt, data);
         });
         return this;
     }

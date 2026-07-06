@@ -223,7 +223,7 @@ internal class EventRoutingBuilder<TIdContext, TContext, TEvent>(SetupProjection
     : ISetupEventRouting<TIdContext, TContext, TEvent>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    public ISetupEventRouting<TIdContext, TContext, TEvent> Transform(Func<TEvent, IImmutableList<object>> transform)
+    public ISetupEventRouting<TIdContext, TContext, TEvent> Transform(Func<TEvent, Task<IImmutableList<object>>> transform)
     {
         parent.RegisterTransformer(transform);
         return this;
@@ -248,7 +248,7 @@ internal class EventRoutingBuilderWithData<TIdContext, TContext, TEvent, TData>(
     : ISetupEventRouting<TIdContext, TContext, TEvent, TData>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    public ISetupEventRouting<TIdContext, TContext, TEvent, TData> Transform(Func<TEvent, TData, IImmutableList<object>> transform)
+    public ISetupEventRouting<TIdContext, TContext, TEvent, TData> Transform(Func<TEvent, TData, Task<IImmutableList<object>>> transform)
     {
         parent.RegisterTransformerWithData(getData, transform);
         return this;
