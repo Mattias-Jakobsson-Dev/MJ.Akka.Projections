@@ -1159,6 +1159,77 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
         position2.ShouldBe(1);
     }
 
+    [Fact]
+    public async Task Transform_produces_secondary_event_and_original_event_is_also_handled()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+        var originalEventId = Fixture.Create<string>();
+        var transformedEventId = Fixture.Create<string>();
+
+        var events = ImmutableList.Create(
+            GetEventWithTransformAndHandler(id, originalEventId, transformedEventId));
+
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+        position.ShouldBe(1);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
+        context.Exists().ShouldBeTrue();
+
+        await VerifyTransformAndHandlerContext(id, context, originalEventId, transformedEventId);
+    }
+
+    [Fact]
+    public async Task Transform_with_data_produces_secondary_event_and_original_event_is_also_handled_with_data()
+    {
+        using var system = actorSystemHandler.StartNewActorSystem();
+
+        var id = Fixture.Create<TIdContext>();
+        var originalEventId = Fixture.Create<string>();
+        var transformedEventId = Fixture.Create<string>();
+        var data = Fixture.Create<string>();
+
+        var events = ImmutableList.Create(
+            GetEventWithDataTransformAndHandler(id, originalEventId, transformedEventId, data));
+
+        var projection = GetProjection(events, ImmutableList<StorageFailures>.Empty);
+        var storageSetup = CreateStorageSetup();
+        var loader = projection.GetLoadProjectionContext(storageSetup);
+        var storageWrapper = new TestStorageWrapper.Modifier();
+
+        var coordinator = await system
+            .Projections(config => Configure(config
+                    .WithProjection(projection))
+                .WithModifiedStorage(storageWrapper),
+                storageSetup)
+            .Start();
+
+        await coordinator.Get(projection.Name)!.WaitForCompletion(Timeout);
+
+        var position = await storageWrapper.Wrapper.PositionStorage.LoadLatestPosition(projection.Name);
+        position.ShouldBe(1);
+
+        var context = await loader.Load(id, projection.GetDefaultContext);
+        context.Exists().ShouldBeTrue();
+
+        await VerifyDataTransformAndHandlerContext(id, context, originalEventId, transformedEventId, data);
+    }
+
     protected virtual IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> Configure(
         IHaveConfiguration<ProjectionSystemConfiguration<TStorageSetup>> config)
     {
@@ -1190,7 +1261,26 @@ public abstract class BaseContinuousProjectionsTests<TIdContext, TContext, TStor
 
     protected abstract object GetEventWithDataForTransform(TIdContext documentId, string data, IImmutableList<object> transformTo);
 
+    protected abstract object GetEventWithTransformAndHandler(
+        TIdContext documentId, string originalEventId, string transformedEventId);
+
+    protected abstract object GetEventWithDataTransformAndHandler(
+        TIdContext documentId, string originalEventId, string transformedEventId, string data);
+
     protected abstract Task VerifyDataContext(TIdContext documentId, TContext context, string expectedData);
+
+    protected abstract Task VerifyTransformAndHandlerContext(
+        TIdContext documentId,
+        TContext context,
+        string originalEventId,
+        string transformedEventId);
+
+    protected abstract Task VerifyDataTransformAndHandlerContext(
+        TIdContext documentId,
+        TContext context,
+        string originalEventId,
+        string transformedEventId,
+        string data);
 
     protected abstract Task VerifyContext(
         TIdContext documentId,

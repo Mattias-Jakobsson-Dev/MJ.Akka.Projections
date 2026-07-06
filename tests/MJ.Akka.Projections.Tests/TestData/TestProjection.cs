@@ -247,7 +247,58 @@ public class TestProjection<TId>(
             {
                 if (data != evnt.Data) throw new Exception($"Data mismatch in Transform: expected '{evnt.Data}', got '{data}'");
                 return evnt.TransformTo.OfType<object>().ToImmutableList();
-            });
+            })
+            // TransformAndHandleEvent: transforms to SecondaryEvent AND handles the original event
+            .On<Events<TId>.TransformAndHandleEvent>()
+            .Transform(evnt =>
+                ImmutableList.Create<object>(new Events<TId>.SecondaryEvent(evnt.DocId, evnt.TransformedEventId)))
+            .WithId(x => x.DocId)
+            .WhenAny(h => h.HandleWith((evnt, ctx, _, _) =>
+            {
+                HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                ctx.ModifyDocument(doc =>
+                {
+                    doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                    doc.AddHandledEvent(evnt.EventId);
+                    return doc;
+                });
+                return Task.CompletedTask;
+            }))
+            // SecondaryEvent: produced by TransformAndHandleEvent and TransformAndHandleWithDataEvent transforms
+            .On<Events<TId>.SecondaryEvent>().WithId(x => x.DocId)
+            .WhenAny(h => h.HandleWith((evnt, ctx, _, _) =>
+            {
+                HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                ctx.ModifyDocument(doc =>
+                {
+                    doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                    doc.AddHandledEvent(evnt.EventId);
+                    return doc;
+                });
+                return Task.CompletedTask;
+            }))
+            // TransformAndHandleWithDataEvent: transforms to SecondaryEvent AND handles the original event with data
+            .On<Events<TId>.TransformAndHandleWithDataEvent>()
+            .WithData(evnt => Task.FromResult(evnt.Data))
+            .Transform((evnt, data) =>
+            {
+                if (data != evnt.Data) throw new Exception($"Data mismatch in Transform: expected '{evnt.Data}', got '{data}'");
+                return ImmutableList.Create<object>(new Events<TId>.SecondaryEvent(evnt.DocId, evnt.TransformedEventId));
+            })
+            .WithId((evnt, _) => new SimpleIdContext<TId>(evnt.DocId))
+            .WhenAny(h => h.HandleWith((evnt, ctx, data, _, _) =>
+            {
+                if (data != evnt.Data) throw new Exception($"Data mismatch in HandleWith: expected '{evnt.Data}', got '{data}'");
+                HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                ctx.ModifyDocument(doc =>
+                {
+                    doc ??= new TestDocument<TId> { Id = evnt.DocId };
+                    doc.AddHandledEvent(evnt.EventId);
+                    doc.ReceivedData = doc.ReceivedData.Add(data);
+                    return doc;
+                });
+                return Task.CompletedTask;
+            }));
     }
 
     public override Task<IProjectionEventSource> GetSource() =>

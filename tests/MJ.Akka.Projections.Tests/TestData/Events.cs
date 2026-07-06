@@ -46,6 +46,24 @@ public static class Events<TId>
     /// </summary>
     public record UnstashEvent(TId DocId, string EventId, uint? NumberToUnstash = null) : IEvent;
 
+    /// <summary>
+    /// Event that is both directly handled (recording <see cref="EventId"/>) AND transforms into a
+    /// <see cref="SecondaryEvent"/> (recording <see cref="TransformedEventId"/>).
+    /// </summary>
+    public record TransformAndHandleEvent(TId DocId, string EventId, string TransformedEventId) : IEvent;
+
+    /// <summary>
+    /// Secondary event produced by transforming a <see cref="TransformAndHandleEvent"/> or
+    /// <see cref="TransformAndHandleWithDataEvent"/>.
+    /// </summary>
+    public record SecondaryEvent(TId DocId, string EventId) : IEvent;
+
+    /// <summary>
+    /// Like <see cref="TransformAndHandleEvent"/> but also carries Data that is accessible both in the
+    /// handler of the original event and in the transform function.
+    /// </summary>
+    public record TransformAndHandleWithDataEvent(TId DocId, string EventId, string TransformedEventId, string Data) : IEvent;
+
     public interface IEvent
     {
         TId DocId { get; }

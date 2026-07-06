@@ -301,7 +301,19 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
 
     protected override object GetEventWithDataForTransform(SimpleIdContext<TId> documentId, string data, IImmutableList<object> transformTo)
     {
-        return new Events<TId>.EventWithDataTransform(documentId, Fixture.Create<string>(), data, transformTo.OfType<Events<TId>.IEvent>().ToImmutableList());
+        return new Events<TId>.EventWithDataTransform(documentId.Id, Fixture.Create<string>(), data, transformTo.OfType<Events<TId>.IEvent>().ToImmutableList());
+    }
+
+    protected override object GetEventWithTransformAndHandler(
+        SimpleIdContext<TId> documentId, string originalEventId, string transformedEventId)
+    {
+        return new Events<TId>.TransformAndHandleEvent(documentId.Id, originalEventId, transformedEventId);
+    }
+
+    protected override object GetEventWithDataTransformAndHandler(
+        SimpleIdContext<TId> documentId, string originalEventId, string transformedEventId, string data)
+    {
+        return new Events<TId>.TransformAndHandleWithDataEvent(documentId.Id, originalEventId, transformedEventId, data);
     }
 
     protected override Task VerifyDataContext(
@@ -310,6 +322,32 @@ public abstract class TestProjectionBaseContinuousTests<TId>(IHaveActorSystem ac
         string expectedData)
     {
         context.Document!.ReceivedData.ShouldContain(expectedData);
+        return Task.CompletedTask;
+    }
+
+    protected override Task VerifyTransformAndHandlerContext(
+        SimpleIdContext<TId> documentId,
+        InMemoryProjectionContext<TId, TestDocument<TId>> context,
+        string originalEventId,
+        string transformedEventId)
+    {
+        context.Document!.HandledEvents.ShouldContain(originalEventId);
+        context.Document!.HandledEvents.ShouldContain(transformedEventId);
+        context.Document!.HandledEvents.Count.ShouldBe(2);
+        return Task.CompletedTask;
+    }
+
+    protected override Task VerifyDataTransformAndHandlerContext(
+        SimpleIdContext<TId> documentId,
+        InMemoryProjectionContext<TId, TestDocument<TId>> context,
+        string originalEventId,
+        string transformedEventId,
+        string data)
+    {
+        context.Document!.HandledEvents.ShouldContain(originalEventId);
+        context.Document!.HandledEvents.ShouldContain(transformedEventId);
+        context.Document!.HandledEvents.Count.ShouldBe(2);
+        context.Document!.ReceivedData.ShouldContain(data);
         return Task.CompletedTask;
     }
 

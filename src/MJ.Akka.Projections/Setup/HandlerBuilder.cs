@@ -223,14 +223,23 @@ internal class EventRoutingBuilder<TIdContext, TContext, TEvent>(SetupProjection
     : ISetupEventRouting<TIdContext, TContext, TEvent>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    public ISetupProjection<TIdContext, TContext> Transform(Func<TEvent, IImmutableList<object>> transform)
-        => parent.RegisterTransformer(transform);
+    public ISetupEventRouting<TIdContext, TContext, TEvent> Transform(Func<TEvent, IImmutableList<object>> transform)
+    {
+        parent.RegisterTransformer(transform);
+        return this;
+    }
 
     public ISetupHandlerFiltering<TIdContext, TContext, TEvent> WithId(Func<TEvent, TIdContext?> getId)
         => parent.GetOrCreateHandlerBuilder(getId);
 
     public ISetupEventRouting<TIdContext, TContext, TEvent, TData> WithData<TData>(Func<TEvent, Task<TData>> getData)
         => new EventRoutingBuilderWithData<TIdContext, TContext, TEvent, TData>(getData, parent);
+
+    public ISetupEventRouting<TIdContext, TContext, TNewEvent> On<TNewEvent>()
+        => parent.On<TNewEvent>();
+
+    public IHandleEventInProjection<TIdContext, TContext> Build()
+        => parent.Build();
 }
 
 internal class EventRoutingBuilderWithData<TIdContext, TContext, TEvent, TData>(
@@ -239,10 +248,19 @@ internal class EventRoutingBuilderWithData<TIdContext, TContext, TEvent, TData>(
     : ISetupEventRouting<TIdContext, TContext, TEvent, TData>
     where TIdContext : IProjectionIdContext where TContext : IProjectionContext
 {
-    public ISetupProjection<TIdContext, TContext> Transform(Func<TEvent, TData, IImmutableList<object>> transform)
-        => parent.RegisterTransformerWithData(getData, transform);
+    public ISetupEventRouting<TIdContext, TContext, TEvent, TData> Transform(Func<TEvent, TData, IImmutableList<object>> transform)
+    {
+        parent.RegisterTransformerWithData(getData, transform);
+        return this;
+    }
 
     public ISetupHandlerFiltering<TIdContext, TContext, TEvent, TData> WithId(Func<TEvent, TData, TIdContext?> getId)
         => parent.GetOrCreateHandlerBuilderWithData(getData, getId);
+
+    public ISetupEventRouting<TIdContext, TContext, TNewEvent> On<TNewEvent>()
+        => parent.On<TNewEvent>();
+
+    public IHandleEventInProjection<TIdContext, TContext> Build()
+        => parent.Build();
 }
 

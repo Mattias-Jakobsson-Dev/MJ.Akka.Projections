@@ -94,12 +94,50 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
             transformTo.OfType<Events<string>.IEvent>().ToImmutableList());
     }
 
+    protected override object GetEventWithTransformAndHandler(
+        SimpleIdContext<string> documentId, string originalEventId, string transformedEventId)
+    {
+        return new Events<string>.TransformAndHandleEvent(documentId, originalEventId, transformedEventId);
+    }
+
+    protected override object GetEventWithDataTransformAndHandler(
+        SimpleIdContext<string> documentId, string originalEventId, string transformedEventId, string data)
+    {
+        return new Events<string>.TransformAndHandleWithDataEvent(documentId, originalEventId, transformedEventId, data);
+    }
+
     protected override Task VerifyDataContext(
         SimpleIdContext<string> documentId,
         RavenDbProjectionContext<TestDocument<string>> context,
         string expectedData)
     {
         context.Document!.ReceivedData.ShouldContain(expectedData);
+        return Task.CompletedTask;
+    }
+
+    protected override Task VerifyTransformAndHandlerContext(
+        SimpleIdContext<string> documentId,
+        RavenDbProjectionContext<TestDocument<string>> context,
+        string originalEventId,
+        string transformedEventId)
+    {
+        context.Document!.HandledEvents.ShouldContain(originalEventId);
+        context.Document!.HandledEvents.ShouldContain(transformedEventId);
+        context.Document!.HandledEvents.Count.ShouldBe(2);
+        return Task.CompletedTask;
+    }
+
+    protected override Task VerifyDataTransformAndHandlerContext(
+        SimpleIdContext<string> documentId,
+        RavenDbProjectionContext<TestDocument<string>> context,
+        string originalEventId,
+        string transformedEventId,
+        string data)
+    {
+        context.Document!.HandledEvents.ShouldContain(originalEventId);
+        context.Document!.HandledEvents.ShouldContain(transformedEventId);
+        context.Document!.HandledEvents.Count.ShouldBe(2);
+        context.Document!.ReceivedData.ShouldContain(data);
         return Task.CompletedTask;
     }
 
@@ -293,7 +331,54 @@ public class ProjectionWithRavenDbStorageTests(RavenDbFixture fixture, NormalTes
                 }))
                 .On<Events<string>.EventWithDataTransform>()
                 .WithData(evnt => Task.FromResult(evnt.Data))
-                .Transform((evnt, _) => evnt.TransformTo.OfType<object>().ToImmutableList());
+                .Transform((evnt, _) => evnt.TransformTo.OfType<object>().ToImmutableList())
+                // TransformAndHandleEvent: transforms to SecondaryEvent AND handles the original event
+                .On<Events<string>.TransformAndHandleEvent>()
+                .Transform(evnt =>
+                    ImmutableList.Create<object>(new Events<string>.SecondaryEvent(evnt.DocId, evnt.TransformedEventId)))
+                .WithId(x => x.DocId)
+                .WhenAny(h => h.HandleWith((evnt, ctx, _, _) =>
+                {
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                    ctx.ModifyDocument(doc =>
+                    {
+                        doc ??= new TestDocument<string> { Id = evnt.DocId };
+                        doc.AddHandledEvent(evnt.EventId);
+                        return doc;
+                    });
+                    return Task.CompletedTask;
+                }))
+                // SecondaryEvent: produced by TransformAndHandleEvent and TransformAndHandleWithDataEvent
+                .On<Events<string>.SecondaryEvent>().WithId(x => x.DocId)
+                .WhenAny(h => h.HandleWith((evnt, ctx, _, _) =>
+                {
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                    ctx.ModifyDocument(doc =>
+                    {
+                        doc ??= new TestDocument<string> { Id = evnt.DocId };
+                        doc.AddHandledEvent(evnt.EventId);
+                        return doc;
+                    });
+                    return Task.CompletedTask;
+                }))
+                // TransformAndHandleWithDataEvent: transforms to SecondaryEvent AND handles the original event with data
+                .On<Events<string>.TransformAndHandleWithDataEvent>()
+                .WithData(evnt => Task.FromResult(evnt.Data))
+                .Transform((evnt, _) =>
+                    ImmutableList.Create<object>(new Events<string>.SecondaryEvent(evnt.DocId, evnt.TransformedEventId)))
+                .WithId((evnt, _) => evnt.DocId)
+                .WhenAny(h => h.HandleWith((evnt, ctx, data, _, _) =>
+                {
+                    HandledEvents.AddOrUpdate(evnt.EventId, evnt, (_, _) => evnt);
+                    ctx.ModifyDocument(doc =>
+                    {
+                        doc ??= new TestDocument<string> { Id = evnt.DocId };
+                        doc.AddHandledEvent(evnt.EventId);
+                        doc.ReceivedData = doc.ReceivedData.Add(data);
+                        return doc;
+                    });
+                    return Task.CompletedTask;
+                }));
         }
         
         public override ILoadProjectionContext<SimpleIdContext<string>, RavenDbProjectionContext<TestDocument<string>>> 

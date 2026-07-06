@@ -14,21 +14,22 @@ public interface ISetupProjection<TIdContext, TContext>
     IHandleEventInProjection<TIdContext, TContext> Build();
 }
 
-public interface ISetupEventRouting<TIdContext, TContext, TEvent> where TIdContext : IProjectionIdContext
+public interface ISetupEventRouting<TIdContext, TContext, TEvent> : ISetupProjection<TIdContext, TContext>
+    where TIdContext : IProjectionIdContext
     where TContext : IProjectionContext
 {
-    ISetupProjection<TIdContext, TContext> Transform(Func<TEvent, IImmutableList<object>> transform);
+    ISetupEventRouting<TIdContext, TContext, TEvent> Transform(Func<TEvent, IImmutableList<object>> transform);
     
     ISetupHandlerFiltering<TIdContext, TContext, TEvent> WithId(Func<TEvent, TIdContext?> getId);
     
     ISetupEventRouting<TIdContext, TContext, TEvent, TData> WithData<TData>(Func<TEvent, Task<TData>> getData);
 }
 
-public interface ISetupEventRouting<TIdContext, TContext, TEvent, TData> 
+public interface ISetupEventRouting<TIdContext, TContext, TEvent, TData> : ISetupProjection<TIdContext, TContext>
     where TIdContext : IProjectionIdContext
     where TContext : IProjectionContext
 {
-    ISetupProjection<TIdContext, TContext> Transform(Func<TEvent, TData, IImmutableList<object>> transform);
+    ISetupEventRouting<TIdContext, TContext, TEvent, TData> Transform(Func<TEvent, TData, IImmutableList<object>> transform);
     
     ISetupHandlerFiltering<TIdContext, TContext, TEvent, TData> WithId(Func<TEvent, TData, TIdContext?> getId);
 }
