@@ -20,8 +20,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Akka" Version="1.5.69" />
-      <PackageReference Include="Akka.Streams" Version="1.5.68" />
+      <PackageReference Include="Akka" Version="1.5.70" />
+      <PackageReference Include="Akka.Streams" Version="1.5.70" />
       <PackageReference Include="JetBrains.Annotations" Version="2026.2.0">
           <PrivateAssets>all</PrivateAssets>
       </PackageReference>
